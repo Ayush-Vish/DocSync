@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DocSync — documents built with your agent</title><link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script></head>
+<body>
+<header class="topbar"><a href="/" class="brand">Doc<span>Sync</span><small>HTML documents, made together.</small></a><div id="owner-actions" hidden><button id="connect">Connect agent</button><button id="logout">Sign out</button></div></header>
+<main>
+  <section id="login-view" class="login" hidden><p class="eyebrow">YOUR DOCUMENT WORKSPACE</p><h1>Give your ideas<br>a better canvas.</h1><p>Write with your agent. Review HTML components.<br>Share a version you’re happy with.</p><form id="login-form"><label for="owner-key">Owner key</label><input id="owner-key" type="password" autocomplete="current-password" required placeholder="Your private workspace key"><button class="primary" type="submit">Open workspace →</button></form><p class="muted">Local setup: your key is in .local/owner-key.</p></section>
+  <section id="workspace" hidden>
+    <aside class="sidebar"><div class="sidebar-heading"><h2>Documents</h2><button id="new-document" aria-label="Create document">＋ New</button></div><div id="documents"></div><p class="sidebar-note">Private until you publish.<br>Your agent can update drafts.</p></aside>
+    <div class="editor-area">
+      <div id="empty"><p class="eyebrow">START WITH A DOCUMENT</p><h1>A canvas for your<br>next good idea.</h1><p>Create a document or connect your agent to generate your first components.</p><button id="empty-new" class="primary">Create document →</button></div>
+      <fieldset id="document-editor" hidden>
+        <div class="document-toolbar"><div><span class="eyebrow">PRIVATE DRAFT</span><span id="revision" class="muted"></span></div><div class="actions"><button id="refresh">Check updates</button><button id="history">History</button><button id="export-draft">Export draft</button><button id="save" class="primary">Save</button><button id="publish">Share</button></div></div>
+        <label class="sr-only" for="document-title">Document title</label><input id="document-title" class="title-input" maxlength="200" placeholder="Untitled document">
+        <div class="editor-grid"><section class="source"><div class="section-heading"><h2>Components</h2><button id="add-section">＋ Add section</button></div><div id="sections"></div><p class="muted">HTML + CSS only. Scripts, remote resources, and embeds are disabled.</p></section><section class="preview"><div class="section-heading"><h2>Live preview</h2><span class="muted">Drag frame corners to resize</span></div><div id="preview"></div></section></div>
+      </fieldset>
+    </div>
+  </section>
+  <section id="shared-view" hidden><p class="eyebrow">PUBLISHED DOCUMENT</p><h1 id="shared-title"></h1><p id="shared-revision" class="muted"></p><div id="shared-content"></div></section>
+  <div id="status" role="status" aria-live="polite"></div>
+</main>
+<dialog id="modal"><div class="modal-heading"><h2 id="modal-title"></h2><button id="modal-close" aria-label="Close dialog">✕</button></div><div id="modal-content"></div></dialog>
+</body></html>

@@ -1,0 +1,52 @@
+import puppeteer from 'puppeteer-core';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const origin = process.env.DOCSYNC_TEST_URL || 'http://127.0.0.1:8787';
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+const page = await browser.newPage(); const errors: string[] = [];
+page.on('pageerror', error => errors.push(String(error)));
+page.on('dialog', dialog => void dialog.accept());
+try {
+  await page.goto(origin); await page.waitForSelector('#owner-key', { visible: true });
+  await page.type('#owner-key', readFileSync('.local/owner-key', 'utf8').trim()); await page.click('#login-form button');
+  await page.waitForSelector('#workspace', { visible: true }); await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('#new-document')!.disabled);
+  await page.click('#new-document'); await page.waitForSelector('#document-editor', { visible: true });
+  await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('#save')!.disabled);
+  await page.$eval('#document-title', element => { (element as HTMLInputElement).value = 'Browser acceptance'; element.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.$eval('textarea[data-field=html]', element => { (element as HTMLTextAreaElement).value = '<h1>Safe preview</h1><p onclick="parent.stolen=true">Hello</p><script>parent.stolen=true</script><img src="https://evil.test/probe">'; element.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('#save'); await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'Saved a new revision.');
+  const frame = page.frames().find(f => f.url() === 'about:srcdoc'); assert.ok(frame);
+  assert.equal(await frame!.$eval('h1', node => node.textContent), 'Safe preview');
+  assert.equal(await frame!.$eval('h1', node => getComputedStyle(node).color), 'rgb(39, 108, 84)');
+  assert.equal(await page.evaluate(() => (window as any).stolen), undefined);
+  assert.equal(await frame!.evaluate(() => document.querySelector('script,img,[onclick]')), null);
+  assert.equal(await page.$eval('iframe', iframe => iframe.getAttribute('sandbox')), '');
+  await page.click('#publish'); await page.waitForSelector('#modal[open]'); await page.click('#modal-content button');
+  await page.waitForSelector('#modal-content input'); const link = await page.$eval('#modal-content input', node => (node as HTMLInputElement).value);
+  await page.click('#modal-close');
+  await page.$eval('#document-title', element => { (element as HTMLInputElement).value = 'Private unsaved'; element.dispatchEvent(new Event('input', { bubbles: true })); });
+  const agentEnv = readFileSync('.local/mcp.env', 'utf8'); const token = agentEnv.match(/DOCSYNC_AGENT_TOKEN=(.+)/)![1];
+  const listResponse = await fetch(`${origin}/api/documents`, { headers: { Authorization: `Bearer ${token}` } }); const docs = await listResponse.json() as any[];
+  const doc = docs.find(d => d.title === 'Browser acceptance'); assert.ok(doc);
+  const current = await (await fetch(`${origin}/api/documents/${doc.id}`, { headers: { Authorization: `Bearer ${token}` } })).json() as any;
+  const changed = await fetch(`${origin}/api/documents/${doc.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Agent update', sections: current.sections, expectedRevision: current.revision }) }); assert.equal(changed.status, 200);
+  await page.click('#save'); await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('Document changed.'));
+  assert.equal(await page.$eval('#document-title', element => (element as HTMLInputElement).value), 'Private unsaved');
+  const reader = await browser.createBrowserContext(); const readPage = await reader.newPage(); await readPage.goto(link); await readPage.waitForSelector('#shared-title');
+  await readPage.waitForFunction(() => document.querySelector('#shared-title')?.textContent === 'Browser acceptance');
+  assert.equal(await readPage.$eval('#owner-actions', node => (node as HTMLElement).hidden), true);
+  // A hostile srcdoc also stays isolated even if a sanitization regression lets script through.
+  await readPage.evaluate(() => { const f = document.createElement('iframe'); f.id = 'hostile-test'; f.setAttribute('sandbox', ''); f.srcdoc = '<script>parent.stolen=true</script><p>isolated</p>'; document.body.append(f); });
+  await readPage.waitForFunction(() => Boolean(document.querySelector('#hostile-test')));
+  assert.equal(await readPage.evaluate(() => (window as any).stolen), undefined);
+  await page.click('#refresh'); await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'Loaded the latest revision.');
+  assert.equal(await page.$eval('#document-title', node => (node as HTMLInputElement).value), 'Agent update');
+  await page.click('#publish'); await page.waitForSelector('#modal[open]'); await page.$$eval('#modal-content button', buttons => (buttons.find(b => b.textContent === 'Revoke link') as HTMLButtonElement).click());
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'Share link revoked.');
+  const revoked = await fetch(link.replace('/share/', '/api/shared/')); assert.equal(revoked.status, 404);
+  await page.setViewport({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  assert.deepEqual(errors, []);
+  console.log('Browser acceptance passed: editing, styled isolated preview, sharing, conflict preservation, refresh, revocation, mobile layout.');
+} finally { await browser.close(); }

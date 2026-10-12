@@ -1,0 +1,107 @@
+<div id="docsync-plan">
+  <h2>DocSync · MVP approval plan</h2>
+  <div class="viz-controls">
+    <label class="form-label">Generate components
+      <select id="ds-generation" class="form-select"><option value="workspace">Codex workspace · recommended</option><option value="server">Document server · requires AI API billing</option></select>
+    </label>
+    <label class="form-label">Component capabilities
+      <select id="ds-components" class="form-select"><option value="static">HTML + CSS · recommended MVP</option><option value="interactive">HTML + CSS + JavaScript · wider scope</option></select>
+    </label>
+  </div>
+  <div class="nav nav-pills" role="tablist" aria-label="Plan sections">
+    <button type="button" class="nav-link active" id="ds-arch-tab" role="tab" aria-controls="ds-arch" aria-selected="true">Architecture</button>
+    <button type="button" class="nav-link" id="ds-scope-tab" role="tab" aria-controls="ds-scope" aria-selected="false">User flow & scope</button>
+    <button type="button" class="nav-link" id="ds-proof-tab" role="tab" aria-controls="ds-proof" aria-selected="false">Delivery & proof</button>
+  </div>
+  <div id="ds-arch" role="tabpanel" aria-labelledby="ds-arch-tab">
+    <div class="ds-flow" role="group" aria-label="Document publishing flow">
+      <div><strong id="ds-producer">Codex workspace</strong><br><span id="ds-producer-detail">Generate HTML/CSS sections</span></div>
+      <span aria-hidden="true">↓</span>
+      <div><strong>Local MCP server</strong><br>Official TypeScript SDK · stdio · authenticated HTTPS to API</div>
+      <span aria-hidden="true">↓</span>
+      <div><strong>Cloudflare Worker + D1</strong><br>Validate · authorize · save revision · publish</div>
+      <span aria-hidden="true">↓</span>
+      <div><strong>Browser editor / shared reader</strong><br>Isolated component rendering</div>
+    </div>
+    <table class="table"><thead><tr><th>Layer</th><th>Proposed choice</th></tr></thead><tbody>
+      <tr><td>Editor</td><td>TypeScript + Vite; native browser UI, no rich-text framework</td></tr>
+      <tr><td>Backend</td><td>One Worker serving assets and API; D1 SQLite for documents and revisions</td></tr>
+      <tr><td>Document model</td><td>Title + ordered sections: stable ID, HTML, CSS; integer revision</td></tr>
+      <tr><td>Agent interface</td><td>list_documents, get_document, create_document, update_document; updates require expected revision</td></tr>
+      <tr><td>Access</td><td>Single owner; revocable scoped agent token; owner browser session; no credentials in share links</td></tr>
+      <tr><td>Publishing</td><td>Owner publishes a revision; unguessable read-only URL; revoke or republish explicitly</td></tr>
+      <tr><td>Hosting cost</td><td>Target $0 within Cloudflare free quotas, using workers.dev; limits must be checked before deployment</td></tr>
+    </tbody></table>
+    <div id="ds-cost" aria-live="polite">AI runs through your existing Codex access. Codex itself is not guaranteed free.</div>
+  </div>
+  <div id="ds-scope" role="tabpanel" aria-labelledby="ds-scope-tab" hidden>
+    <ol>
+      <li>Create a private document in the browser or through Codex.</li>
+      <li>Ask Codex to turn workspace information into HTML components.</li>
+      <li>Codex reads the current revision, generates sections, and saves through MCP.</li>
+      <li>Review rendered sections; edit HTML/CSS, reorder sections, and save. Refresh detects agent updates; dirty edits are preserved.</li>
+      <li>Publish the reviewed revision and copy its read-only link.</li>
+      <li>Continue private edits; republish when ready. Restore an earlier revision if needed.</li>
+    </ol>
+    <table class="table"><thead><tr><th>Included</th><th>Deferred</th></tr></thead><tbody>
+      <tr><td>HTML source editing + preview</td><td>Google Docs-style inline WYSIWYG editing</td></tr>
+      <tr><td>Headings, cards, tables, layouts, self-contained visuals</td><td>File uploads, external embeds, arbitrary npm packages</td></tr>
+      <tr><td>Single owner + link readers</td><td>Team accounts, comments, live co-editing</td></tr>
+      <tr><td>Codex MCP integration</td><td>Claude / Antigravity setup and compatibility testing</td></tr>
+      <tr><td>Revision conflicts + restore</td><td>Automatic merges and live collaboration protocols</td></tr>
+    </tbody></table>
+    <div id="ds-security" aria-live="polite">Render sections in sandboxed iframes with restrictive CSP. Block scripts, forms, external requests, and access to editor credentials; sanitize and size-limit input.</div>
+  </div>
+  <div id="ds-proof" role="tabpanel" aria-labelledby="ds-proof-tab" hidden>
+    <table class="table"><thead><tr><th>Build order</th><th>Acceptance condition</th></tr></thead><tbody>
+      <tr><td>1 · Storage + private API</td><td>Create/read/update succeeds; unauthorized requests fail; stale revisions cannot overwrite newer content.</td></tr>
+      <tr><td>2 · Browser editor</td><td>Edit and reorder sections, reload persisted content, preserve unsaved edits on conflicts, restore a revision.</td></tr>
+      <tr><td>3 · Codex MCP</td><td>Codex creates a document, reads it back, updates one section, and sees the resulting revision in the browser.</td></tr>
+      <tr><td>4 · Publish + isolation</td><td>Shared revision opens without login; private edits stay private; revoked links fail; hostile HTML cannot reach editor data.</td></tr>
+      <tr><td>5 · Free-tier deployment</td><td>Deploy Worker + D1, verify migrations, configure owner/agent secrets, and smoke-test the complete flow.</td></tr>
+    </tbody></table>
+    <div>Deliverables: runnable project, focused tests, schema migrations, Codex MCP configuration, deployment guide.</div>
+    <div>Deployment requires your Cloudflare account. No paid services or domain required by this design.</div>
+  </div>
+  <hr>
+  <div id="ds-selection" aria-live="polite">Selected: workspace generation · HTML/CSS · single owner · reviewed publishing.</div>
+  <div class="viz-row"><button type="button" id="ds-approve" class="btn btn-primary">Approve selected plan…</button><button type="button" id="ds-change" class="btn">Request changes…</button></div>
+  <div id="ds-status" class="text-small" aria-live="polite">Approval is sent to the conversation for confirmation.</div>
+</div>
+<style>
+#docsync-plan .ds-flow{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;margin:20px 0}
+#docsync-plan [role="tabpanel"]{padding-top:16px}
+#docsync-plan #ds-selection{margin-bottom:12px}
+#docsync-plan #ds-status{margin-top:8px}
+#docsync-plan strong{font-weight:500}
+#docsync-plan td{overflow-wrap:anywhere}
+</style>
+<script>
+(()=>{
+ const root=document.getElementById('docsync-plan');
+ const generation=root.querySelector('#ds-generation'), components=root.querySelector('#ds-components');
+ const defaults={generation:'workspace',components:'static'};
+ function choices(){return {generation:generation.value,components:components.value};}
+ function apply(s){generation.value=s?.generation==='server'?'server':'workspace';components.value=s?.components==='interactive'?'interactive':'static';render();}
+ function summary(){return (generation.value==='workspace'?'Codex workspace generation':'server generation with AI API billing')+' · '+(components.value==='static'?'HTML/CSS only':'HTML/CSS/JavaScript with additional isolation tests')+' · single owner · reviewed publishing';}
+ function render(){
+  const server=generation.value==='server', js=components.value==='interactive';
+  root.querySelector('#ds-producer').textContent=server?'Codex workspace → generation API':'Codex workspace';
+  root.querySelector('#ds-producer-detail').textContent=server?'Submit instructions; server calls an AI model':'Generate HTML/CSS sections';
+  root.querySelector('#ds-cost').textContent=server?'Server generation adds an AI provider, API credentials, background jobs, and usage costs. This conflicts with an entirely free system.':'AI runs through your existing Codex access. Codex itself is not guaranteed free.';
+  root.querySelector('#ds-security').textContent=js?'Additional scope: scripts run only inside opaque-origin sandboxed frames; never allow same-origin access, network, popups, or top navigation. Validate message boundaries and test malicious scripts. Arbitrary packages remain deferred.':'Render sections in sandboxed iframes with restrictive CSP. Block scripts, forms, external requests, and access to editor credentials; sanitize and size-limit input.';
+  root.querySelector('#ds-selection').textContent='Selected: '+summary()+'.';
+ }
+ function save(){const api=window.openai;if(api?.setWidgetState)api.setWidgetState({modelContent:choices(),privateContent:null}).catch(()=>{});}
+ generation.addEventListener('change',()=>{render();save();});components.addEventListener('change',()=>{render();save();});
+ async function send(approve){
+  const prompt=approve?'I approve the DocSync MVP plan with these selections: '+summary()+'. Implement the plan; ask before activating any paid service.':'I want to revise the DocSync MVP plan. Current selections: '+summary()+'. Ask me what I want changed; do not code yet.';
+  const status=root.querySelector('#ds-status');
+  if(!window.openai?.sendFollowUpMessage){status.textContent='Reply in chat: '+prompt;return;}
+  try{await window.openai.sendFollowUpMessage({prompt,title:approve?'Approve DocSync plan':'Revise DocSync plan'});status.textContent='Follow-up requested; confirm in the conversation.';}catch{status.textContent='Could not send. Reply in chat with your approval or requested changes.';}
+ }
+ root.querySelector('#ds-approve').addEventListener('click',()=>send(true));root.querySelector('#ds-change').addEventListener('click',()=>send(false));
+ apply(window.openai?.widgetState?.modelContent||defaults);
+ window.addEventListener('openai:set_globals',e=>{const s=e.detail?.globals?.widgetState;if(s)apply(s.modelContent||defaults);});
+})();
+</script>

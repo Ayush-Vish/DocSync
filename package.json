@@ -1,0 +1,36 @@
+{
+  "name": "docsync",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && node --experimental-strip-types scripts/dev.ts",
+    "start": "node --experimental-strip-types scripts/dev.ts",
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --experimental-test-isolation=none --test test/*.test.ts && npm run test:stdio",
+    "test:browser": "node --experimental-strip-types test/browser.ts",
+    "mcp": "node dist/docsync-mcp.cjs",
+    "setup": "node --experimental-strip-types scripts/setup.mjs",
+    "backup": "node --experimental-strip-types scripts/backup.ts",
+    "restore-backup": "node --experimental-strip-types scripts/restore-backup.ts",
+    "test:stdio": "sh test/mcp-stdio.sh && DOCSYNC_TEST_BUNDLE=1 sh test/mcp-stdio.sh",
+    "pretest": "npm run build",
+    "mcp:configure": "node --experimental-strip-types scripts/connect.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "css-tree": "2.3.1",
+    "parse5": "7.3.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "puppeteer-core": "24.40.0"
+  }
+}
