@@ -24,7 +24,7 @@ export function validateMcpConnection(origin: string, token: string): URL {
   return url;
 }
 
-export function createMcpServer(origin: string, token: string) {
+export function createMcpServer(origin: string, token: string, fetchApi: typeof fetch = fetch) {
   const url = validateMcpConnection(origin, token);
   const server = new McpServer(
     { name: "docsync", version: "0.3.0" },
@@ -35,7 +35,7 @@ export function createMcpServer(origin: string, token: string) {
   );
   async function request(path: string, method = "GET", data?: unknown) {
     try {
-      const response = await fetch(new URL(`/api${path}`, url), {
+      const response = await fetchApi(new URL(`/api${path}`, url), {
         method,
         redirect: "error",
         signal: AbortSignal.timeout(15_000),
@@ -50,7 +50,8 @@ export function createMcpServer(origin: string, token: string) {
         content: [{ type: "text" as const, text: JSON.stringify(result) }],
         isError: !response.ok,
       };
-    } catch {
+    } catch (error) {
+      console.error("DocSync MCP API request failed", error instanceof Error ? error.name : "UnknownError");
       return {
         content: [
           {

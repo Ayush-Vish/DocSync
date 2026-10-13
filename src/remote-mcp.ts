@@ -31,7 +31,7 @@ function loopbackRedirect(uri: string) {
   try { const u = new URL(uri); return u.protocol === "https:" || (u.protocol === "http:" && ["localhost","127.0.0.1","[::1]"].includes(u.hostname)); } catch { return false; }
 }
 
-export async function handleRemoteMcp(request: Request, env: Env): Promise<Response | null> {
+export async function handleRemoteMcp(request: Request, env: Env, fetchApi: typeof fetch): Promise<Response | null> {
   const url = new URL(request.url), path = url.pathname, origin = url.origin, method = request.method;
   if (path === "/.well-known/oauth-protected-resource" || path === "/.well-known/oauth-protected-resource/mcp")
     return json({ resource: `${origin}/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["docsync", "docsync:publish"] });
@@ -116,7 +116,7 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
   if(path==="/mcp") {
     const auth=request.headers.get("Authorization")||"", match=auth.match(/^Bearer ([a-f0-9]{64})$/); if(!match)return json({error:"unauthorized"},401,{"WWW-Authenticate":`Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp", scope="docsync"`});
     const valid=await env.DB.prepare("SELECT 1 AS ok FROM oauth_access_tokens WHERE token_hash=? AND expires_at>?").bind(await hash(match[1]),now()).first(); if(!valid)return json({error:"invalid_token"},401,{"WWW-Authenticate":`Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"`});
-    const server=createMcpServer(origin,match[1]),transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true}); await server.connect(transport); return transport.handleRequest(request);
+    const server=createMcpServer(origin,match[1],fetchApi),transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true}); await server.connect(transport); return transport.handleRequest(request);
   }
   return null;
 }

@@ -65,7 +65,10 @@ function revision(value: unknown): number {
 async function route(request: Request, env: Env): Promise<Response> {
   const { pathname } = new URL(request.url),
     method = request.method;
-  const remote = await handleRemoteMcp(request, env);
+  // Hosted MCP calls share the authenticated API handler without Worker self-fetch.
+  const remote = await handleRemoteMcp(request, env, (input, init) =>
+    handle(new Request(input, init), env),
+  );
   if (remote) return remote;
   if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
   if (

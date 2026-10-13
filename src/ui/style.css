@@ -1068,11 +1068,6 @@ blockquote {
   box-sizing: border-box;
 }
 
-.landing-page > * {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
 .landing-nav {
   position: sticky;
   top: 0;
@@ -1081,6 +1076,13 @@ blockquote {
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   width: 100%;
+  box-sizing: border-box;
+}
+
+.landing-nav > div {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
   box-sizing: border-box;
 }
 
@@ -1121,6 +1123,13 @@ blockquote {
   box-sizing: border-box;
 }
 
+#features {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
 .landing-features-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1128,7 +1137,6 @@ blockquote {
   max-width: 1080px;
   width: 100%;
   margin: 0 auto;
-  padding: 3rem 1.5rem;
   box-sizing: border-box;
 }
 
@@ -1146,11 +1154,18 @@ blockquote {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
 }
 
+#mcp-protocol {
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
 .landing-cta-banner {
-  max-width: 1080px;
-  width: auto;
-  margin: 2rem auto 5rem;
-  padding: 4rem 2rem;
+  max-width: 680px;
+  width: 100%;
+  margin: 3rem auto 5rem;
+  padding: 3.5rem 2rem;
   background: #f4f4f5;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 4px);
@@ -1164,6 +1179,13 @@ blockquote {
   background: #fafafa;
   margin-top: auto;
   width: 100%;
+  box-sizing: border-box;
+}
+
+.landing-footer > div {
+  max-width: 1080px;
+  width: 100%;
+  margin: 0 auto;
   box-sizing: border-box;
 }
 
@@ -1339,11 +1361,12 @@ blockquote {
 
   .landing-features-grid {
     grid-template-columns: 1fr;
-    padding: 1.5rem 1rem;
+    padding: 0;
     gap: 1rem;
   }
 
   .landing-cta-banner {
+    width: auto;
     margin: 2rem 1rem 3.5rem;
     padding: 2.75rem 1.5rem;
   }
@@ -1378,7 +1401,7 @@ blockquote {
 
   .landing-features-grid {
     grid-template-columns: 1fr;
-    padding: 1.5rem 0.875rem;
+    padding: 0;
     gap: 0.875rem;
   }
 
@@ -1387,6 +1410,7 @@ blockquote {
   }
 
   .landing-cta-banner {
+    width: auto;
     margin: 1.25rem 0.75rem 2.5rem;
     padding: 2rem 1rem;
   }
