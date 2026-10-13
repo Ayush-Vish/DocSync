@@ -38,6 +38,15 @@ import {
   Shield,
   Layers,
   Check,
+  Presentation,
+  Play,
+  ChevronLeft,
+  ChevronRight,
+  BarChart3,
+  LayoutGrid,
+  Columns,
+  Quote,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,35 +116,58 @@ const blank = (): Content => ({
     {
       id: crypto.randomUUID(),
       kind: "text",
-      html: "<p>Start writing…</p>",
+      html: "<p></p>",
       css: "",
     },
   ],
 });
 
+const VISUAL_TEMPLATES = [
+  {
+    name: "KPI Metrics",
+    icon: LayoutGrid,
+    html: `<article class="slide">\n  <span class="badge">KEY METRICS</span>\n  <h2>Performance Overview</h2>\n  <div class="metrics-grid">\n    <div class="card">\n      <span class="num">$2.4M</span>\n      <span class="label">ARR (+38% YoY)</span>\n    </div>\n    <div class="card">\n      <span class="num">99.98%</span>\n      <span class="label">Uptime SLA</span>\n    </div>\n    <div class="card">\n      <span class="num">14,200</span>\n      <span class="label">Active Teams</span>\n    </div>\n  </div>\n</article>`,
+    css: `.slide { padding: 36px; font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; text-transform: uppercase; }\nh2 { font-size: 26px; margin: 8px 0 24px; letter-spacing: -0.5px; color: #09090b; }\n.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }\n.card { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }\n.num { display: block; font-size: 30px; font-weight: 700; color: #09090b; margin-bottom: 4px; }\n.label { font-size: 12px; color: #71717a; font-weight: 500; }`,
+  },
+  {
+    name: "Bar Chart",
+    icon: BarChart3,
+    html: `<article class="slide">\n  <span class="badge">GROWTH TRAJECTORY</span>\n  <h2>Revenue by Quarter</h2>\n  <div class="chart">\n    <div class="col"><div class="bar" style="height: 35%"><span class="val">$1.2M</span></div><span class="sub">Q1</span></div>\n    <div class="col"><div class="bar" style="height: 55%"><span class="val">$1.8M</span></div><span class="sub">Q2</span></div>\n    <div class="col"><div class="bar" style="height: 75%"><span class="val">$2.4M</span></div><span class="sub">Q3</span></div>\n    <div class="col"><div class="bar highlight" style="height: 100%"><span class="val">$3.2M</span></div><span class="sub">Q4 (Est)</span></div>\n  </div>\n</article>`,
+    css: `.slide { padding: 36px; font-family: system-ui, sans-serif; background: #fff; border-radius: 12px; border: 1px solid #e4e4e7; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; }\nh2 { font-size: 26px; margin: 8px 0 28px; letter-spacing: -0.5px; color: #09090b; }\n.chart { display: flex; align-items: flex-end; gap: 20px; height: 180px; padding-bottom: 20px; border-bottom: 1px solid #e4e4e7; }\n.col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 8px; }\n.bar { width: 100%; background: #e4e4e7; border-radius: 6px; display: flex; align-items: flex-start; justify-content: center; padding-top: 8px; transition: all 0.3s; }\n.bar.highlight { background: #09090b; }\n.bar .val { font-size: 11px; font-weight: 600; color: #71717a; }\n.bar.highlight .val { color: #fff; }\n.col .sub { font-size: 12px; color: #71717a; font-weight: 500; }`,
+  },
+  {
+    name: "Comparison",
+    icon: Columns,
+    html: `<article class="slide">\n  <span class="badge">PRODUCT COMPARISON</span>\n  <h2>DocSync vs Traditional Tools</h2>\n  <div class="split">\n    <div class="box">\n      <h3>Standard Word Docs</h3>\n      <ul>\n        <li>Static text with no real-time code</li>\n        <li>Rigid table styling</li>\n        <li>No AI Agent MCP protocol</li>\n      </ul>\n    </div>\n    <div class="box highlight">\n      <h3>DocSync Presentation</h3>\n      <ul>\n        <li>HTML + CSS interactive components</li>\n        <li>Real-time live rendering</li>\n        <li>Autonomous MCP agent tools</li>\n      </ul>\n    </div>\n  </div>\n</article>`,
+    css: `.slide { padding: 36px; font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; }\nh2 { font-size: 26px; margin: 8px 0 24px; letter-spacing: -0.5px; color: #09090b; }\n.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }\n.box { background: #fff; padding: 22px; border-radius: 8px; border: 1px solid #e4e4e7; }\n.box.highlight { border-color: #09090b; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }\nh3 { font-size: 16px; margin: 0 0 12px; color: #09090b; }\nul { padding-left: 20px; margin: 0; font-size: 13px; color: #52525b; line-height: 1.7; }`,
+  },
+  {
+    name: "Quote Slide",
+    icon: Quote,
+    html: `<article class="slide quote-slide">\n  <blockquote>“Great presentations don’t just report numbers—they create a shared picture of what’s next.”</blockquote>\n  <p class="author">— Strategy & Operations, FY27</p>\n</article>`,
+    css: `.slide { padding: 50px 40px; font-family: system-ui, sans-serif; background: #09090b; color: #fff; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; min-height: 220px; }\nblockquote { font-size: 24px; font-style: italic; line-height: 1.45; margin: 0 0 16px; font-weight: 400; color: #fff; border: 0; padding: 0; }\n.author { font-size: 13px; color: #a1a1aa; font-weight: 500; margin: 0; }`,
+  },
+];
+
+function renderFrame(section: Content["sections"][number]): string {
+  try {
+    return frameSource(section);
+  } catch {
+    return `<!doctype html><html><body style="font:14px system-ui,sans-serif;color:#ef4444;padding:24px;">Invalid HTML or CSS syntax. Please check your markup.</body></html>`;
+  }
+}
+
 function Preview({ sections }: { sections: Content["sections"] }) {
   return (
     <div className="preview-stack">
-      {sections.map((section) => {
-        let source = "";
-        try {
-          source = frameSource(section);
-        } catch {
-          return (
-            <p role="alert" key={section.id} className="p-4 text-xs text-destructive">
-              This component has invalid HTML or CSS. Fix it in source view.
-            </p>
-          );
-        }
-        return (
-          <iframe
-            key={section.id}
-            title={`Preview: ${section.id}`}
-            sandbox=""
-            srcDoc={source}
-          />
-        );
-      })}
+      {sections.map((section) => (
+        <iframe
+          key={section.id}
+          title={`Preview: ${section.id}`}
+          sandbox=""
+          srcDoc={renderFrame(section)}
+        />
+      ))}
     </div>
   );
 }
@@ -170,136 +202,7 @@ function RichText({
 
   if (!editor) return null;
 
-  return (
-    <>
-      <div className="format-bar" aria-label="Text formatting" role="toolbar">
-        <button
-          type="button"
-          title="Undo"
-          aria-label="Undo"
-          onClick={() => editor.chain().focus().undo().run()}
-        >
-          <Undo2 className="w-3.5 h-3.5" />
-        </button>
-        <button
-          type="button"
-          title="Redo"
-          aria-label="Redo"
-          onClick={() => editor.chain().focus().redo().run()}
-        >
-          <Redo2 className="w-3.5 h-3.5" />
-        </button>
-        <span className="divider" />
-        <button
-          type="button"
-          className={editor.isActive("paragraph") ? "bg-accent text-accent-foreground" : ""}
-          onClick={() => editor.chain().focus().setParagraph().run()}
-        >
-          Text
-        </button>
-        <button
-          type="button"
-          className={editor.isActive("heading", { level: 1 }) ? "bg-accent text-accent-foreground" : ""}
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
-          }
-        >
-          H1
-        </button>
-        <button
-          type="button"
-          className={editor.isActive("heading", { level: 2 }) ? "bg-accent text-accent-foreground" : ""}
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }
-        >
-          H2
-        </button>
-        <span className="divider" />
-        <button
-          type="button"
-          aria-label="Bold"
-          className={editor.isActive("bold") ? "bg-accent text-accent-foreground font-bold" : ""}
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        >
-          <b>B</b>
-        </button>
-        <button
-          type="button"
-          aria-label="Italic"
-          className={editor.isActive("italic") ? "bg-accent text-accent-foreground italic" : ""}
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        >
-          <i>I</i>
-        </button>
-        <button
-          type="button"
-          aria-label="Underline"
-          className={editor.isActive("underline") ? "bg-accent text-accent-foreground underline" : ""}
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-        >
-          <u>U</u>
-        </button>
-        <button
-          type="button"
-          className={editor.isActive("bulletList") ? "bg-accent text-accent-foreground" : ""}
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          • List
-        </button>
-        <button
-          type="button"
-          className={editor.isActive("orderedList") ? "bg-accent text-accent-foreground" : ""}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          1. List
-        </button>
-        <button
-          type="button"
-          className={editor.isActive("blockquote") ? "bg-accent text-accent-foreground" : ""}
-          onClick={() => editor.chain().focus().toggleBlockquote().run()}
-        >
-          Quote
-        </button>
-        <button
-          type="button"
-          className={editor.isActive("table") ? "bg-accent text-accent-foreground" : ""}
-          onClick={() =>
-            editor
-              .chain()
-              .focus()
-              .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-              .run()
-          }
-        >
-          Table
-        </button>
-        {editor.isActive("table") && (
-          <>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().addRowAfter().run()}
-            >
-              + Row
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().addColumnAfter().run()}
-            >
-              + Column
-            </button>
-            <button
-              type="button"
-              onClick={() => editor.chain().focus().deleteTable().run()}
-            >
-              Remove table
-            </button>
-          </>
-        )}
-      </div>
-      <EditorContent editor={editor} />
-    </>
-  );
+  return <EditorContent editor={editor} />;
 }
 
 function App() {
@@ -320,6 +223,9 @@ function App() {
       location.pathname === "/connect" ? "connect" : "library",
     );
   const [preview, setPreview] = useState(false),
+    [editorMode, setEditorMode] = useState<"doc" | "slide">("doc"),
+    [activeSlide, setActiveSlide] = useState(0),
+    [fullscreen, setFullscreen] = useState(false),
     [history, setHistory] = useState<
       { revision: number; created_at: string }[] | null
     >(null),
@@ -328,6 +234,9 @@ function App() {
     [token, setToken] = useState(""),
     [allowPublishing, setAllowPublishing] = useState(true),
     [tokenActive, setTokenActive] = useState(false);
+  const safeActiveSlide = doc && doc.sections.length > 0
+    ? Math.min(activeSlide, doc.sections.length - 1)
+    : 0;
   const [claim, setClaim] = useState(() => {
     const code = new URLSearchParams(location.hash.slice(1)).get("claim");
     if (code && /^[a-f0-9]{64}$/.test(code)) {
@@ -395,6 +304,21 @@ function App() {
     return () => window.removeEventListener("beforeunload", guard);
   }, [dirty]);
 
+  useEffect(() => {
+    if (!fullscreen || !doc) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFullscreen(false);
+      } else if (e.key === "ArrowRight" || e.key === " " || e.key === "Enter") {
+        setActiveSlide((prev) => Math.min(doc.sections.length - 1, prev + 1));
+      } else if (e.key === "ArrowLeft") {
+        setActiveSlide((prev) => Math.max(0, prev - 1));
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullscreen, doc]);
+
   const leave = () =>
     !dirty ||
     confirm(
@@ -412,6 +336,7 @@ function App() {
     await run(async () => {
       const next = await api<Document>("/documents/" + id);
       setDoc(next);
+      setActiveSlide(0);
       setDirty(false);
       setShare("");
       setHistory(null);
@@ -1036,19 +961,53 @@ function App() {
                 onChange={(e) => change({ ...doc, title: e.target.value })}
               />
               <div className="actions flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center bg-muted p-0.5 rounded-md border border-border">
+                    <Button
+                      variant={editorMode === "doc" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2.5 font-medium shadow-none"
+                      onClick={() => setEditorMode("doc")}
+                    >
+                      <FileText className="w-3.5 h-3.5 mr-1" />
+                      Document
+                    </Button>
+                    <Button
+                      variant={editorMode === "slide" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 text-xs px-2.5 font-medium shadow-none"
+                      onClick={() => setEditorMode("slide")}
+                    >
+                      <Presentation className="w-3.5 h-3.5 mr-1" />
+                      Slides (PPT)
+                    </Button>
+                  </div>
+                  {editorMode === "slide" ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 text-xs px-2.5 font-medium"
+                      onClick={() => setFullscreen(true)}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1 fill-current" />
+                      Present
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2.5"
+                      disabled={busy}
+                      onClick={() => setPreview(!preview)}
+                    >
+                      {preview ? <Edit3Icon className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
+                      {preview ? "Edit" : "Preview"}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={busy}
-                    onClick={() => setPreview(!preview)}
-                  >
-                    {preview ? <Edit3Icon className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
-                    {preview ? "Edit" : "Preview"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    className="h-7 text-xs px-2.5"
                     disabled={busy}
                     onClick={() =>
                       void run(async () => {
@@ -1062,6 +1021,7 @@ function App() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="h-7 text-xs px-2.5"
                     disabled={busy}
                     onClick={exportDraft}
                   >
@@ -1207,6 +1167,280 @@ function App() {
             )}
             {preview ? (
               <Preview sections={doc.sections} />
+            ) : editorMode === "slide" ? (
+              <div className="slide-deck space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Slide {safeActiveSlide + 1} of {doc.sections.length}
+                    </span>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {doc.sections[safeActiveSlide]?.kind === "text"
+                        ? "Text Slide"
+                        : "Interactive Slide"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      disabled={safeActiveSlide === 0}
+                      onClick={() =>
+                        setActiveSlide((prev) => Math.max(0, prev - 1))
+                      }
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      disabled={safeActiveSlide >= doc.sections.length - 1}
+                      onClick={() =>
+                        setActiveSlide((prev) =>
+                          Math.min(doc.sections.length - 1, prev + 1),
+                        )
+                      }
+                    >
+                      Next
+                      <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-7 px-2.5 text-xs font-medium"
+                      onClick={() => setFullscreen(true)}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1 fill-current" />
+                      Present Fullscreen
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 16:9 Slide Canvas */}
+                <div className="slide-canvas">
+                  {doc.sections[safeActiveSlide] && (
+                    <iframe
+                      title={`Slide ${safeActiveSlide + 1}`}
+                      sandbox=""
+                      srcDoc={renderFrame(doc.sections[safeActiveSlide])}
+                    />
+                  )}
+                </div>
+
+                {/* Slide Thumbnail Strip */}
+                <div className="slide-strip">
+                  {doc.sections.map((s, idx) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`slide-thumb ${idx === safeActiveSlide ? "active" : ""}`}
+                      onClick={() => setActiveSlide(idx)}
+                    >
+                      <span className="slide-thumb-num">#{idx + 1}</span>
+                      <span className="slide-thumb-title">
+                        {s.kind === "text" ? "Text slide" : "Interactive"}
+                      </span>
+                    </button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-auto aspect-[16/9] w-[120px] shrink-0 border-dashed text-xs flex flex-col items-center justify-center gap-1"
+                    disabled={doc.sections.length >= 40}
+                    onClick={() => {
+                      const newSection = {
+                        id: crypto.randomUUID(),
+                        kind: "html" as const,
+                        html: `<article class="slide">\n  <h2>New Slide</h2>\n  <p>Add presentation content here.</p>\n</article>`,
+                        css: `.slide { padding: 40px; font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; }\nh2 { font-size: 26px; margin: 0 0 12px; color: #09090b; }\np { font-size: 15px; color: #71717a; }`,
+                      };
+                      change({ ...doc, sections: [...doc.sections, newSection] });
+                      setActiveSlide(doc.sections.length);
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Slide</span>
+                  </Button>
+                </div>
+
+                {/* Interactive Slide Quick Templates */}
+                <div className="pt-2">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                    Add Interactive Visualization Template
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {VISUAL_TEMPLATES.map((tmpl) => {
+                      const Icon = tmpl.icon;
+                      return (
+                        <Button
+                          key={tmpl.name}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs font-normal"
+                          disabled={doc.sections.length >= 40}
+                          onClick={() => {
+                            const newSection = {
+                              id: crypto.randomUUID(),
+                              kind: "html" as const,
+                              html: tmpl.html,
+                              css: tmpl.css,
+                            };
+                            change({
+                              ...doc,
+                              sections: [...doc.sections, newSection],
+                            });
+                            setActiveSlide(doc.sections.length);
+                          }}
+                        >
+                          <Icon className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                          {tmpl.name}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Active Slide Editor */}
+                {doc.sections[safeActiveSlide] && (
+                  <article className="section-card mt-4">
+                    <header>
+                      <span className="font-medium">
+                        Edit Slide #{safeActiveSlide + 1}{" "}
+                        <small>
+                          {doc.sections[safeActiveSlide].kind === "text"
+                            ? "Text"
+                            : "HTML / CSS component"}
+                        </small>
+                      </span>
+                      <div className="actions flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          aria-label={`Move slide ${safeActiveSlide + 1} up`}
+                          disabled={safeActiveSlide === 0}
+                          onClick={() => {
+                            const sections = [...doc.sections];
+                            [
+                              sections[safeActiveSlide - 1],
+                              sections[safeActiveSlide],
+                            ] = [
+                              sections[safeActiveSlide],
+                              sections[safeActiveSlide - 1],
+                            ];
+                            change({ ...doc, sections });
+                            setActiveSlide(safeActiveSlide - 1);
+                          }}
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          aria-label={`Move slide ${safeActiveSlide + 1} down`}
+                          disabled={safeActiveSlide === doc.sections.length - 1}
+                          onClick={() => {
+                            const sections = [...doc.sections];
+                            [
+                              sections[safeActiveSlide + 1],
+                              sections[safeActiveSlide],
+                            ] = [
+                              sections[safeActiveSlide],
+                              sections[safeActiveSlide + 1],
+                            ];
+                            change({ ...doc, sections });
+                            setActiveSlide(safeActiveSlide + 1);
+                          }}
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          disabled={doc.sections.length === 1}
+                          onClick={() => {
+                            if (confirm("Remove this slide?")) {
+                              const filtered = doc.sections.filter(
+                                (_, idx) => idx !== safeActiveSlide,
+                              );
+                              change({ ...doc, sections: filtered });
+                              setActiveSlide(Math.max(0, safeActiveSlide - 1));
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    </header>
+                    {doc.sections[safeActiveSlide].kind === "text" ? (
+                      <RichText
+                        key={
+                          doc.sections[safeActiveSlide].id +
+                          "-" +
+                          doc.revision
+                        }
+                        disabled={busy}
+                        html={doc.sections[safeActiveSlide].html}
+                        onChange={(html) =>
+                          change({
+                            ...doc,
+                            sections: doc.sections.map((s, idx) =>
+                              idx === safeActiveSlide ? { ...s, html } : s,
+                            ),
+                          })
+                        }
+                      />
+                    ) : (
+                      <div className="component-editor">
+                        <details open>
+                          <summary>Edit HTML & CSS (Real-time)</summary>
+                          <label>
+                            HTML
+                            <textarea
+                              spellCheck={false}
+                              value={doc.sections[safeActiveSlide].html}
+                              onChange={(e) =>
+                                change({
+                                  ...doc,
+                                  sections: doc.sections.map((s, idx) =>
+                                    idx === safeActiveSlide
+                                      ? { ...s, html: e.target.value }
+                                      : s,
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
+                            CSS
+                            <textarea
+                              spellCheck={false}
+                              value={doc.sections[safeActiveSlide].css}
+                              onChange={(e) =>
+                                change({
+                                  ...doc,
+                                  sections: doc.sections.map((s, idx) =>
+                                    idx === safeActiveSlide
+                                      ? { ...s, css: e.target.value }
+                                      : s,
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
+                        </details>
+                      </div>
+                    )}
+                  </article>
+                )}
+              </div>
             ) : (
               doc.sections.map((section, index) => (
                 <article className="section-card" key={section.id}>
@@ -1329,50 +1563,88 @@ function App() {
                 </article>
               ))
             )}
-            {!preview && (
-              <div className="add-section">
-                <Button
-                  variant="outline"
-                  className="border-dashed text-xs h-8"
-                  disabled={doc.sections.length >= 40}
-                  onClick={() =>
-                    change({
-                      ...doc,
-                      sections: [
-                        ...doc.sections,
-                        {
-                          id: crypto.randomUUID(),
-                          kind: "text",
-                          html: "<p></p>",
-                          css: "",
-                        },
-                      ],
-                    })
-                  }
-                >
-                  ＋ Text section
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-dashed text-xs h-8"
-                  disabled={doc.sections.length >= 40}
-                  onClick={() =>
-                    change({
-                      ...doc,
-                      sections: [
-                        ...doc.sections,
-                        {
-                          id: crypto.randomUUID(),
-                          kind: "html",
-                          html: "<section><h2>A new perspective</h2><p>Add your component here.</p></section>",
-                          css: "section{padding:24px;background:#f5f6f0;border-radius:12px}",
-                        },
-                      ],
-                    })
-                  }
-                >
-                  ＋ HTML component
-                </Button>
+            {!preview && editorMode === "doc" && (
+              <div className="space-y-4 mt-6">
+                <div className="add-section">
+                  <Button
+                    variant="outline"
+                    className="border-dashed text-xs h-8"
+                    disabled={doc.sections.length >= 40}
+                    onClick={() =>
+                      change({
+                        ...doc,
+                        sections: [
+                          ...doc.sections,
+                          {
+                            id: crypto.randomUUID(),
+                            kind: "text",
+                            html: "<p></p>",
+                            css: "",
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    ＋ Text section
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-dashed text-xs h-8"
+                    disabled={doc.sections.length >= 40}
+                    onClick={() =>
+                      change({
+                        ...doc,
+                        sections: [
+                          ...doc.sections,
+                          {
+                            id: crypto.randomUUID(),
+                            kind: "html",
+                            html: "<section><h2>A new perspective</h2><p>Add your component here.</p></section>",
+                            css: "section{padding:24px;background:#f5f6f0;border-radius:12px}",
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    ＋ HTML component
+                  </Button>
+                </div>
+                <div className="p-3 bg-muted/40 rounded-lg border border-dashed border-border/80">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
+                    Quick-Insert Interactive Visualizations
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {VISUAL_TEMPLATES.map((tmpl) => {
+                      const Icon = tmpl.icon;
+                      return (
+                        <Button
+                          key={tmpl.name}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs font-normal bg-background"
+                          disabled={doc.sections.length >= 40}
+                          onClick={() =>
+                            change({
+                              ...doc,
+                              sections: [
+                                ...doc.sections,
+                                {
+                                  id: crypto.randomUUID(),
+                                  kind: "html",
+                                  html: tmpl.html,
+                                  css: tmpl.css,
+                                },
+                              ],
+                            })
+                          }
+                        >
+                          <Icon className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+                          {tmpl.name}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </fieldset>
@@ -1458,6 +1730,71 @@ function App() {
           </section>
         )}
       </main>
+      {fullscreen && doc && (
+        <div
+          className="fullscreen-overlay"
+          onClick={(e) => {
+            if ((e.target as HTMLElement).tagName !== "BUTTON") {
+              setActiveSlide((prev) => Math.min(doc.sections.length - 1, prev + 1));
+            }
+          }}
+        >
+          <div className="fullscreen-slide">
+            {doc.sections[safeActiveSlide] && (
+              <iframe
+                title={`Fullscreen Slide ${safeActiveSlide + 1}`}
+                sandbox=""
+                srcDoc={renderFrame(doc.sections[safeActiveSlide])}
+              />
+            )}
+          </div>
+          <div className="fullscreen-controls flex items-center justify-between w-full max-w-[1200px] mt-4 px-2 text-white">
+            <div className="text-xs font-mono text-zinc-400">
+              Slide {safeActiveSlide + 1} of {doc.sections.length} · Use ← → arrows or click to navigate
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
+                disabled={safeActiveSlide === 0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveSlide((prev) => Math.max(0, prev - 1));
+                }}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Prev
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
+                disabled={safeActiveSlide >= doc.sections.length - 1}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveSlide((prev) => Math.min(doc.sections.length - 1, prev + 1));
+                }}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFullscreen(false);
+                }}
+              >
+                <X className="w-4 h-4 mr-1" />
+                Exit (Esc)
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
