@@ -47,6 +47,8 @@ import {
   Columns,
   Quote,
   X,
+  ArrowLeft,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -205,14 +207,440 @@ function RichText({
   return <EditorContent editor={editor} />;
 }
 
+function LandingPage({
+  onSignIn,
+  onSignUp,
+}: {
+  onSignIn: () => void;
+  onSignUp: () => void;
+}) {
+  const [activeTemplate, setActiveTemplate] = useState(0);
+
+  return (
+    <div className="landing-page select-none">
+      {/* Sticky Navigation Bar */}
+      <header className="landing-nav">
+        <div className="max-w-6xl mx-auto flex items-center justify-between py-3.5 px-6">
+          <div className="flex items-center gap-3">
+            {brand}
+            <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
+              v0.3.0
+            </Badge>
+          </div>
+          <div className="hidden md:flex items-center gap-6 text-xs text-muted-foreground font-medium">
+            <a href="#features" className="hover:text-foreground transition-colors">
+              Features
+            </a>
+            <a href="#interactive-preview" className="hover:text-foreground transition-colors">
+              Interactive Slides
+            </a>
+            <a href="#mcp-protocol" className="hover:text-foreground transition-colors">
+              Agent Protocol
+            </a>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-8 px-3"
+              onClick={onSignIn}
+            >
+              Sign in
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="text-xs h-8 px-3.5 font-medium"
+              onClick={onSignUp}
+            >
+              Get Started Free
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <section className="landing-hero">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/80 text-[11px] font-medium text-muted-foreground border border-border mb-4">
+          <Sparkles className="w-3.5 h-3.5 text-foreground" />
+          <span>MINIMALIST WORKSPACE FOR HUMANS & AI AGENTS</span>
+        </div>
+        <h1>
+          A clearer space for your ideas.
+          <br />
+          <span className="text-muted-foreground font-normal">
+            Documents and presentations in sync.
+          </span>
+        </h1>
+        <p className="subtitle">
+          Write reports, craft interactive 16:9 slide decks with real-time HTML & CSS visualizations, and connect autonomous AI agents natively via Model Context Protocol.
+        </p>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <Button
+            size="lg"
+            className="h-10 px-6 text-xs font-medium gap-2"
+            onClick={onSignUp}
+          >
+            Get Started Free
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="h-10 px-5 text-xs font-medium"
+            onClick={onSignIn}
+          >
+            Sign In to Workspace
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          ⚡ One free document through your AI agent. No account required to start.
+        </p>
+
+        {/* Interactive Live Preview Showcase */}
+        <div id="interactive-preview" className="landing-preview-box">
+          <div className="p-3 bg-muted/30 border-b border-border flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Live Interactive Canvas
+              </span>
+              <span className="text-xs text-muted-foreground">·</span>
+              <span className="text-xs text-muted-foreground font-medium">
+                {VISUAL_TEMPLATES[activeTemplate].name}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {VISUAL_TEMPLATES.map((tmpl, idx) => {
+                const Icon = tmpl.icon;
+                return (
+                  <Button
+                    key={tmpl.name}
+                    variant={idx === activeTemplate ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 text-xs px-2.5 font-medium"
+                    onClick={() => setActiveTemplate(idx)}
+                  >
+                    <Icon className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+                    {tmpl.name}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="aspect-[16/9] w-full bg-white">
+            <iframe
+              title="Landing Live Preview"
+              sandbox=""
+              className="w-full h-full border-0 block"
+              srcDoc={renderFrame({
+                id: "preview",
+                kind: "html",
+                html: VISUAL_TEMPLATES[activeTemplate].html,
+                css: VISUAL_TEMPLATES[activeTemplate].css,
+              })}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Features Bento Grid */}
+      <section id="features" className="max-w-6xl mx-auto px-6 py-12">
+        <div className="text-center mb-10">
+          <p className="eyebrow">DESIGNED FOR CLARITY</p>
+          <h2 className="text-2xl font-bold tracking-tight">Everything you need to communicate clearly.</h2>
+        </div>
+        <div className="landing-features-grid">
+          <div className="landing-feature-card">
+            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
+              <BarChart3 className="w-4 h-4 text-foreground" />
+            </div>
+            <h3 className="text-base font-semibold mb-2">Interactive Visualizations</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Embed live KPI metrics, dynamic bar charts, and responsive comparison matrices with scoped HTML and CSS without heavy client libraries.
+            </p>
+          </div>
+
+          <div className="landing-feature-card">
+            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
+              <Presentation className="w-4 h-4 text-foreground" />
+            </div>
+            <h3 className="text-base font-semibold mb-2">Dual Doc & PPT Deck Mode</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Toggle between long-form editorial writing and a 16:9 presentation slide deck with a single click. Fullscreen presenter mode included.
+            </p>
+          </div>
+
+          <div className="landing-feature-card">
+            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
+              <Bot className="w-4 h-4 text-foreground" />
+            </div>
+            <h3 className="text-base font-semibold mb-2">Native Model Context Protocol</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Connect Cursor, Claude Desktop, Antigravity, or custom CLI tools. Autonomous agents draft, update, and publish documents directly to your workspace.
+            </p>
+          </div>
+
+          <div className="landing-feature-card">
+            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
+              <Shield className="w-4 h-4 text-foreground" />
+            </div>
+            <h3 className="text-base font-semibold mb-2">Zero Telemetry & Sandboxed</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Rigorous HTML/CSS sanitization, strict Content Security Policy iframes, and end-to-end credential rotation keep your data private.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* How it Works with Agents */}
+      <section id="mcp-protocol" className="max-w-4xl mx-auto px-6 py-12 text-center">
+        <p className="eyebrow">AUTONOMOUS WORKFLOW</p>
+        <h2 className="text-2xl font-bold tracking-tight mb-8">How It Works with Your AI Agent</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+          <div className="p-4 rounded-lg border border-border bg-card">
+            <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">01. CONNECT</span>
+            <h4 className="text-sm font-semibold mb-1">Add MCP Tool</h4>
+            <p className="text-xs text-muted-foreground">Run <code>npx @docsync/mcp connect</code> in Cursor or Claude to integrate your workspace.</p>
+          </div>
+          <div className="p-4 rounded-lg border border-border bg-card">
+            <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">02. AUTONOMY</span>
+            <h4 className="text-sm font-semibold mb-1">Agent Drafts Slides</h4>
+            <p className="text-xs text-muted-foreground">Your agent analyzes data and creates structured HTML components with live charts.</p>
+          </div>
+          <div className="p-4 rounded-lg border border-border bg-card">
+            <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">03. PRESENT</span>
+            <h4 className="text-sm font-semibold mb-1">Review & Present</h4>
+            <p className="text-xs text-muted-foreground">Review drafts live in real-time, switch to slides mode, and present or share snapshot links.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Bottom CTA Banner */}
+      <section className="landing-cta-banner">
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
+          Make room for what matters.
+        </h2>
+        <p className="text-xs text-muted-foreground max-w-md mx-auto mb-5">
+          Join teams and engineers crafting interactive reports and presentations with autonomous agents.
+        </p>
+        <Button
+          size="lg"
+          className="h-10 px-6 text-xs font-medium"
+          onClick={onSignUp}
+        >
+          Create your account →
+        </Button>
+      </section>
+
+      {/* Footer */}
+      <footer className="landing-footer">
+        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            {brand}
+            <span>· Minimalism UI & Model Context Protocol</span>
+          </div>
+          <div>
+            © 2026 DocSync. Open agent protocol.
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+function LoginPage({
+  authMode,
+  setAuthMode,
+  error,
+  setError,
+  google,
+  busy,
+  claim,
+  authenticate,
+  onBackToLanding,
+}: {
+  authMode: "signin" | "signup" | "legacy";
+  setAuthMode: (mode: "signin" | "signup" | "legacy") => void;
+  error: string;
+  setError: (err: string) => void;
+  google: boolean;
+  busy: boolean;
+  claim: string;
+  authenticate: (e: FormEvent<HTMLFormElement>) => Promise<void>;
+  onBackToLanding: () => void;
+}) {
+  return (
+    <div className="auth-centered-layout">
+      <div className="mb-6 flex items-center justify-between w-full max-w-[420px]">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground hover:text-foreground gap-1.5 px-2"
+          onClick={onBackToLanding}
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to DocSync
+        </Button>
+        <span className="text-xs text-muted-foreground font-mono">v0.3.0</span>
+      </div>
+
+      <div className="auth-centered-card">
+        <div className="mb-6">
+          <div className="mb-3">{brand}</div>
+          <h2 className="text-xl font-bold tracking-tight text-foreground">
+            {authMode === "signup"
+              ? "Make yourself at home."
+              : authMode === "legacy"
+                ? "Workspace Owner Key"
+                : "Welcome back."}
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            {claim
+              ? "Sign in to bring your first document into your workspace."
+              : "A quiet place to do your best thinking."}
+          </p>
+        </div>
+
+        {error && (
+          <div role="alert" className="error mb-4">
+            {error}
+          </div>
+        )}
+
+        {google && (
+          <>
+            <Button
+              variant="outline"
+              className="w-full justify-between h-10 mb-3 text-xs font-medium"
+              asChild
+            >
+              <a href="/api/auth/google">
+                Continue with Google <ArrowRight className="w-4 h-4 ml-1" />
+              </a>
+            </Button>
+            <div className="or mb-3">or use your email</div>
+          </>
+        )}
+
+        <form onSubmit={authenticate} className="space-y-3.5">
+          {authMode === "legacy" ? (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Workspace owner key
+              </label>
+              <Input
+                name="key"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="h-9 text-xs"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Email address
+                </label>
+                <Input
+                  name="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  required
+                  autoComplete="email"
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Password
+                </label>
+                <Input
+                  name="password"
+                  type="password"
+                  placeholder="At least 12 characters"
+                  minLength={12}
+                  maxLength={256}
+                  required
+                  autoComplete={
+                    authMode === "signup"
+                      ? "new-password"
+                      : "current-password"
+                  }
+                  className="h-9 text-xs"
+                />
+              </div>
+            </>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full justify-between h-9 text-xs font-medium mt-1"
+            disabled={busy}
+          >
+            {busy
+              ? "Please wait…"
+              : authMode === "signup"
+                ? "Create account →"
+                : "Sign in →"}
+          </Button>
+        </form>
+
+        <p className="auth-switch text-xs text-muted-foreground mt-5 text-center">
+          {authMode === "signup"
+            ? "Already have an account?"
+            : "New to DocSync?"}{" "}
+          <button
+            type="button"
+            className="font-medium text-foreground underline-offset-4 hover:underline cursor-pointer"
+            onClick={() => {
+              setAuthMode(authMode === "signup" ? "signin" : "signup");
+              setError("");
+            }}
+          >
+            {authMode === "signup" ? "Sign in" : "Create an account"}
+          </button>
+        </p>
+
+        <div className="text-center mt-3 pt-3 border-t border-border">
+          <button
+            type="button"
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            onClick={() => {
+              setAuthMode(authMode === "legacy" ? "signin" : "legacy");
+              setError("");
+            }}
+          >
+            {authMode === "legacy"
+              ? "Use email instead"
+              : "Existing workspace owner"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  const isAuthRoute = () => {
+    const p = location.pathname;
+    return (
+      p === "/login" ||
+      p === "/signup" ||
+      p === "/connect" ||
+      Boolean(sessionStorage.getItem("docsync_claim")) ||
+      location.hash.includes("claim=")
+    );
+  };
+  const [authPage, setAuthPage] = useState(isAuthRoute);
   const [session, setSession] = useState<Session | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const [authMode, setAuthMode] = useState<"signin" | "signup" | "legacy">(
-      "signin",
+      location.pathname === "/signup" ? "signup" : "signin",
     ),
     [google, setGoogle] = useState(false);
   const [documents, setDocuments] = useState<Summary[]>([]),
@@ -319,6 +747,36 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [fullscreen, doc]);
 
+  useEffect(() => {
+    const handlePop = () => {
+      setAuthPage(isAuthRoute());
+      if (location.pathname === "/signup") setAuthMode("signup");
+      else if (location.pathname === "/login") setAuthMode("signin");
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, []);
+
+  const goToLogin = () => {
+    setAuthMode("signin");
+    setError("");
+    setAuthPage(true);
+    window.history.pushState(null, "", "/login");
+  };
+
+  const goToSignup = () => {
+    setAuthMode("signup");
+    setError("");
+    setAuthPage(true);
+    window.history.pushState(null, "", "/signup");
+  };
+
+  const goToLanding = () => {
+    setError("");
+    setAuthPage(false);
+    window.history.pushState(null, "", "/");
+  };
+
   const leave = () =>
     !dirty ||
     confirm(
@@ -397,6 +855,8 @@ function App() {
       );
       setSession(await api("/session"));
       await refresh();
+      setAuthPage(false);
+      window.history.pushState(null, "", "/");
     });
   }
 
@@ -433,161 +893,29 @@ function App() {
       </div>
     );
 
-  if (!session)
+  if (!session) {
+    if (!authPage) {
+      return (
+        <LandingPage
+          onSignIn={goToLogin}
+          onSignUp={goToSignup}
+        />
+      );
+    }
     return (
-      <div className="auth-layout">
-        <section className="auth-story select-none">
-          {brand}
-          <div>
-            <p className="eyebrow">FROM AN IDEA TO A DOCUMENT</p>
-            <h1>
-              Your ideas.
-              <br />A little more
-              <br />
-              <em>room to grow.</em>
-            </h1>
-            <p>
-              Write, shape, and share beautiful documents.
-              <br />
-              Bring your favorite AI agent along.
-            </p>
-            <div className="sample-page">
-              <div className="sample-label">STRATEGY / FY27</div>
-              <h2>
-                A clearer view
-                <br />
-                of what’s next.
-              </h2>
-              <div className="sample-lines" />
-              <div className="sample-chart">
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-              <span className="flex items-center gap-1">Made with DocSync <ArrowRight className="w-2.5 h-2.5" /></span>
-            </div>
-          </div>
-          <small className="text-muted-foreground text-xs">
-            One free document through your agent. No account needed.
-          </small>
-        </section>
-        <main className="auth-panel">
-          <div className="auth-form">
-            <p className="eyebrow">YOUR WORKSPACE, TOGETHER</p>
-            <h2>
-              {authMode === "signup"
-                ? "Make yourself at home."
-                : "Welcome back."}
-            </h2>
-            <p className="muted">
-              {claim
-                ? "Sign in to bring your first document into your workspace."
-                : "A quiet place to do your best thinking."}
-            </p>
-            {error && (
-              <div role="alert" className="error mb-4">
-                {error}
-              </div>
-            )}
-            {google && (
-              <>
-                <Button variant="outline" className="w-full justify-between h-10 mb-3" asChild>
-                  <a href="/api/auth/google">
-                    Continue with Google <ArrowRight className="w-4 h-4 ml-1" /> <span>↗</span>
-                  </a>
-                </Button>
-                <div className="or">or use your email</div>
-              </>
-            )}
-            <form onSubmit={authenticate}>
-              {authMode === "legacy" ? (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Workspace owner key
-                  </label>
-                  <Input
-                    name="key"
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Email address
-                    </label>
-                    <Input
-                      name="email"
-                      type="email"
-                      placeholder="you@company.com"
-                      required
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      Password
-                    </label>
-                    <Input
-                      name="password"
-                      type="password"
-                      placeholder="At least 12 characters"
-                      minLength={12}
-                      maxLength={256}
-                      required
-                      autoComplete={
-                        authMode === "signup"
-                          ? "new-password"
-                          : "current-password"
-                      }
-                    />
-                  </div>
-                </>
-              )}
-              <Button type="submit" className="w-full justify-between h-10 mt-2" disabled={busy}>
-                {busy
-                  ? "Please wait…"
-                  : authMode === "signup"
-                    ? "Create account"
-                    : "Sign in"}{" "}
-                <span>→</span>
-              </Button>
-            </form>
-            <p className="auth-switch">
-              {authMode === "signup"
-                ? "Already have an account?"
-                : "New to DocSync?"}{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode(authMode === "signup" ? "signin" : "signup");
-                  setError("");
-                }}
-              >
-                {authMode === "signup" ? "Sign in" : "Create an account"}
-              </button>
-            </p>
-            <div className="text-center mt-3">
-              <button
-                type="button"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                onClick={() =>
-                  setAuthMode(authMode === "legacy" ? "signin" : "legacy")
-                }
-              >
-                {authMode === "legacy"
-                  ? "Use email instead"
-                  : "Existing workspace owner"}
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
+      <LoginPage
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        error={error}
+        setError={setError}
+        google={google}
+        busy={busy}
+        claim={claim}
+        authenticate={authenticate}
+        onBackToLanding={goToLanding}
+      />
     );
+  }
 
   const list = documents.filter((d) =>
     d.title.toLowerCase().includes(search.toLowerCase()),
@@ -687,6 +1015,9 @@ function App() {
                 setDoc(null);
                 setDirty(false);
                 setToken("");
+                setAuthPage(true);
+                setAuthMode("signin");
+                window.history.pushState(null, "", "/login");
               });
             }}
           >
