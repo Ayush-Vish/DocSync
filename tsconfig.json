@@ -15,11 +15,17 @@
     "types": [
       "node"
     ],
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "jsx": "react-jsx"
   },
   "include": [
     "src",
     "scripts/*.ts",
-    "test"
+    "test",
+    "vite.config.ts"
   ]
 }

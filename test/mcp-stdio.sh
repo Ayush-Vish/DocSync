@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 let input = ""; for await (const chunk of process.stdin) input += chunk;
 const rows = input.trim().split("\n").map(line => JSON.parse(line));
 assert.equal(rows.find(row => row.id === 1).result.serverInfo.name, "docsync");
-assert.equal(rows.find(row => row.id === 2).result.tools.length, 6);
+assert.equal(rows.find(row => row.id === 2).result.tools.length, 7);
 const created = rows.find(row => row.id === 3).result;
 assert.equal(created.isError, false);
 assert.equal(JSON.parse(created.content[0].text).title, "Stdio acceptance");

@@ -1,199 +1,174 @@
 # DocSync
 
-Ask DocSync to make a report and return its link. Your agent generates HTML/CSS, saves a versioned document, verifies the saved content, and publishes a read-only snapshot. No server-side AI calls. The browser remains available for manual editing and review.
+Create, edit, and share HTML component documents from any MCP-compatible coding agent. The browser app uses **React + Vite + TipTap**; the API runs on **Cloudflare Workers + D1**. A Node/SQLite adapter runs the same API locally.
 
 ## Run locally
 
-Requires Node.js **22.18+** (or Node 24+) and npm. Use a current supported Node release.
+Requires Node.js **22.18+** and npm.
 
 ```sh
 npm ci
 npm run setup
-npm run dev
+PORT=8788 npm run dev
 ```
 
-Open **http://127.0.0.1:8787**. Read `.local/owner-key` and paste it into the sign-in form. Setup creates random credentials, a local SQLite database, and an initial agent token. Running setup again preserves existing credentials.
+Open **http://127.0.0.1:8788**. Create an email/password account, or choose **Existing workspace owner** and use `.local/owner-key` to access documents from the original MVP. Setup preserves existing credentials. The default port remains 8787; this workspace uses 8788 because another process occupies 8787.
 
-Local files in `.local/` contain private content and credentials. They are ignored by Git. Do not share them. Bind the development server only to loopback; deploy the Worker for remote access.
+For frontend hot reload, keep the backend running on 8788 and run `npm run dev:ui` in a second terminal. Open http://localhost:5173. Vite proxies API calls to the local backend and keeps cookies on the frontend origin. Production serves the built frontend and API from one origin.
 
-`npm run dev` builds once and starts the server. After code changes, stop and rerun it. `npm run build` bundles the browser, Worker, and MCP entry point. There is no framework runtime or server-side code generation.
+## Included
 
-## Connect once in any MCP-compatible coding agent
+- Minimal document library with search, responsive navigation, and an editor.
+- Text sections with headings, bold, italic, underline, lists, quotes, tables, and undo/redo through TipTap.
+- HTML/CSS component sections with source editing and isolated previews. Existing component HTML is preserved instead of being converted to rich text.
+- Explicit saves, immutable revision history, restore, conflict preservation, and JSON draft download.
+- Fixed-revision public links, republishing with link rotation, and revocation.
+- Email/password accounts, server-side sessions, Google OAuth, and account-scoped document access.
+- One anonymous document per MCP installation, browser claiming, and account tokens with an explicit publishing grant.
+- A self-contained, publishable npm MCP package and a standalone download in **Connect agent**.
 
-DocSync uses standard **stdio MCP**, not a provider-specific plugin. The same standalone executable works with coding agents that can launch a local MCP server, including Codex, Claude Code, and Antigravity. Their configuration and mention syntax differ; the document tools and workflow are the same.
+Live multi-user editing, comments, uploads, offline sync, pagination, password reset/email verification, and remote HTTP MCP transport are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
 
-1. Run DocSync locally, or deploy it for links other people can open.
-2. Open **Connect agent** in the owner UI. Generate a token with **Allow publishing** enabled and save the displayed `DOCSYNC_URL` / `DOCSYNC_AGENT_TOKEN` lines in a private environment file.
-3. Save that connection once:
+## Agent onboarding
+
+A fresh installation needs only the server URL. It generates a random local credential, stores it privately, and registers it with DocSync. The first document can be created, edited, and published without a web account. The database enforces a one-document limit atomically.
+
+For local Antigravity CLI (`agy`):
 
 ```sh
-npm run mcp:configure -- /absolute/path/to/private/connection.env
+agy mcp add docsync node /absolute/path/to/DocSync/dist/docsync-mcp.cjs --url http://127.0.0.1:8788
 ```
 
-For a fresh local setup, use `.local/mcp.env`. **Existing workspaces retain their draft-only token:** rotate it in the UI and update that file first. Migrations do not silently broaden old tokens.
-
-The connection helper saves the profile to `~/.config/docsync/connection.env` with mode 600, without printing credentials. The MCP executable reads it regardless of the agent's working directory. `DOCSYNC_CONNECTION_FILE` selects an alternative private path; use the same value when configuring and launching. Hosts can also supply `DOCSYNC_URL` and `DOCSYNC_AGENT_TOKEN` directly in the process environment.
-
-4. Add the server in your agent using one of the following setups, then restart or reload its MCP connection.
-
-### Codex CLI / IDE
-
-CLI:
+Codex CLI:
 
 ```sh
-codex mcp add docsync -- node /absolute/path/to/DocSync/dist/docsync-mcp.cjs
+codex mcp add docsync -- node /absolute/path/to/DocSync/dist/docsync-mcp.cjs --url http://127.0.0.1:8788
 ```
 
-Or merge the generated `dist/codex-mcp.toml` into your Codex MCP configuration. Verify it with `/mcp` in Codex CLI. [Official Codex MCP documentation](https://developers.openai.com/codex/mcp/).
-
-### Claude Code
+Claude Code:
 
 ```sh
-claude mcp add --scope user --transport stdio docsync -- node /absolute/path/to/DocSync/dist/docsync-mcp.cjs
+claude mcp add --scope user --transport stdio docsync -- node /absolute/path/to/DocSync/dist/docsync-mcp.cjs --url http://127.0.0.1:8788
 ```
 
-Use `/mcp` to check the connection. [Official Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
-
-### Antigravity and other JSON-configured clients
-
-Merge the generated `dist/mcp-config.json` server entry into your agent's MCP configuration. It contains the actual absolute executable path for this checkout and no credentials. Its shape is:
+Other clients use:
 
 ```json
 {
   "mcpServers": {
     "docsync": {
       "command": "node",
-      "args": ["/absolute/path/to/DocSync/dist/docsync-mcp.cjs"]
+      "args": ["/absolute/path/to/DocSync/dist/docsync-mcp.cjs", "--url", "http://127.0.0.1:8788"]
     }
   }
 }
 ```
 
-In Antigravity IDE, use **MCP Servers → Manage MCP Servers → View raw config**. Antigravity CLI also provides `/mcp`. The documented global file is `~/.gemini/config/mcp_config.json`; workspace configurations use `.agents/mcp_config.json`. Merge with existing entries rather than replacing the file. [Official Antigravity MCP documentation](https://antigravity.google/docs/mcp).
+Restart the client and ask:
 
-If the host cannot find Node on its PATH, use the absolute path to your Node 22.18+ executable for `command`.
+> Use DocSync to make a report from these notes, verify the saved content, and return its link.
 
-### Request a report
+Literal `@DocSync` support depends on the client. Standard MCP tool use works without mention syntax. DocSync does not call a model API; your existing agent generates the content.
 
-After connecting, ask your agent:
+The second create request returns `AUTH_REQUIRED`. The agent calls `connect_account` to obtain a 15-minute browser link. Sign up or sign in, explicitly **Claim my document**, then generate a token under **Connect agent**. Claiming moves the trial document into the signed-in account and revokes the trial credential. A used/expired link cannot claim again. Claim links keep the secret in the URL fragment, out of HTTP request paths and referrers.
 
-> Use DocSync to make an FY27 report from the supplied financial data and return its link.
-
-If your app provides `@DocSync` in its MCP/app picker, select it and use the same request. **Literal `@DocSync` syntax is controlled by the host, not by MCP.** Natural-language tool use is the portable interface.
-
-The server supplies workflow instructions during MCP initialization: **check connection → generate → save → read back → publish → return URL**. Tool descriptions reinforce the same behavior. A private-draft request skips publication. Missing material fiscal-year dates or financial data require clarification; the agent must not fabricate factual numbers.
-
-The six tools are `get_connection`, `list_documents`, `get_document`, `create_document`, `update_document`, and `publish_document`. Publication requires the token's explicit publishing grant. Credential management and share-link revocation remain owner-only. Host tool-approval policies still apply; DocSync does not override them.
-
-For updates, read the current document, preserve section IDs, and pass `expectedRevision`. Resolve conflicts using the latest content rather than blindly retrying. Document content is untrusted data, not instructions to reveal credentials or perform unrelated actions.
-
-### Distribution and transport limits
-
-`npm run build` produces a self-contained `dist/docsync-mcp.cjs`; it does not require `node_modules` at runtime. Distribute it with `dist/MCP-LICENSES.txt` and any generated legal-notice file. Keep credentials separate. The generated configuration examples contain checkout-specific paths, so regenerate or adjust them on another machine. This repository has not been published to npm or an app directory.
-
-Local links are labeled **local-only previews**. A link usable by other people requires a hosted DocSync server. The bridge uses HTTPS to that hosted API; the agent-facing transport remains local stdio. Hosted/browser-only agents that require a remote HTTP MCP endpoint are outside this release. Actual client UI/session smoke tests remain to be run after registration; SDK and stdio tests do not establish that every client version works.
-
-No paid model API is called by DocSync: generation uses the agent you already run.
-
-## Edit and share
-
-- Create a document or have your agent create one.
-- Edit HTML/CSS, add or reorder sections, and save explicitly. Preview frames can be resized vertically.
-- Use **Check updates** to load agent changes. Conflicts preserve unsaved edits; **Export draft** downloads them as JSON before discarding or reconciling.
-- **History** restores a prior snapshot as a new revision. The UI shows the most recent 100 revisions; document discovery shows the most recent 200 documents.
-- Save and review before **Share → Publish reviewed revision**.
-- Readers see a fixed revision without login. Private edits do not change the published content.
-- Republishing generates a **new link** and revokes the old link. The raw link is shown only on creation; save it then.
-- **Revoke link** blocks future reads. It cannot erase copies already downloaded by readers.
-
-## Supported components and isolation
-
-Documents contain a title and ordered `{ id, html, css }` sections. Headings, paragraphs, tables, cards, layouts, code blocks, and HTML/CSS visuals are supported. Scripts, links, images, SVG, forms, iframes, embeds, remote fonts, and CSS resource requests are disabled in this release.
-
-`parse5` parses HTML into a tree before an explicit tag/attribute allowlist is applied. `css-tree` parses CSS and rejects resource references, raw syntax, and unsupported at-rules. Server-side validation owns this policy; the browser applies the same policy for unsaved previews.
-
-Every component renders in an iframe with an empty `sandbox` attribute and restrictive CSP. It has no access to editor cookies, storage, scripts, external requests, forms, popups, or top navigation. The application CSP permits inline styling so styled `srcdoc` frames work; component content never enters the editor's DOM.
-
-Limits: 40 sections per document, 100,000 HTML characters and 30,000 CSS characters per section, 500 KB total document content, and 550 KB request bodies. A document must retain at least one section. Unsupported HTML elements are removed; prohibited CSS returns a validation error. The saved server response is the canonical sanitized content.
-
-Preview heights are manually resizable because scripts and same-origin access are disabled. WYSIWYG editing, live co-editing, comments, uploads, and JavaScript components are deferred.
-
-## Verify
+Save the token in a private file containing only the token (mode 600), then import it outside the agent conversation:
 
 ```sh
-npm run check
-npm test
+node dist/docsync-mcp.cjs login --url http://127.0.0.1:8788 --token-stdin < /path/to/private-token-file
 ```
 
-`npm test` builds before running the suites.
+Delete the temporary token file afterward, then restart the agent. The CLI verifies the token against the server before storing it. Profiles are scoped to the server origin under `~/.config/docsync/servers/` with mode 600. `DOCSYNC_CONFIG_DIR` overrides that directory.
 
-For browser checks, run the local server in another terminal, then:
+**Existing installations:** `DOCSYNC_AGENT_TOKEN` and `DOCSYNC_CONNECTION_FILE` override the new per-server profile. Remove those client environment overrides when switching to the new login flow. The legacy `npm run mcp:configure -- /private/connection.env` helper remains supported for deployments that explicitly supply a credential. Keep credentials out of chat, command arguments, source control, and MCP tool arguments.
+
+This trial identifies a local installation, **not physical hardware**. Deleting the profile can start another installation. Per-IP registration limits reduce casual abuse; this is not a billing or hardware-attestation boundary. No fingerprinting is performed.
+
+## Google sign-in
+
+Create a **Web application OAuth client** in Google Cloud. Configure an exact authorized redirect URI:
+
+- Local built app: `http://127.0.0.1:8788/api/auth/google/callback`
+- Vite development: `http://localhost:5173/api/auth/google/callback`
+- Production: `https://YOUR_HOST/api/auth/google/callback`
+
+Configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the server. Locally they can be supplied through environment variables or the ignored private `.local/config.json`. Never expose the secret through `VITE_*` variables. In production, use Wrangler secrets. The Google button appears only when both credentials exist.
+
+The flow uses authorization code exchange with PKCE, a single-use expiring state record, and an HttpOnly state cookie. The server fetches the verified Google identity directly from Google's userinfo endpoint. A Google identity is never automatically linked to an existing password account merely because the email matches; sign in using that account's password instead.
+
+Google credentials are not included. Automated tests mock Google's endpoints; a real Google sign-in must be checked with your OAuth client before launch.
+
+## Publish the MCP package
 
 ```sh
-npm run test:browser
+npm run pack:mcp
 ```
 
-The browser check uses an installed Chrome/Chromium executable (`CHROME_PATH` overrides `/usr/bin/google-chrome`). It creates a test document in the local database and revokes its test share link. It covers source edits, CSS rendering, sandbox isolation, publication, stale agent/browser writes, refresh, revocation, and mobile layout.
+Produces `dist/ayush-vish-docsync-mcp-0.3.0.tgz`. The package source is `packages/mcp/`; the archive includes a Node executable, package metadata, README, MIT license, and dependency notices. The executable is bundled and requires no runtime dependency installation. The `prepack` hook rebuilds when packing/publishing directly from the package directory.
 
-The MCP integration test connects an official SDK client and server in-process, with requests routed through the real Worker handler and an in-memory SQLite database. Separate real-stdio smoke tests verify initialization, tool discovery, and document creation against both the development bridge and the standalone MCP bundle. The SDK integration also verifies publication and anonymous link reads. These tests avoid TCP listeners. A live Codex model session is a separate smoke test after configuring Codex; these tests do not imply a live model ran. Local stdio configuration applies to Codex CLI/IDE, not hosted ChatGPT Work.
-
-## Deploy to Cloudflare's free tier
-
-You need a Cloudflare account and outbound network access. The repository contains a Worker bundle configuration and D1 migrations. The local Node adapter exists only for offline development; production requests run in the Worker.
-
-1. Build with `npm run build`.
-2. Install or run Wrangler, then authenticate: `npx wrangler@4 login`.
-3. Create the database: `npx wrangler@4 d1 create docsync`.
-4. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.jsonc` with the returned database ID.
-5. Apply the schema: `npx wrangler@4 d1 migrations apply docsync --remote`.
-6. Generate a **new** random owner key and session secret for production. Keep the owner key privately; set `OWNER_KEY_HASH` to its SHA-256 hex digest and `SESSION_SECRET` to a random 32-byte or longer secret using `npx wrangler@4 secret put OWNER_KEY_HASH` and `npx wrangler@4 secret put SESSION_SECRET`. Do not commit secrets or reuse example values.
-7. Deploy: `npx wrangler@4 deploy`.
-8. Open the workers.dev URL, sign in, and generate an agent token using **Connect agent**, with Allow publishing enabled for one-prompt reports. Update the private environment file and run `npm run mcp:configure -- /path/to/that/file`.
-9. Smoke-test agent create → verify → publish → anonymous read → revoke.
-
-To generate production credentials into private files (not terminal history), use:
+The npm package is **`@ayush-vish/docsync-mcp`**. Packaging does not publish to npm. Maintainers can publish a new version after updating the manifest and authenticating to the authorized npm account:
 
 ```sh
-node scripts/production-secrets.mjs
+npm publish ./packages/mcp --access public
 ```
 
-Read the owner key from `.local/production-owner-key`. Feed `.local/production-owner-key-hash` and `.local/production-session-secret` to Wrangler's secret prompts or standard input. This helper does not deploy or activate anything.
-
-Target cost is **$0 within free quotas**, with the included workers.dev address. No paid AI API or custom domain is required. Your coding agent's subscription or usage costs are separate. Select the free plan and check [Worker pricing](https://developers.cloudflare.com/workers/platform/pricing/) and [D1 limits](https://developers.cloudflare.com/d1/platform/limits/) before deploying. Workload size and parsing CPU can hit free limits; this is not an unlimited-hosting promise.
-
-Production owner sessions expire after eight hours and use HttpOnly, Secure, SameSite=Strict cookies. State-changing cookie-authenticated requests require a matching Origin. Login attempts are rate-limited. Keep the owner key strong. Rotating `SESSION_SECRET` invalidates all existing sessions; rotate it when rotating the owner key or after suspected credential exposure.
-
-## Backups and migrations
-
-Local backup:
+Clients can install the npm package with:
 
 ```sh
-npm run backup
+agy mcp add docsync npx -y @ayush-vish/docsync-mcp --url https://YOUR_HOST
 ```
 
-This uses SQLite's consistent backup API and writes to `.local/backups/`. To recover, stop the server and restore the backup using `npm run restore-backup -- /absolute/path/to/backup.sqlite`. The helper validates the backup and refuses to overwrite live WAL/SHM files; it preserves the previous database as a rollback copy. Backups contain private document content and credential hashes and must be protected.
+A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Seven tools are exposed: `get_connection`, `connect_account`, `list_documents`, `get_document`, `create_document`, `update_document`, and `publish_document`.
 
-Before changing the production schema, export D1:
+## Content and sharing
+
+The document model is `{title, sections: [{id, kind?, html, css}]}`. `kind: "text"` is for supported rich text; `kind: "html"` (or omitted for older documents) preserves arbitrary supported components. Agents should use HTML mode for layouts, custom classes, or CSS. Text sections are edited through TipTap's schema and should contain only supported headings, paragraphs, inline formatting, lists, quotes, code blocks, and tables.
+
+`parse5` and `css-tree` validate content on the server. Component previews also validate drafts in the browser and use empty-sandbox iframes with restrictive CSP. Scripts, navigation, external images, SVG, forms, embeds, remote fonts, and CSS resource requests are disabled. HTML components never enter the application DOM.
+
+Limits: 40 sections, 100,000 HTML characters and 30,000 CSS characters per section, 500 KB per document, 550 KB request bodies. History shows the latest 100 revisions; the library lists the latest 200 documents per account.
+
+Save before sharing. A link points to a saved revision, so later private edits do not change it. Republishing rotates the URL and revokes its predecessor. The raw link is shown only when publishing. Revocation stops future reads but cannot erase copies already downloaded. Share responses use `no-store`, prioritizing revocation over CDN caching. Localhost links are previews accessible only on the host machine.
+
+## Deploy to Cloudflare
+
+1. Run `npm run build` and authenticate with `npx wrangler@4 login`.
+2. Create a database using `npx wrangler@4 d1 create docsync` and replace the database ID placeholder in `wrangler.jsonc`.
+3. Apply all migrations with `npx wrangler@4 d1 migrations apply docsync --remote`.
+4. Generate production credentials using `node scripts/production-secrets.mjs`. It writes private files under `.local/production-*` without deploying anything.
+5. Set `OWNER_KEY_HASH` and `SESSION_SECRET` using `npx wrangler@4 secret put NAME`, using the generated hash and session-secret files. Keep the owner key privately for the legacy workspace.
+6. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if enabling Google sign-in. Register the correct deployed callback URL with Google.
+7. Run `npx wrangler@4 deploy` and verify sign-up, Google sign-in, anonymous installation, claim, token connection, publication, and revocation on the hosted origin.
+
+Free-tier deployment is quota-limited. HTML parsing and password hashing consume CPU; check actual usage against [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [D1 limits](https://developers.cloudflare.com/d1/platform/limits/). Production traffic may need paid capacity. No model API is billed by DocSync; your coding agent's subscription is separate.
+
+Account sessions use opaque hashed server-side tokens with a seven-day expiry, HttpOnly cookies, and Secure in HTTPS deployments. Cookie-authenticated mutations require the matching Origin. Password and installation requests are rate-limited. Passwords use a random salt, a server-side HMAC pepper, and WebCrypto PBKDF2-SHA256 at 100,000 iterations, matching Workers' WebCrypto iteration ceiling. **`SESSION_SECRET` is currently also the password pepper: changing it invalidates password verification as well as legacy owner sessions. Preserve it across deployments and backups.** To invalidate account sessions, delete their `account_sessions` records. Do not casually rotate the pepper without a password-migration/reset strategy.
+
+## Backups and migration safety
+
+Before upgrading the local database, run `npm run backup`. It uses SQLite's consistent backup API. Migration `0003_accounts.sql` preserves existing documents under the `legacy` account and keeps legacy credentials functional. New accounts cannot see legacy or other users' documents.
+
+Stop the server before restoring with `npm run restore-backup -- /absolute/path/to/backup.sqlite`. The restore helper checks integrity, refuses live WAL/SHM files, and preserves the old database. Protect backups and the original `.local/config.json`, which contains the password pepper.
+
+Before production migrations, export D1:
 
 ```sh
 npx wrangler@4 d1 export docsync --remote --output=/private/path/docsync-backup.sql
 ```
 
-Review migrations against a separate database first, then apply forward-only migrations. Keep the previous Worker deployment available for rollback. Rolling back application code does not reverse database changes; use a compatible forward fix or restore to a separate database and switch the binding after verification. Never restore over the only copy of production data.
+**Do not roll back to the pre-account Worker after admitting multiple users.** The old API lacks tenant filtering and is incompatible with multi-user data. Prefer a forward fix, or restore a matching pre-upgrade database and code together while preserving the current database separately.
 
-## Layout
+## Verification
 
-- `src/document.ts`: shared document model and schemas.
-- `src/content.ts`: HTML/CSS policy and frame rendering.
-- `src/store.ts`: versioned document operations and publication snapshots.
-- `src/auth.ts`: owner sessions, scoped agent authentication, login limits.
-- `src/worker.ts`: API routing and response security headers.
-- `src/browser.ts`, `public/`: editor and shared reader.
-- `src/mcp.ts`, `src/mcp-server.ts`: stdio entry point and document tools.
-- `scripts/`: builds, local database adapter, setup, backup helpers.
-- `migrations/`: production/local database schema, including the publishing-permission migration.
-- `test/`: focused API, SDK stdio, and browser acceptance checks.
+```sh
+npm run check
+npm test
+npm run test:browser
+npm run pack:mcp
+```
 
-## Verification status in this workspace
+The API tests cover isolation across accounts and all document operations, CSRF, session revocation, token rotation, trial quota enforcement, claiming/replay, Google state/PKCE and identity linking, snapshots, concurrency, publication, and HTML/CSS security. Stdio tests exercise both development and bundled MCP entry points.
 
-Build, TypeScript checks, eleven focused API/MCP tests, and both real-stdio smoke tests pass. The private connection-file helper was exercised against a temporary profile, including its mode 600 permissions. Client registration and live Codex/Claude/Antigravity invocations have not been performed here; user-level client configuration is outside the writable workspace. The execution sandbox denies local TCP listeners and Chrome socket operations, so the HTTP development-server smoke test and browser acceptance suite could not run here. Run the documented browser check outside this sandbox before publishing real documents. Cloudflare deployment and a live Codex model session have not been performed.
+The browser test launches an isolated in-memory API server and installed Chrome (`CHROME_PATH` overrides `/usr/bin/google-chrome`). It does not modify your local database. It exercises the actual packaged MCP executable and private CLI profiles through the entire free-document → browser signup → claim → account token → next document workflow, then editor behavior, sharing, conflicts, revocation, logout, and mobile layout. Screenshots go to `/tmp/docsync-*.png`.
+
+Google's live service, Cloudflare deployment, npm publication, and live model sessions are separate checks; local acceptance does not claim those have happened.

@@ -1,3 +1,5 @@
+> **Implementation update (2026-10-13):** React + Vite + TipTap replaces the original browser UI. Email/password accounts, Google OAuth integration (requires deployment credentials), tenant isolation, one-document installation trials, explicit browser claiming, account MCP tokens, and a publishable bundled MCP package are implemented. Real browser + packaged MCP acceptance covers signup through account connection. Live collaboration/comments and public deployment remain future work. See README.md for current setup and behavior; the proposal below records the original MVP scope.
+
 # DocSync MVP plan
 
 **Status:** Approved for implementation by the user. The local MVP code is implemented and focused checks pass. HTTP/browser verification is blocked by sandbox permissions; hosted deployment requires account access.

@@ -1,52 +1,330 @@
-import puppeteer from 'puppeteer-core';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import puppeteer from "puppeteer-core";
+import assert from "node:assert/strict";
+import {
+  readFileSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+} from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
+import { createServer } from "node:http";
+import { spawn } from "node:child_process";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { fixture, sample } from "./helpers.ts";
+import { handle } from "../src/worker.ts";
 
-const origin = process.env.DOCSYNC_TEST_URL || 'http://127.0.0.1:8787';
-const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
-const page = await browser.newPage(); const errors: string[] = [];
-page.on('pageerror', error => errors.push(String(error)));
-page.on('dialog', dialog => void dialog.accept());
+const f = await fixture();
+const root = resolve("dist/public");
+f.env.ASSETS = {
+  fetch: async (request) => {
+    const path = new URL(request.url).pathname;
+    const candidate = resolve(root, "." + path);
+    const file =
+      candidate.startsWith(root + "/") &&
+      existsSync(candidate) &&
+      statSync(candidate).isFile()
+        ? candidate
+        : join(root, "index.html");
+    return new Response(readFileSync(file), {
+      headers: {
+        "Content-Type": file.endsWith(".js")
+          ? "text/javascript"
+          : file.endsWith(".css")
+            ? "text/css"
+            : "text/html",
+      },
+    });
+  },
+};
+const server = createServer(async (req, res) => {
+  try {
+    const chunks: Buffer[] = [];
+    for await (const c of req) chunks.push(c);
+    const method = req.method || "GET";
+    const r = await handle(
+      new Request(`http://${req.headers.host}${req.url}`, {
+        method,
+        headers: req.headers as Record<string, string>,
+        ...(["GET", "HEAD"].includes(method)
+          ? {}
+          : { body: Buffer.concat(chunks) }),
+      }),
+      f.env,
+    );
+    res.setHeader("Set-Cookie", r.headers.getSetCookie());
+    res.writeHead(
+      r.status,
+      Object.fromEntries([...r.headers].filter(([k]) => k !== "set-cookie")),
+    );
+    res.end(Buffer.from(await r.arrayBuffer()));
+  } catch {
+    res.writeHead(500);
+    res.end();
+  }
+});
+await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+const origin = `http://127.0.0.1:${(server.address() as any).port}`;
+const profile = mkdtempSync(join(tmpdir(), "docsync-browser-"));
+const env = Object.fromEntries(
+  Object.entries(process.env).filter(
+    ([k, v]) =>
+      v !== undefined &&
+      ![
+        "DOCSYNC_AGENT_TOKEN",
+        "DOCSYNC_CONNECTION_FILE",
+        "DOCSYNC_URL",
+      ].includes(k),
+  ),
+) as Record<string, string>;
+env.DOCSYNC_CONFIG_DIR = profile;
+const clients: Client[] = [];
+async function mcp() {
+  const c = new Client({ name: "browser-acceptance", version: "1" });
+  await c.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [resolve("packages/mcp/docsync-mcp.cjs"), "--url", origin],
+      env,
+    }),
+  );
+  clients.push(c);
+  return c;
+}
+const parse = (r: any) => JSON.parse(r.content[0].text);
+const browser = await puppeteer.launch({
+  executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
+  headless: true,
+  args: ["--no-sandbox", "--disable-dev-shm-usage"],
+});
+const page = await browser.newPage(),
+  errors: string[] = [];
+await page.setViewport({ width: 1440, height: 1000 });
+page.on("pageerror", (e) => errors.push(String(e)));
+page.on("dialog", (d) => void d.accept());
+async function click(text: string) {
+  await page.waitForFunction(
+    (text) =>
+      [...document.querySelectorAll("button")].some(
+        (b) => b.textContent?.trim() === text && !b.disabled,
+      ),
+    {},
+    text,
+  );
+  await page.evaluate(
+    (text) =>
+      (
+        [...document.querySelectorAll("button")].find(
+          (b) => b.textContent?.trim() === text,
+        ) as HTMLButtonElement
+      ).click(),
+    text,
+  );
+}
+async function fill(selector: string, text: string) {
+  await page.click(selector);
+  await page.keyboard.down("Control");
+  await page.keyboard.press("A");
+  await page.keyboard.up("Control");
+  await page.keyboard.type(text);
+}
 try {
-  await page.goto(origin); await page.waitForSelector('#owner-key', { visible: true });
-  await page.type('#owner-key', readFileSync('.local/owner-key', 'utf8').trim()); await page.click('#login-form button');
-  await page.waitForSelector('#workspace', { visible: true }); await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('#new-document')!.disabled);
-  await page.click('#new-document'); await page.waitForSelector('#document-editor', { visible: true });
-  await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('#save')!.disabled);
-  await page.$eval('#document-title', element => { (element as HTMLInputElement).value = 'Browser acceptance'; element.dispatchEvent(new Event('input', { bubbles: true })); });
-  await page.$eval('textarea[data-field=html]', element => { (element as HTMLTextAreaElement).value = '<h1>Safe preview</h1><p onclick="parent.stolen=true">Hello</p><script>parent.stolen=true</script><img src="https://evil.test/probe">'; element.dispatchEvent(new Event('input', { bubbles: true })); });
-  await page.click('#save'); await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'Saved a new revision.');
-  const frame = page.frames().find(f => f.url() === 'about:srcdoc'); assert.ok(frame);
-  assert.equal(await frame!.$eval('h1', node => node.textContent), 'Safe preview');
-  assert.equal(await frame!.$eval('h1', node => getComputedStyle(node).color), 'rgb(39, 108, 84)');
+  const trial = await mcp();
+  const connection = parse(
+    await trial.callTool({ name: "get_connection", arguments: {} }),
+  );
+  assert.equal(connection.trial, true);
+  const created = await trial.callTool({
+    name: "create_document",
+    arguments: sample("My first report"),
+  });
+  assert.equal(created.isError, false);
+  const doc = parse(created);
+  const publication = parse(
+    await trial.callTool({
+      name: "publish_document",
+      arguments: { id: doc.id, expectedRevision: 1 },
+    }),
+  );
+  assert.ok(publication.url);
+  const blocked = await trial.callTool({
+    name: "create_document",
+    arguments: sample("Second"),
+  });
+  assert.equal(blocked.isError, true);
+  assert.equal(parse(blocked).details.code, "AUTH_REQUIRED");
+  const link = parse(
+    await trial.callTool({ name: "connect_account", arguments: {} }),
+  );
+  await page.goto(link.signInUrl);
+  await page.waitForSelector("input[name=email]");
+  await page.screenshot({ path: "/tmp/docsync-signin.png", fullPage: true });
+  await click("Create an account");
+  await page.type("input[name=email]", "browser@example.com");
+  await page.type("input[name=password]", "Browser account password 123!");
+  await click("Create account →");
+  await page.waitForSelector(".workspace");
+  await click("Claim my document");
+  await page.waitForFunction(() =>
+    document
+      .querySelector("[role=status]")
+      ?.textContent?.includes("Document added"),
+  );
+  await click("Generate token");
+  await page.waitForSelector('input[aria-label="New agent token"]');
+  const token = await page.$eval(
+    'input[aria-label="New agent token"]',
+    (el) => (el as HTMLInputElement).value,
+  );
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        "packages/mcp/docsync-mcp.cjs",
+        "login",
+        "--url",
+        origin,
+        "--token-stdin",
+      ],
+      { env, stdio: ["pipe", "pipe", "pipe"] },
+    );
+    child.on("error", reject);
+    child.on("exit", (code) =>
+      code === 0 ? resolve() : reject(new Error("MCP login failed")),
+    );
+    child.stdin.end(token);
+  });
+  const account = await mcp();
+  assert.equal(
+    parse(await account.callTool({ name: "get_connection", arguments: {} }))
+      .trial,
+    false,
+  );
+  assert.equal(
+    (await trial.callTool({ name: "get_document", arguments: { id: doc.id } }))
+      .isError,
+    true,
+  );
+  assert.equal(
+    (
+      await account.callTool({
+        name: "create_document",
+        arguments: sample("Account second document"),
+      })
+    ).isError,
+    false,
+  );
+  await page.reload();
+  await page.waitForSelector(".workspace");
+  // Navigate using the sidebar and open the claimed document.
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("nav button")].find((b) =>
+      b.textContent?.includes("My documents"),
+    ) as HTMLButtonElement;
+    button.click();
+  });
+  await page.waitForSelector(".document-card");
+  await page.screenshot({ path: "/tmp/docsync-library.png", fullPage: true });
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll(".document-card")].find((b) =>
+      b.textContent?.includes("My first report"),
+    ) as HTMLButtonElement;
+    button.click();
+  });
+  await page.waitForSelector(".editor-page");
+  await fill('input[aria-label="Document title"]', "Browser edited report");
+  await click("＋ Text section");
+  await page.waitForSelector("[contenteditable=true]");
+  await page.click("[contenteditable=true]");
+  await page.keyboard.type("A clear view of the coming year.");
+  await click("Save");
+  await page.waitForFunction(
+    () => document.querySelector("[role=status]")?.textContent === "Saved.",
+  );
+  // Unsafe HTML remains isolated during preview and is removed when saved.
+  await page.click(".component-editor summary");
+  await fill(
+    ".component-editor textarea",
+    '<h2>Safe component</h2><script>parent.stolen=true</script><p onclick="parent.stolen=true">Hello</p><img src="https://evil.example/probe">',
+  );
+  await click("Save");
+  await page.waitForFunction(
+    () => document.querySelector("[role=status]")?.textContent === "Saved.",
+  );
   assert.equal(await page.evaluate(() => (window as any).stolen), undefined);
-  assert.equal(await frame!.evaluate(() => document.querySelector('script,img,[onclick]')), null);
-  assert.equal(await page.$eval('iframe', iframe => iframe.getAttribute('sandbox')), '');
-  await page.click('#publish'); await page.waitForSelector('#modal[open]'); await page.click('#modal-content button');
-  await page.waitForSelector('#modal-content input'); const link = await page.$eval('#modal-content input', node => (node as HTMLInputElement).value);
-  await page.click('#modal-close');
-  await page.$eval('#document-title', element => { (element as HTMLInputElement).value = 'Private unsaved'; element.dispatchEvent(new Event('input', { bubbles: true })); });
-  const agentEnv = readFileSync('.local/mcp.env', 'utf8'); const token = agentEnv.match(/DOCSYNC_AGENT_TOKEN=(.+)/)![1];
-  const listResponse = await fetch(`${origin}/api/documents`, { headers: { Authorization: `Bearer ${token}` } }); const docs = await listResponse.json() as any[];
-  const doc = docs.find(d => d.title === 'Browser acceptance'); assert.ok(doc);
-  const current = await (await fetch(`${origin}/api/documents/${doc.id}`, { headers: { Authorization: `Bearer ${token}` } })).json() as any;
-  const changed = await fetch(`${origin}/api/documents/${doc.id}`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Agent update', sections: current.sections, expectedRevision: current.revision }) }); assert.equal(changed.status, 200);
-  await page.click('#save'); await page.waitForFunction(() => document.querySelector('#status')?.textContent?.startsWith('Document changed.'));
-  assert.equal(await page.$eval('#document-title', element => (element as HTMLInputElement).value), 'Private unsaved');
-  const reader = await browser.createBrowserContext(); const readPage = await reader.newPage(); await readPage.goto(link); await readPage.waitForSelector('#shared-title');
-  await readPage.waitForFunction(() => document.querySelector('#shared-title')?.textContent === 'Browser acceptance');
-  assert.equal(await readPage.$eval('#owner-actions', node => (node as HTMLElement).hidden), true);
-  // A hostile srcdoc also stays isolated even if a sanitization regression lets script through.
-  await readPage.evaluate(() => { const f = document.createElement('iframe'); f.id = 'hostile-test'; f.setAttribute('sandbox', ''); f.srcdoc = '<script>parent.stolen=true</script><p>isolated</p>'; document.body.append(f); });
-  await readPage.waitForFunction(() => Boolean(document.querySelector('#hostile-test')));
-  assert.equal(await readPage.evaluate(() => (window as any).stolen), undefined);
-  await page.click('#refresh'); await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'Loaded the latest revision.');
-  assert.equal(await page.$eval('#document-title', node => (node as HTMLInputElement).value), 'Agent update');
-  await page.click('#publish'); await page.waitForSelector('#modal[open]'); await page.$$eval('#modal-content button', buttons => (buttons.find(b => b.textContent === 'Revoke link') as HTMLButtonElement).click());
-  await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'Share link revoked.');
-  const revoked = await fetch(link.replace('/share/', '/api/shared/')); assert.equal(revoked.status, 404);
+  const frame = page.frames().find((x) => x.url() === "about:srcdoc");
+  assert.ok(frame);
+  await frame!.waitForSelector("h2");
+  assert.equal(
+    await frame!.$eval("h2", (e) => e.textContent),
+    "Safe component",
+  );
+  assert.equal(await frame!.$("script,img,[onclick]"), null);
+  await page.screenshot({ path: "/tmp/docsync-editor.png", fullPage: true });
+  await click("Share ↗");
+  await page.waitForSelector(".share-link a");
+  const sharedUrl = await page.$eval(
+    ".share-link a",
+    (a) => (a as HTMLAnchorElement).href,
+  );
+  const reader = await browser.createBrowserContext();
+  const publicPage = await reader.newPage();
+  await publicPage.goto(sharedUrl);
+  await publicPage.waitForFunction(
+    () => document.querySelector("h1")?.textContent === "Browser edited report",
+  );
+  assert.equal(await publicPage.$(".sidebar"), null);
+  // A stale save must preserve the user's draft.
+  await fill('input[aria-label="Document title"]', "Unsaved browser draft");
+  const current = parse(
+    await account.callTool({ name: "get_document", arguments: { id: doc.id } }),
+  );
+  await account.callTool({
+    name: "update_document",
+    arguments: {
+      id: doc.id,
+      expectedRevision: current.revision,
+      title: "Agent update",
+      sections: current.sections,
+    },
+  });
+  await click("Save");
+  await page.waitForFunction(() =>
+    document
+      .querySelector("[role=alert]")
+      ?.textContent?.includes("Document changed"),
+  );
+  assert.equal(
+    await page.$eval(
+      'input[aria-label="Document title"]',
+      (el) => (el as HTMLInputElement).value,
+    ),
+    "Unsaved browser draft",
+  );
+  await click("Revoke link");
+  assert.equal(
+    (await fetch(sharedUrl.replace("/share/", "/api/shared/"))).status,
+    404,
+  );
   await page.setViewport({ width: 390, height: 844 });
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  );
+  await page.screenshot({ path: "/tmp/docsync-mobile.png", fullPage: true });
+  await page.click('button[aria-label="Sign out"]');
+  await page.waitForSelector("input[name=email]");
   assert.deepEqual(errors, []);
-  console.log('Browser acceptance passed: editing, styled isolated preview, sharing, conflict preservation, refresh, revocation, mobile layout.');
-} finally { await browser.close(); }
+  console.log(
+    "Browser + packaged MCP acceptance passed: signup, free document, quota, claim, account token login, editor, sanitization, sharing, conflict preservation, revocation, logout, mobile.",
+  );
+} finally {
+  for (const client of clients) await client.close();
+  await browser.close();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  f.close();
+  rmSync(profile, { recursive: true, force: true });
+}

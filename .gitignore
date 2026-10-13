@@ -6,3 +6,7 @@ dist/
 .env
 *.sqlite*
 .gemini/
+
+packages/mcp/docsync-mcp.cjs
+packages/mcp/MCP-LICENSES.txt
+*.tgz

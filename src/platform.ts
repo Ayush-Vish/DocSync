@@ -10,6 +10,8 @@ export interface Database {
 }
 export interface Env {
   DB: Database;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   OWNER_KEY_HASH: string;
   SESSION_SECRET: string;
   ASSETS: { fetch(request: Request): Promise<Response> };
