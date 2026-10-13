@@ -12,9 +12,10 @@ CREATE TABLE revisions (
   created_at TEXT NOT NULL,
   PRIMARY KEY (document_id, revision)
 );
-CREATE TRIGGER revision_sequence BEFORE INSERT ON revisions BEGIN
-  SELECT CASE WHEN NEW.revision != (SELECT current_revision + 1 FROM documents WHERE id = NEW.document_id)
-    THEN RAISE(ABORT, 'revision conflict') END;
+CREATE TRIGGER revision_sequence BEFORE INSERT ON revisions
+WHEN NEW.revision != (SELECT current_revision + 1 FROM documents WHERE id = NEW.document_id)
+BEGIN
+  SELECT RAISE(ABORT, 'revision conflict');
 END;
 CREATE TRIGGER revision_head AFTER INSERT ON revisions BEGIN
   UPDATE documents SET current_revision = NEW.revision,
