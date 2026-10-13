@@ -300,7 +300,7 @@ function LandingPage({
 
         {/* Interactive Live Preview Showcase */}
         <div id="interactive-preview" className="landing-preview-box">
-          <div className="p-3 bg-muted/30 border-b border-border flex items-center justify-between flex-wrap gap-2">
+          <div className="p-2.5 sm:p-3 bg-muted/30 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                 Live Interactive Canvas
@@ -310,7 +310,7 @@ function LandingPage({
                 {VISUAL_TEMPLATES[activeTemplate].name}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full w-full sm:w-auto min-w-0 pb-0.5">
               {VISUAL_TEMPLATES.map((tmpl, idx) => {
                 const Icon = tmpl.icon;
                 return (
@@ -345,7 +345,7 @@ function LandingPage({
       </section>
 
       {/* Features Bento Grid */}
-      <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
+      <section id="features" className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-10 sm:py-12 box-border">
         <div className="text-center mb-10">
           <p className="eyebrow">DESIGNED FOR CLARITY</p>
           <h2 className="text-2xl font-bold tracking-tight">Everything you need to communicate clearly.</h2>
@@ -394,10 +394,10 @@ function LandingPage({
       </section>
 
       {/* How it Works with Agents */}
-      <section id="mcp-protocol" className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-12 text-center">
+      <section id="mcp-protocol" className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 sm:py-12 text-center box-border">
         <p className="eyebrow">AUTONOMOUS WORKFLOW</p>
         <h2 className="text-2xl font-bold tracking-tight mb-8">How It Works with Your AI Agent</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 text-left w-full">
           <div className="p-4 rounded-lg border border-border bg-card">
             <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">01. CONNECT</span>
             <h4 className="text-sm font-semibold mb-1">Add MCP Tool</h4>
