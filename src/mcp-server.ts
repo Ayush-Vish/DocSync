@@ -51,7 +51,7 @@ export function createMcpServer(origin: string, token: string, fetchApi: typeof 
         isError: !response.ok,
       };
     } catch (error) {
-      console.error("DocSync MCP API request failed", error instanceof Error ? error.name : "UnknownError");
+      console.error("DocSync MCP API request failed", error instanceof Error ? error.message.replace(/[a-f0-9]{64}/gi, "[redacted]") : "UnknownError");
       return {
         content: [
           {
