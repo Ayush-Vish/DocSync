@@ -10,6 +10,7 @@ import {
 } from "./auth.ts";
 import * as accounts from "./accounts.ts";
 import * as store from "./store.ts";
+import { handleRemoteMcp } from "./remote-mcp.ts";
 
 export const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -61,6 +62,8 @@ function revision(value: unknown): number {
 async function route(request: Request, env: Env): Promise<Response> {
   const { pathname } = new URL(request.url),
     method = request.method;
+  const remote = await handleRemoteMcp(request, env);
+  if (remote) return remote;
   if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
   if (
     !/^[a-f0-9]{64}$/.test(env.OWNER_KEY_HASH || "") ||
@@ -108,6 +111,24 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (principal.role !== "owner")
       throw new HttpError(403, "Owner access required");
   };
+  if (pathname === "/api/mcp-clients" && method === "GET") {
+    owner();
+    const clients = await env.DB.prepare(
+      "SELECT c.client_id,c.client_name,MAX(t.expires_at) AS access_expires FROM oauth_clients c JOIN (SELECT client_id,account_id,expires_at FROM oauth_access_tokens UNION ALL SELECT client_id,account_id,expires_at FROM oauth_refresh_tokens) t ON t.client_id=c.client_id WHERE t.account_id=? AND t.expires_at>? GROUP BY c.client_id,c.client_name ORDER BY c.client_name",
+    ).bind(principal.accountId, Math.floor(Date.now()/1000)).all();
+    return json(clients.results);
+  }
+  if (pathname === "/api/mcp-clients" && method === "DELETE") {
+    owner(); checkOrigin(request);
+    const clientId=(await body(request)).clientId;
+    if(typeof clientId!=="string" || !/^[a-f0-9]{64}$/.test(clientId)) throw new HttpError(400,"Invalid MCP client");
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM oauth_codes WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
+      env.DB.prepare("DELETE FROM oauth_access_tokens WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
+      env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
+    ]);
+    return json({ok:true});
+  }
   const linkAccess = ["localhost", "127.0.0.1", "[::1]"].includes(
     new URL(request.url).hostname,
   )

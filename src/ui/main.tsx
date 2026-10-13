@@ -337,6 +337,7 @@ function App() {
     return sessionStorage.getItem("docsync_claim") || "";
   });
   const [shared, setShared] = useState<Content | null>(null);
+  const [mcpClients, setMcpClients] = useState<{client_id:string;client_name:string;access_expires:number}[]>([]);
   const sharePath = location.pathname.startsWith("/share/");
 
   async function run(action: () => Promise<void>) {
@@ -377,6 +378,11 @@ function App() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (view !== "connect" || !session) return;
+    void api("/mcp-clients").then(setMcpClients).catch((e) => setError(message(e)));
+  }, [view, session]);
 
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => {
@@ -859,11 +865,12 @@ function App() {
             )}
             <div className="connect-card">
               <span className="step">01</span>
-              <h3 className="tracking-tight">Get your private token</h3>
+              <h3 className="tracking-tight">Optional: use a private token</h3>
               <p>
-                The token lets your agent access your documents. Keep it out of
-                conversations.
+                Use this for local stdio clients. Remote clients can connect below and authorize in your browser without copying a token.
               </p>
+              <details className="mt-3">
+                <summary>Generate or revoke a private token</summary>
               <label className="checkbox flex items-center gap-2 text-xs font-normal cursor-pointer my-4">
                 <input
                   type="checkbox"
@@ -945,44 +952,32 @@ function App() {
                   </Button>
                 </div>
               )}
+              </details>
             </div>
             <div className="connect-card">
               <span className="step">02</span>
-              <h3 className="tracking-tight">Connect your MCP client</h3>
+              <h3 className="tracking-tight">Connect directly from your client</h3>
               <p>
-                Requires Node.js 22.18 or newer and npm. Run the command for
-                your client; npx downloads the published DocSync MCP package.
+                Add DocSync as a remote MCP server. Your client opens a DocSync sign-in page to authorize access; no local server or copied token is needed.
               </p>
               <h4 className="mt-3">Codex CLI</h4>
-              <pre>{`codex mcp add docsync -- npx -y @ayush-vish/docsync-mcp@0.3.0 --url ${location.origin}`}</pre>
+              <pre>{`codex mcp add docsync --url ${location.origin}/mcp\ncodex mcp login docsync`}</pre>
               <h4 className="mt-3">Antigravity CLI</h4>
-              <pre>{`agy mcp add docsync npx -y @ayush-vish/docsync-mcp@0.3.0 --url ${location.origin}`}</pre>
+              <pre>{`agy mcp add --type http docsync ${location.origin}/mcp`}</pre>
               <h4 className="mt-3">Claude Code</h4>
-              <pre>{`claude mcp add --transport stdio --scope user docsync -- npx -y @ayush-vish/docsync-mcp@0.3.0 --url ${location.origin}`}</pre>
-              <p className="mt-3">
-                Save your token to a private file (permissions 600), then import
-                it:
-              </p>
-              <pre>{`npx -y @ayush-vish/docsync-mcp@0.3.0 login --url ${location.origin} --token-stdin < /path/to/private-token-file`}</pre>
+              <pre>{`claude mcp add --transport http docsync ${location.origin}/mcp`}</pre>
               <p className="text-xs text-muted-foreground mt-2">
-                Delete the temporary token file afterward and restart your
-                agent. Existing environment token overrides must be removed to
-                use the saved profile.
+                The client will open DocSync in your browser for sign-in and permission approval.
               </p>
               <details className="mt-3">
-                <summary>Other MCP clients</summary>
+                <summary>Other remote MCP clients</summary>
                 <pre>
                   {JSON.stringify(
                     {
                       mcpServers: {
                         docsync: {
-                          command: "npx",
-                          args: [
-                            "-y",
-                            "@ayush-vish/docsync-mcp@0.3.0",
-                            "--url",
-                            location.origin,
-                          ],
+                          type: "http",
+                          url: `${location.origin}/mcp`,
                         },
                       },
                     },
@@ -992,17 +987,29 @@ function App() {
                 </pre>
               </details>
               <details className="mt-3">
-                <summary>Standalone download</summary>
-                <p>Prefer a local file? Download the server and use its full path.</p>
+                <summary>Use a local stdio server</summary>
+                <p>For clients that do not support remote MCP servers.</p>
                 <Button variant="outline" size="sm" asChild>
                   <a href="/downloads/docsync-mcp.cjs" download>
                     <Download className="w-3.5 h-3.5 mr-1.5" />
                     Download MCP server
                   </a>
                 </Button>
-                <p className="mt-2">Replace npx and its package arguments above with:</p>
-                <pre>node /path/to/docsync-mcp.cjs</pre>
+                <pre>{`agy mcp add docsync node /path/to/docsync-mcp.cjs --url ${location.origin}`}</pre>
               </details>
+              <div className="mt-4 border-t pt-3">
+                <h4>Authorized MCP clients</h4>
+                {mcpClients.length ? mcpClients.map((client) => (
+                  <div key={client.client_id} className="flex items-center justify-between gap-3 py-2">
+                    <span className="text-sm">{client.client_name}</span>
+                    <Button variant="outline" size="sm" disabled={busy} onClick={() => void run(async () => {
+                      await api("/mcp-clients", "DELETE", {clientId:client.client_id});
+                      setMcpClients(mcpClients.filter((item)=>item.client_id!==client.client_id));
+                      setNotice(`${client.client_name} access revoked.`);
+                    })}>Revoke access</Button>
+                  </div>
+                )) : <p className="text-xs text-muted-foreground">No remote MCP clients authorized yet.</p>}
+              </div>
             </div>
             <div className="connect-card">
               <span className="step">03</span>

@@ -120,6 +120,19 @@ agy mcp add docsync npx -y @ayush-vish/docsync-mcp --url https://YOUR_HOST
 
 A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Seven tools are exposed: `get_connection`, `connect_account`, `list_documents`, `get_document`, `create_document`, `update_document`, and `publish_document`.
 
+### Hosted MCP (OAuth)
+
+For clients with remote MCP and OAuth support, connect directly without installing Node.js or copying a token:
+
+```sh
+codex mcp add docsync --url https://YOUR_HOST/mcp
+codex mcp login docsync
+agy mcp add --type http docsync https://YOUR_HOST/mcp
+claude mcp add --transport http docsync https://YOUR_HOST/mcp
+```
+
+The browser authorization page grants document access and lets the user separately allow publishing. OAuth uses authorization code with PKCE, short-lived access tokens, rotating refresh tokens, and account-scoped revocation from **Connect agent**. Hosted MCP requires migrations through `0004_remote_mcp_oauth.sql`. Local stdio with private agent tokens remains available for clients without remote OAuth.
+
 ## Content and sharing
 
 The document model is `{title, sections: [{id, kind?, html, css}]}`. `kind: "text"` is for supported rich text; `kind: "html"` (or omitted for older documents) preserves arbitrary supported components. Agents should use HTML mode for layouts, custom classes, or CSS. Text sections are edited through TipTap's schema and should contain only supported headings, paragraphs, inline formatting, lists, quotes, code blocks, and tables.

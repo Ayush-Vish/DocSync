@@ -115,6 +115,12 @@ export async function authenticate(
         accountId: credential.account_id,
         kind: credential.kind,
       };
+    const oauth = await env.DB.prepare(
+      "SELECT t.account_id,t.can_publish,a.kind FROM oauth_access_tokens t JOIN accounts a ON a.id=t.account_id WHERE t.token_hash=? AND t.expires_at>?",
+    )
+      .bind(await hash(bearer.slice(7)), Math.floor(Date.now() / 1000))
+      .first<{ account_id: string; can_publish: number; kind: Principal["kind"] }>();
+    if (oauth) return { role: "agent", canPublish: oauth.can_publish === 1, accountId: oauth.account_id, kind: oauth.kind };
     const stored = await env.DB.prepare(
       "SELECT token_hash,can_publish FROM agent_credentials WHERE slot=1",
     ).first<{ token_hash: string; can_publish: number }>();
