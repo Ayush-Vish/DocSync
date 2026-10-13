@@ -13,6 +13,16 @@ function page(client: string, fields: Record<string, string>, error = "", signed
   const hidden = Object.entries(fields).map(([k,v]) => `<input type="hidden" name="${html(k)}" value="${html(v)}">`).join("");
   return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect ${html(client)} to DocSync</title><style>body{font:16px system-ui;max-width:440px;margin:12vh auto;padding:24px;color:#202124}form{display:grid;gap:14px}input{padding:12px;border:1px solid #bbb;border-radius:8px}button{padding:12px;background:#171717;color:white;border:0;border-radius:8px;cursor:pointer}.error{color:#b42318}</style><h1>Connect ${html(client)} to DocSync</h1><p>Authorize this agent to read and edit your DocSync documents. You can revoke access from Connect agent.</p>${error ? `<p class="error">${html(error)}</p>` : ""}<form method="post">${hidden}${signedIn ? `<p>Signed in as ${html(signedIn)}</p>` : `<label>Email<br><input required type="email" name="email" autocomplete="username"></label><label>Password<br><input required type="password" name="password" autocomplete="current-password"></label>`}<label><input type="checkbox" name="publish" value="yes"> Allow this agent to publish share links</label><button>Authorize DocSync</button></form><p><a href="/">Create an account in DocSync first</a></p>`, { headers: { "Content-Type": "text/html;charset=utf-8", "Cache-Control": "no-store" } });
 }
+async function retryPage(env: Env, client: string, fields: Record<string, string>, error: string) {
+  const csrf = randomToken();
+  await env.DB.prepare("INSERT INTO oauth_authorizations VALUES(?,?,?,?,?,?)")
+    .bind(await hash(csrf), fields.client_id, fields.redirect_uri, fields.code_challenge, fields.state || null, now() + 600)
+    .run();
+  return page(client, { ...fields, csrf }, error);
+}
+function expiredPage() {
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Authorization expired</title><style>body{font:16px system-ui;max-width:440px;margin:12vh auto;padding:24px;color:#202124}</style><h1>Authorization expired</h1><p>This DocSync authorization request expired or was already used. Return to your agent and start the connection again.</p>`, { status: 403, headers: { "Content-Type": "text/html;charset=utf-8", "Cache-Control": "no-store" } });
+}
 function redirect(url: string, values: Record<string,string>) {
   const to = new URL(url); for (const [k,v] of Object.entries(values)) to.searchParams.set(k,v);
   return Response.redirect(to.toString(),302);
@@ -49,7 +59,7 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
   if (path === "/oauth/authorize" && method === "POST") {
     const form = await request.formData(), csrf=String(form.get("csrf")||"");
     const authorization=await env.DB.prepare("DELETE FROM oauth_authorizations WHERE csrf_hash=? RETURNING client_id,redirect_uri,code_challenge,state,expires_at").bind(await hash(csrf)).first<{client_id:string;redirect_uri:string;code_challenge:string;state:string|null;expires_at:number}>();
-    if(!authorization||authorization.expires_at<=now()) return json({error:"authorization_expired"},403);
+    if(!authorization||authorization.expires_at<=now()) return expiredPage();
     const fields={client_id:authorization.client_id,redirect_uri:authorization.redirect_uri,code_challenge:authorization.code_challenge,state:authorization.state||""};
     const client = await env.DB.prepare("SELECT client_name,redirect_uris FROM oauth_clients WHERE client_id=?").bind(fields.client_id).first<{client_name:string;redirect_uris:string}>();
     if (!client || !(JSON.parse(client.redirect_uris) as string[]).includes(fields.redirect_uri) || !/^[A-Za-z0-9_-]{43}$/.test(fields.code_challenge)) return json({error:"invalid_request"},400);
@@ -59,10 +69,10 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
     const email=String(form.get("email")||""),password=String(form.get("password")||"");
     if (email && password) {
       try { sessionCookie = await (await import("./accounts.ts")).emailAuth(new Request(`${origin}/oauth/authorize`,{method:"POST",headers:{Origin:origin,"Content-Type":"application/json"}}),env,{email,password},false); }
-      catch(error) { if(error instanceof HttpError && error.status===401) return page(client.client_name,fields,"Email or password is incorrect."); throw error; }
+      catch(error) { if(error instanceof HttpError && error.status===401) return retryPage(env,client.client_name,fields,"Email or password is incorrect."); throw error; }
       const value=sessionCookie.split(";")[0].slice("docsync_account=".length);
       const session=await env.DB.prepare("SELECT account_id FROM account_sessions WHERE token_hash=? AND expires_at>?").bind(await hash(value),now()).first<{account_id:string}>();
-      if(!session) return page(client.client_name,fields,"Sign-in failed; check your credentials.");
+      if(!session) return retryPage(env,client.client_name,fields,"Sign-in failed; check your credentials.");
       accountId=session.account_id;
     } else {
       try {
@@ -70,7 +80,7 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
         const authRequest=new Request(request.url,{method:request.method,headers:authHeaders});
         const user=await authenticate(authRequest,env); if(user.role!=="owner" || user.kind!=="user") throw new Error(); accountId=user.accountId;
       }
-      catch { return page(client.client_name,fields,"Enter your DocSync email and password to continue."); }
+      catch { return retryPage(env,client.client_name,fields,"Enter your DocSync email and password to continue."); }
     }
     const code=randomToken(), canPublish=form.get("publish")==="yes", scope=canPublish?"docsync docsync:publish":"docsync";
     await env.DB.prepare("DELETE FROM oauth_codes WHERE expires_at<?").bind(now()).run();
