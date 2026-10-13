@@ -85,10 +85,16 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
     const code=randomToken(), canPublish=form.get("publish")==="yes", scope=canPublish?"docsync docsync:publish":"docsync";
     await env.DB.prepare("DELETE FROM oauth_codes WHERE expires_at<?").bind(now()).run();
     await env.DB.prepare("INSERT INTO oauth_codes VALUES(?,?,?,?,?,?,?)").bind(await hash(code),fields.client_id,accountId,fields.redirect_uri,fields.code_challenge,scope,now()+300).run();
-    const headers=new Headers(); const callback=new URL(fields.redirect_uri); callback.searchParams.set("code",code); if(fields.state)callback.searchParams.set("state",fields.state); headers.set("Location",callback.toString());
-    const response=new Response(null,{status:302,headers});
-    if(sessionCookie) response.headers.append("Set-Cookie",sessionCookie);
-    return response;
+    const headers = new Headers();
+    const callback = new URL(fields.redirect_uri);
+    callback.searchParams.set("code", code);
+    if (fields.state) callback.searchParams.set("state", fields.state);
+    headers.set("Location", callback.toString());
+    headers.set("Content-Type", "text/html;charset=utf-8");
+    if (sessionCookie) headers.append("Set-Cookie", sessionCookie);
+    const callbackUrl = callback.toString();
+    const body = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connecting to agent...</title><meta http-equiv="refresh" content="0;url=${html(callbackUrl)}"><style>body{font:16px system-ui;max-width:480px;margin:12vh auto;padding:24px;color:#202124}a.button{display:inline-block;padding:12px 18px;background:#171717;color:white;text-decoration:none;border-radius:8px;margin:16px 0;font-weight:500}pre{background:#f4f4f4;padding:12px;border-radius:6px;word-break:break-all;white-space:pre-wrap;font-size:13px}</style><h1>Authorization granted</h1><p>Connecting to your agent...</p><p><a class="button" href="${html(callbackUrl)}">Complete connection ↗</a></p><p style="font-size:13px;color:#666">If your terminal asks for the callback URL, copy and paste this into your terminal:</p><pre>${html(callbackUrl)}</pre><script>location.href=${JSON.stringify(callbackUrl)};</script>`;
+    return new Response(body, { status: 302, headers });
   }
   if (path === "/oauth/token" && method === "POST") {
     const form=await request.formData(), grant=String(form.get("grant_type")||""), clientId=String(form.get("client_id")||"");

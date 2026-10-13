@@ -179,7 +179,7 @@ function RichText({
           aria-label="Undo"
           onClick={() => editor.chain().focus().undo().run()}
         >
-          <Undo2 className="w-3.5 h-3.5 mr-1" />↶
+          <Undo2 className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
@@ -187,7 +187,7 @@ function RichText({
           aria-label="Redo"
           onClick={() => editor.chain().focus().redo().run()}
         >
-          <Redo2 className="w-3.5 h-3.5 mr-1" />↷
+          <Redo2 className="w-3.5 h-3.5" />
         </button>
         <span className="divider" />
         <button
@@ -688,8 +688,8 @@ function App() {
             });
           }}
         >
-          <Plus className="w-4 h-4" />
-          <span>＋</span> New document
+          <Plus className="w-4 h-4 shrink-0" />
+          <span>New document</span>
         </Button>
         <nav className="space-y-1">
           <button
@@ -710,8 +710,8 @@ function App() {
             }}
           >
             <span className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              ▤ <span>My documents</span>
+              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span>My documents</span>
             </span>
             <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground">
               <small>{documents.length}</small>
@@ -728,8 +728,8 @@ function App() {
             )}
             onClick={() => void connect()}
           >
-            <Bot className="w-4 h-4 text-muted-foreground" />
-            ⌘ <span>Connect agent</span>
+            <Bot className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span>Connect agent</span>
           </button>
         </nav>
         <div className="sidebar-note mt-auto rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
@@ -750,7 +750,7 @@ function App() {
           </span>
           <button
             type="button"
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-0 bg-transparent"
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer border-0 bg-transparent flex items-center justify-center"
             title="Sign out"
             aria-label="Sign out"
             disabled={busy}
@@ -766,7 +766,6 @@ function App() {
             }}
           >
             <LogOut className="w-3.5 h-3.5" />
-            ↗
           </button>
         </div>
       </aside>
@@ -849,7 +848,7 @@ function App() {
                       sessionStorage.removeItem("docsync_claim");
                       await refresh();
                       setNotice(
-                        "Document added to your workspace. Generate your account token below.",
+                        "Document added to your workspace. Connect your MCP client from this page.",
                       );
                     })
                   }
@@ -1021,7 +1020,7 @@ function App() {
               <p className="text-xs text-muted-foreground">
                 {["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
                   ? "Localhost links are local previews. Use a deployed DocSync server to share with other people."
-                  : "Enable publishing when generating your token to let your agent return a share link. Anyone with the link can view the published document."}
+                  : "During browser authorization, allow publishing if you want the agent to return share links. Anyone with a published link can view that document."}
               </p>
             </div>
           </section>
@@ -1233,7 +1232,6 @@ function App() {
                         }}
                       >
                         <ArrowUp className="w-3.5 h-3.5" />
-                        ↑
                       </Button>
                       <Button
                         variant="ghost"
@@ -1251,7 +1249,6 @@ function App() {
                         }}
                       >
                         <ArrowDown className="w-3.5 h-3.5" />
-                        ↓
                       </Button>
                       <Button
                         variant="ghost"
@@ -1336,7 +1333,7 @@ function App() {
               <div className="add-section">
                 <Button
                   variant="outline"
-                  className="border-dashed gap-1 text-xs"
+                  className="border-dashed text-xs h-8"
                   disabled={doc.sections.length >= 40}
                   onClick={() =>
                     change({
@@ -1353,12 +1350,11 @@ function App() {
                     })
                   }
                 >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
                   ＋ Text section
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-dashed gap-1 text-xs"
+                  className="border-dashed text-xs h-8"
                   disabled={doc.sections.length >= 40}
                   onClick={() =>
                     change({
@@ -1375,7 +1371,6 @@ function App() {
                     })
                   }
                 >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
                   ＋ HTML component
                 </Button>
               </div>
@@ -1418,8 +1413,7 @@ function App() {
                   >
                     <div className="document-thumbnail">
                       <span className="paper-icon">
-                        <FileText className="w-7 h-7 text-muted-foreground/60" />
-                        ▤
+                        <FileText className="w-8 h-8 text-muted-foreground/40" />
                       </span>
                       <div />
                       <div />

@@ -14,6 +14,9 @@ import { handleRemoteMcp } from "./remote-mcp.ts";
 
 export const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+
+export const oauthPolicy =
+  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self' http: https:; frame-ancestors 'none'";
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -401,7 +404,11 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   secured.headers.set("Cache-Control", "no-store");
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("Referrer-Policy", "no-referrer");
-  secured.headers.set("Content-Security-Policy", appPolicy);
+  const { pathname } = new URL(request.url);
+  secured.headers.set(
+    "Content-Security-Policy",
+    pathname.startsWith("/oauth/") ? oauthPolicy : appPolicy,
+  );
   secured.headers.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",
