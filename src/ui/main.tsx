@@ -129,25 +129,25 @@ const VISUAL_TEMPLATES = [
     name: "KPI Metrics",
     icon: LayoutGrid,
     html: `<article class="slide">\n  <span class="badge">KEY METRICS</span>\n  <h2>Performance Overview</h2>\n  <div class="metrics-grid">\n    <div class="card">\n      <span class="num">$2.4M</span>\n      <span class="label">ARR (+38% YoY)</span>\n    </div>\n    <div class="card">\n      <span class="num">99.98%</span>\n      <span class="label">Uptime SLA</span>\n    </div>\n    <div class="card">\n      <span class="num">14,200</span>\n      <span class="label">Active Teams</span>\n    </div>\n  </div>\n</article>`,
-    css: `.slide { padding: 36px; font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; text-transform: uppercase; }\nh2 { font-size: 26px; margin: 8px 0 24px; letter-spacing: -0.5px; color: #09090b; }\n.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }\n.card { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }\n.num { display: block; font-size: 30px; font-weight: 700; color: #09090b; margin-bottom: 4px; }\n.label { font-size: 12px; color: #71717a; font-weight: 500; }`,
+    css: `.slide { padding: clamp(16px, 4vw, 36px); font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; box-sizing: border-box; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; text-transform: uppercase; }\nh2 { font-size: clamp(18px, 3.5vw, 26px); margin: 6px 0 16px; letter-spacing: -0.5px; color: #09090b; }\n.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 12px; }\n.card { background: #fff; padding: clamp(10px, 2vw, 20px); border-radius: 8px; border: 1px solid #e4e4e7; box-shadow: 0 1px 3px rgba(0,0,0,0.03); box-sizing: border-box; }\n.num { display: block; font-size: clamp(18px, 3.5vw, 30px); font-weight: 700; color: #09090b; margin-bottom: 4px; }\n.label { font-size: clamp(10px, 1.8vw, 12px); color: #71717a; font-weight: 500; }`,
   },
   {
     name: "Bar Chart",
     icon: BarChart3,
     html: `<article class="slide">\n  <span class="badge">GROWTH TRAJECTORY</span>\n  <h2>Revenue by Quarter</h2>\n  <div class="chart">\n    <div class="col"><div class="bar" style="height: 35%"><span class="val">$1.2M</span></div><span class="sub">Q1</span></div>\n    <div class="col"><div class="bar" style="height: 55%"><span class="val">$1.8M</span></div><span class="sub">Q2</span></div>\n    <div class="col"><div class="bar" style="height: 75%"><span class="val">$2.4M</span></div><span class="sub">Q3</span></div>\n    <div class="col"><div class="bar highlight" style="height: 100%"><span class="val">$3.2M</span></div><span class="sub">Q4 (Est)</span></div>\n  </div>\n</article>`,
-    css: `.slide { padding: 36px; font-family: system-ui, sans-serif; background: #fff; border-radius: 12px; border: 1px solid #e4e4e7; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; }\nh2 { font-size: 26px; margin: 8px 0 28px; letter-spacing: -0.5px; color: #09090b; }\n.chart { display: flex; align-items: flex-end; gap: 20px; height: 180px; padding-bottom: 20px; border-bottom: 1px solid #e4e4e7; }\n.col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 8px; }\n.bar { width: 100%; background: #e4e4e7; border-radius: 6px; display: flex; align-items: flex-start; justify-content: center; padding-top: 8px; transition: all 0.3s; }\n.bar.highlight { background: #09090b; }\n.bar .val { font-size: 11px; font-weight: 600; color: #71717a; }\n.bar.highlight .val { color: #fff; }\n.col .sub { font-size: 12px; color: #71717a; font-weight: 500; }`,
+    css: `.slide { padding: clamp(16px, 4vw, 36px); font-family: system-ui, sans-serif; background: #fff; border-radius: 12px; border: 1px solid #e4e4e7; box-sizing: border-box; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; }\nh2 { font-size: clamp(18px, 3.5vw, 26px); margin: 6px 0 clamp(12px, 3vw, 28px); letter-spacing: -0.5px; color: #09090b; }\n.chart { display: flex; align-items: flex-end; gap: clamp(8px, 2vw, 20px); height: clamp(100px, 20vw, 180px); padding-bottom: 12px; border-bottom: 1px solid #e4e4e7; }\n.col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }\n.bar { width: 100%; background: #e4e4e7; border-radius: 6px; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px; transition: all 0.3s; }\n.bar.highlight { background: #09090b; }\n.bar .val { font-size: clamp(9px, 1.5vw, 11px); font-weight: 600; color: #71717a; }\n.bar.highlight .val { color: #fff; }\n.col .sub { font-size: clamp(10px, 1.8vw, 12px); color: #71717a; font-weight: 500; }`,
   },
   {
     name: "Comparison",
     icon: Columns,
     html: `<article class="slide">\n  <span class="badge">PRODUCT COMPARISON</span>\n  <h2>DocSync vs Traditional Tools</h2>\n  <div class="split">\n    <div class="box">\n      <h3>Standard Word Docs</h3>\n      <ul>\n        <li>Static text with no real-time code</li>\n        <li>Rigid table styling</li>\n        <li>No AI Agent MCP protocol</li>\n      </ul>\n    </div>\n    <div class="box highlight">\n      <h3>DocSync Presentation</h3>\n      <ul>\n        <li>HTML + CSS interactive components</li>\n        <li>Real-time live rendering</li>\n        <li>Autonomous MCP agent tools</li>\n      </ul>\n    </div>\n  </div>\n</article>`,
-    css: `.slide { padding: 36px; font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; }\nh2 { font-size: 26px; margin: 8px 0 24px; letter-spacing: -0.5px; color: #09090b; }\n.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }\n.box { background: #fff; padding: 22px; border-radius: 8px; border: 1px solid #e4e4e7; }\n.box.highlight { border-color: #09090b; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }\nh3 { font-size: 16px; margin: 0 0 12px; color: #09090b; }\nul { padding-left: 20px; margin: 0; font-size: 13px; color: #52525b; line-height: 1.7; }`,
+    css: `.slide { padding: clamp(16px, 4vw, 36px); font-family: system-ui, sans-serif; background: #fafafa; border-radius: 12px; box-sizing: border-box; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #71717a; }\nh2 { font-size: clamp(18px, 3.5vw, 26px); margin: 6px 0 16px; letter-spacing: -0.5px; color: #09090b; }\n.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }\n.box { background: #fff; padding: clamp(12px, 2vw, 22px); border-radius: 8px; border: 1px solid #e4e4e7; box-sizing: border-box; }\n.box.highlight { border-color: #09090b; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }\nh3 { font-size: clamp(13px, 2vw, 16px); margin: 0 0 8px; color: #09090b; }\nul { padding-left: 16px; margin: 0; font-size: clamp(11px, 1.8vw, 13px); color: #52525b; line-height: 1.6; }`,
   },
   {
     name: "Quote Slide",
     icon: Quote,
     html: `<article class="slide quote-slide">\n  <blockquote>“Great presentations don’t just report numbers—they create a shared picture of what’s next.”</blockquote>\n  <p class="author">— Strategy & Operations, FY27</p>\n</article>`,
-    css: `.slide { padding: 50px 40px; font-family: system-ui, sans-serif; background: #09090b; color: #fff; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; min-height: 220px; }\nblockquote { font-size: 24px; font-style: italic; line-height: 1.45; margin: 0 0 16px; font-weight: 400; color: #fff; border: 0; padding: 0; }\n.author { font-size: 13px; color: #a1a1aa; font-weight: 500; margin: 0; }`,
+    css: `.slide { padding: clamp(24px, 5vw, 50px) clamp(20px, 4vw, 40px); font-family: system-ui, sans-serif; background: #09090b; color: #fff; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; min-height: 140px; box-sizing: border-box; }\nblockquote { font-size: clamp(15px, 3vw, 24px); font-style: italic; line-height: 1.45; margin: 0 0 12px; font-weight: 400; color: #fff; border: 0; padding: 0; }\n.author { font-size: clamp(11px, 1.8vw, 13px); color: #a1a1aa; font-weight: 500; margin: 0; }`,
   },
 ];
 
@@ -220,10 +220,10 @@ function LandingPage({
     <div className="landing-page select-none">
       {/* Sticky Navigation Bar */}
       <header className="landing-nav">
-        <div className="max-w-6xl mx-auto flex items-center justify-between py-3.5 px-6">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-4 sm:px-6">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {brand}
-            <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
+            <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0 hidden xs:inline-flex">
               v0.3.0
             </Badge>
           </div>
@@ -238,11 +238,11 @@ function LandingPage({
               Agent Protocol
             </a>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <Button
               variant="ghost"
               size="sm"
-              className="text-xs h-8 px-3"
+              className="text-xs h-8 px-2 sm:px-3"
               onClick={onSignIn}
             >
               Sign in
@@ -250,10 +250,11 @@ function LandingPage({
             <Button
               variant="default"
               size="sm"
-              className="text-xs h-8 px-3.5 font-medium"
+              className="text-xs h-8 px-2.5 sm:px-3.5 font-medium"
               onClick={onSignUp}
             >
-              Get Started Free
+              <span className="hidden sm:inline">Get Started Free</span>
+              <span className="sm:hidden">Get Started</span>
             </Button>
           </div>
         </div>
@@ -261,9 +262,9 @@ function LandingPage({
 
       {/* Hero Section */}
       <section className="landing-hero">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/80 text-[11px] font-medium text-muted-foreground border border-border mb-4">
-          <Sparkles className="w-3.5 h-3.5 text-foreground" />
-          <span>MINIMALIST WORKSPACE FOR HUMANS & AI AGENTS</span>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/80 text-[10px] sm:text-[11px] font-medium text-muted-foreground border border-border mb-4 text-center max-w-full leading-normal">
+          <Sparkles className="w-3.5 h-3.5 text-foreground shrink-0" />
+          <span className="truncate sm:whitespace-normal">MINIMALIST WORKSPACE FOR HUMANS & AI AGENTS</span>
         </div>
         <h1>
           A clearer space for your ideas.
@@ -275,10 +276,10 @@ function LandingPage({
         <p className="subtitle">
           Write reports, craft interactive 16:9 slide decks with real-time HTML & CSS visualizations, and connect autonomous AI agents natively via Model Context Protocol.
         </p>
-        <div className="flex items-center justify-center gap-3 flex-wrap">
+        <div className="flex items-center justify-center gap-3 flex-wrap w-full max-w-sm sm:max-w-none mx-auto">
           <Button
             size="lg"
-            className="h-10 px-6 text-xs font-medium gap-2"
+            className="h-10 px-6 text-xs font-medium gap-2 w-full sm:w-auto"
             onClick={onSignUp}
           >
             Get Started Free
@@ -287,7 +288,7 @@ function LandingPage({
           <Button
             variant="outline"
             size="lg"
-            className="h-10 px-5 text-xs font-medium"
+            className="h-10 px-5 text-xs font-medium w-full sm:w-auto"
             onClick={onSignIn}
           >
             Sign In to Workspace
@@ -300,16 +301,16 @@ function LandingPage({
         {/* Interactive Live Preview Showcase */}
         <div id="interactive-preview" className="landing-preview-box">
           <div className="p-3 bg-muted/30 border-b border-border flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                 Live Interactive Canvas
               </span>
               <span className="text-xs text-muted-foreground">·</span>
-              <span className="text-xs text-muted-foreground font-medium">
+              <span className="text-xs text-muted-foreground font-medium truncate">
                 {VISUAL_TEMPLATES[activeTemplate].name}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5">
               {VISUAL_TEMPLATES.map((tmpl, idx) => {
                 const Icon = tmpl.icon;
                 return (
@@ -317,7 +318,7 @@ function LandingPage({
                     key={tmpl.name}
                     variant={idx === activeTemplate ? "secondary" : "ghost"}
                     size="sm"
-                    className="h-7 text-xs px-2.5 font-medium"
+                    className="h-7 text-xs px-2 sm:px-2.5 font-medium shrink-0"
                     onClick={() => setActiveTemplate(idx)}
                   >
                     <Icon className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
@@ -344,7 +345,7 @@ function LandingPage({
       </section>
 
       {/* Features Bento Grid */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-12">
+      <section id="features" className="max-w-6xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
         <div className="text-center mb-10">
           <p className="eyebrow">DESIGNED FOR CLARITY</p>
           <h2 className="text-2xl font-bold tracking-tight">Everything you need to communicate clearly.</h2>
@@ -393,7 +394,7 @@ function LandingPage({
       </section>
 
       {/* How it Works with Agents */}
-      <section id="mcp-protocol" className="max-w-4xl mx-auto px-6 py-12 text-center">
+      <section id="mcp-protocol" className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-12 text-center">
         <p className="eyebrow">AUTONOMOUS WORKFLOW</p>
         <h2 className="text-2xl font-bold tracking-tight mb-8">How It Works with Your AI Agent</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
@@ -434,7 +435,7 @@ function LandingPage({
 
       {/* Footer */}
       <footer className="landing-footer">
-        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4 text-xs text-muted-foreground">
+        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4 text-xs text-muted-foreground px-4 sm:px-0">
           <div className="flex items-center gap-2">
             {brand}
             <span>· Minimalism UI & Model Context Protocol</span>
@@ -471,7 +472,7 @@ function LoginPage({
 }) {
   return (
     <div className="auth-centered-layout">
-      <div className="mb-6 flex items-center justify-between w-full max-w-[420px]">
+      <div className="mb-4 sm:mb-6 flex items-center justify-between w-full max-w-[420px]">
         <Button
           type="button"
           variant="ghost"
@@ -1027,10 +1028,10 @@ function App() {
       </aside>
       <main className="workspace">
         <header className="topbar">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground min-w-0">
             <span>Workspace</span>
             <span className="slash">/</span>
-            <span className="text-foreground">
+            <span className="text-foreground truncate">
               {view === "connect"
                 ? "Connect agent"
                 : doc
@@ -1038,7 +1039,7 @@ function App() {
                   : "My documents"}
             </span>
           </div>
-          <div>
+          <div className="shrink-0">
             {doc ? (
               dirty ? (
                 <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 text-xs font-normal">
@@ -1422,14 +1423,14 @@ function App() {
               </p>
             )}
             {share && (
-              <div className="share-link">
-                <a href={share} target="_blank" rel="noreferrer">
+              <div className="share-link flex-wrap sm:flex-nowrap">
+                <a href={share} target="_blank" rel="noreferrer" className="break-all sm:truncate">
                   {share}
                 </a>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs shrink-0"
+                  className="h-7 text-xs shrink-0 w-full sm:w-auto"
                   onClick={() =>
                     void run(async () => {
                       await navigator.clipboard.writeText(share);
@@ -1989,12 +1990,12 @@ function App() {
                   A little structure for your next big idea.
                 </p>
               </div>
-              <div className="relative search">
+              <div className="relative search w-full sm:w-64">
                 <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   aria-label="Search documents"
                   placeholder="Search documents…"
-                  className="w-64 h-9 pl-9 pr-3 text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full h-9 pl-9 pr-3 text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-1 focus:ring-ring"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -2079,28 +2080,29 @@ function App() {
               />
             )}
           </div>
-          <div className="fullscreen-controls flex items-center justify-between w-full max-w-[1200px] mt-4 px-2 text-white">
+          <div className="fullscreen-controls flex items-center justify-between w-full max-w-[1200px] mt-4 px-2 text-white flex-wrap gap-2">
             <div className="text-xs font-mono text-zinc-400">
-              Slide {safeActiveSlide + 1} of {doc.sections.length} · Use ← → arrows or click to navigate
+              Slide {safeActiveSlide + 1} of {doc.sections.length}
+              <span className="hidden sm:inline"> · Use ← → arrows or click to navigate</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-8 px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
+                className="h-8 px-2.5 sm:px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
                 disabled={safeActiveSlide === 0}
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveSlide((prev) => Math.max(0, prev - 1));
                 }}
               >
-                <ChevronLeft className="w-4 h-4 mr-1" />
+                <ChevronLeft className="w-4 h-4 mr-0.5 sm:mr-1" />
                 Prev
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-8 px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
+                className="h-8 px-2.5 sm:px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
                 disabled={safeActiveSlide >= doc.sections.length - 1}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2108,19 +2110,19 @@ function App() {
                 }}
               >
                 Next
-                <ChevronRight className="w-4 h-4 ml-1" />
+                <ChevronRight className="w-4 h-4 ml-0.5 sm:ml-1" />
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                className="h-8 px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
+                className="h-8 px-2.5 sm:px-3 text-xs bg-zinc-800 text-white hover:bg-zinc-700 border-0"
                 onClick={(e) => {
                   e.stopPropagation();
                   setFullscreen(false);
                 }}
               >
-                <X className="w-4 h-4 mr-1" />
-                Exit (Esc)
+                <X className="w-4 h-4 mr-0.5 sm:mr-1" />
+                Exit<span className="hidden sm:inline"> (Esc)</span>
               </Button>
             </div>
           </div>

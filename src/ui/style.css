@@ -86,6 +86,12 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -1069,7 +1075,7 @@ blockquote {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .auth-layout {
     grid-template-columns: 1fr;
   }
@@ -1091,12 +1097,19 @@ blockquote {
   .sidebar {
     position: static;
     height: auto;
-    padding: 1rem;
+    padding: 0.875rem 1rem;
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 0.75rem;
     border-bottom: 1px solid var(--border);
     border-right: 0;
+  }
+
+  .sidebar .new-button {
+    width: auto;
+    padding: 0 0.875rem;
+    height: 2rem;
+    font-size: 0.75rem;
   }
 
   .sidebar nav {
@@ -1118,7 +1131,7 @@ blockquote {
   }
 
   .topbar {
-    height: 3rem;
+    height: 3.25rem;
     padding: 0 1rem;
   }
 
@@ -1168,6 +1181,103 @@ blockquote {
 
   .preview-stack iframe {
     min-height: 280px;
+  }
+
+  .fullscreen-overlay {
+    padding: 1rem 0.75rem;
+  }
+
+  .landing-hero {
+    padding: 3.5rem 1rem 2.25rem;
+  }
+
+  .landing-cta-banner {
+    margin: 2rem 1rem 3.5rem;
+    padding: 2.75rem 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .document-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .auth-centered-layout {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .auth-centered-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .landing-hero {
+    padding: 2.75rem 0.875rem 1.75rem;
+  }
+
+  .landing-hero h1 {
+    font-size: clamp(1.75rem, 6.5vw, 2.25rem);
+  }
+
+  .landing-preview-box {
+    margin-top: 1.5rem;
+  }
+
+  .landing-features-grid {
+    grid-template-columns: 1fr;
+    padding: 2rem 1rem;
+    gap: 1rem;
+  }
+
+  .landing-feature-card {
+    padding: 1.25rem;
+  }
+
+  .landing-cta-banner {
+    margin: 1.5rem 0.75rem 2.5rem;
+    padding: 2rem 1rem;
+  }
+
+  .slide-thumb {
+    width: 96px;
+  }
+
+  .fullscreen-overlay {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .library {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .editor-page {
+    padding: 1.25rem 0.75rem 3rem;
+  }
+
+  .document-text {
+    padding: 1rem 0.875rem;
+  }
+
+  .connect-page {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .connect-card,
+  .claim-card {
+    padding: 1rem;
+  }
+
+  .shared {
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+  }
+
+  .shared h1 {
+    font-size: 1.5rem;
+  }
+
+  .share-header {
+    padding: 0 1rem;
   }
 }
 
@@ -1224,22 +1334,22 @@ blockquote {
 }
 
 .landing-hero {
-  padding: 5.5rem 1.5rem 3.5rem;
+  padding: clamp(3.5rem, 7vw, 5.5rem) 1.5rem clamp(2rem, 5vw, 3.5rem);
   max-width: 1080px;
   margin: 0 auto;
   text-align: center;
 }
 
 .landing-hero h1 {
-  font-size: clamp(2.5rem, 5.5vw, 4.25rem);
+  font-size: clamp(1.875rem, 5.5vw, 4.25rem);
   font-weight: 700;
   letter-spacing: -0.04em;
-  line-height: 1.08;
+  line-height: 1.12;
   margin: 1.25rem 0 1.25rem;
 }
 
 .landing-hero .subtitle {
-  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-size: clamp(0.9375rem, 2vw, 1.25rem);
   color: var(--muted-foreground);
   max-width: 680px;
   margin: 0 auto 2.25rem;
@@ -1247,8 +1357,9 @@ blockquote {
 }
 
 .landing-preview-box {
-  margin: 3rem auto 0;
+  margin: 2.5rem auto 0;
   max-width: 980px;
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -1258,7 +1369,7 @@ blockquote {
 
 .landing-features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1.5rem;
   max-width: 1080px;
   margin: 0 auto;
@@ -1298,6 +1409,7 @@ blockquote {
 /* Dedicated Centered Login Page */
 .auth-centered-layout {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
