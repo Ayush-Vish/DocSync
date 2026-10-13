@@ -950,21 +950,20 @@ function App() {
               <span className="step">02</span>
               <h3 className="tracking-tight">Connect your MCP client</h3>
               <p>
-                Download the standalone server, then add it to your client using
-                the full path to the file. Requires Node.js 22.18 or newer.
+                Requires Node.js 22.18 or newer and npm. Run the command for
+                your client; npx downloads the published DocSync MCP package.
               </p>
-              <Button variant="outline" size="sm" asChild className="mb-3">
-                <a href="/downloads/docsync-mcp.cjs" download>
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                  Download MCP server ↓
-                </a>
-              </Button>
-              <pre>{`agy mcp add docsync node /path/to/docsync-mcp.cjs --url ${location.origin}`}</pre>
+              <h4 className="mt-3">Codex CLI</h4>
+              <pre>{`codex mcp add docsync -- npx -y @ayush-vish/docsync-mcp@0.3.0 --url ${location.origin}`}</pre>
+              <h4 className="mt-3">Antigravity CLI</h4>
+              <pre>{`agy mcp add docsync npx -y @ayush-vish/docsync-mcp@0.3.0 --url ${location.origin}`}</pre>
+              <h4 className="mt-3">Claude Code</h4>
+              <pre>{`claude mcp add --transport stdio --scope user docsync -- npx -y @ayush-vish/docsync-mcp@0.3.0 --url ${location.origin}`}</pre>
               <p className="mt-3">
                 Save your token to a private file (permissions 600), then import
                 it:
               </p>
-              <pre>{`node /path/to/docsync-mcp.cjs login --url ${location.origin} --token-stdin < /path/to/private-token-file`}</pre>
+              <pre>{`npx -y @ayush-vish/docsync-mcp@0.3.0 login --url ${location.origin} --token-stdin < /path/to/private-token-file`}</pre>
               <p className="text-xs text-muted-foreground mt-2">
                 Delete the temporary token file afterward and restart your
                 agent. Existing environment token overrides must be removed to
@@ -977,9 +976,10 @@ function App() {
                     {
                       mcpServers: {
                         docsync: {
-                          command: "node",
+                          command: "npx",
                           args: [
-                            "/path/to/docsync-mcp.cjs",
+                            "-y",
+                            "@ayush-vish/docsync-mcp@0.3.0",
                             "--url",
                             location.origin,
                           ],
@@ -991,6 +991,18 @@ function App() {
                   )}
                 </pre>
               </details>
+              <details className="mt-3">
+                <summary>Standalone download</summary>
+                <p>Prefer a local file? Download the server and use its full path.</p>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/downloads/docsync-mcp.cjs" download>
+                    <Download className="w-3.5 h-3.5 mr-1.5" />
+                    Download MCP server
+                  </a>
+                </Button>
+                <p className="mt-2">Replace npx and its package arguments above with:</p>
+                <pre>node /path/to/docsync-mcp.cjs</pre>
+              </details>
             </div>
             <div className="connect-card">
               <span className="step">03</span>
@@ -1000,8 +1012,9 @@ function App() {
                 link.
               </blockquote>
               <p className="text-xs text-muted-foreground">
-                Localhost links are local previews. Deploy DocSync to share with
-                other people.
+                {["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
+                  ? "Localhost links are local previews. Use a deployed DocSync server to share with other people."
+                  : "Enable publishing when generating your token to let your agent return a share link. Anyone with the link can view the published document."}
               </p>
             </div>
           </section>
