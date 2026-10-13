@@ -39,15 +39,22 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
     const clientId = url.searchParams.get("client_id") || "", redirectUri = url.searchParams.get("redirect_uri") || "", challenge = url.searchParams.get("code_challenge") || "", state = url.searchParams.get("state") || "", resource = url.searchParams.get("resource");
     const client = await env.DB.prepare("SELECT client_name,redirect_uris FROM oauth_clients WHERE client_id=?").bind(clientId).first<{client_name:string;redirect_uris:string}>();
     if (!client || !(JSON.parse(client.redirect_uris) as string[]).includes(redirectUri) || url.searchParams.get("response_type") !== "code" || url.searchParams.get("code_challenge_method") !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(challenge) || (resource && resource !== `${origin}/mcp`)) return json({error:"invalid_request"},400);
+    await env.DB.prepare("DELETE FROM oauth_authorizations WHERE expires_at<?").bind(now()).run();
+    const csrf=randomToken();
+    await env.DB.prepare("INSERT INTO oauth_authorizations VALUES(?,?,?,?,?,?)").bind(await hash(csrf),clientId,redirectUri,challenge,state||null,now()+600).run();
     let signedIn="";
     try { const user=await authenticate(request,env); if(user.role==="owner"&&user.kind==="user") signedIn=(await env.DB.prepare("SELECT email FROM accounts WHERE id=?").bind(user.accountId).first<{email:string}>())?.email||""; } catch {}
-    return page(client.client_name,{client_id:clientId,redirect_uri:redirectUri,code_challenge:challenge,state,resource:resource||""},"",signedIn);
+    return page(client.client_name,{csrf},"",signedIn);
   }
   if (path === "/oauth/authorize" && method === "POST") {
-    const form = await request.formData(), fields = Object.fromEntries(["client_id","redirect_uri","code_challenge","state","resource"].map(k=>[k,String(form.get(k)||"")]));
+    const form = await request.formData(), csrf=String(form.get("csrf")||"");
+    const authorization=await env.DB.prepare("DELETE FROM oauth_authorizations WHERE csrf_hash=? RETURNING client_id,redirect_uri,code_challenge,state,expires_at").bind(await hash(csrf)).first<{client_id:string;redirect_uri:string;code_challenge:string;state:string|null;expires_at:number}>();
+    if(!authorization||authorization.expires_at<=now()) return json({error:"authorization_expired"},403);
+    const fields={client_id:authorization.client_id,redirect_uri:authorization.redirect_uri,code_challenge:authorization.code_challenge,state:authorization.state||""};
     const client = await env.DB.prepare("SELECT client_name,redirect_uris FROM oauth_clients WHERE client_id=?").bind(fields.client_id).first<{client_name:string;redirect_uris:string}>();
     if (!client || !(JSON.parse(client.redirect_uris) as string[]).includes(fields.redirect_uri) || !/^[A-Za-z0-9_-]{43}$/.test(fields.code_challenge)) return json({error:"invalid_request"},400);
-    const originHeader = request.headers.get("Origin"); if (originHeader !== origin) return json({error:"origin_mismatch"},403);
+    // OAuth authorization uses a one-time request-bound CSRF token, so a
+    // reverse proxy may safely preserve a different browser-facing Origin.
     let accountId: string, sessionCookie = "";
     const email=String(form.get("email")||""),password=String(form.get("password")||"");
     if (email && password) {
@@ -58,7 +65,11 @@ export async function handleRemoteMcp(request: Request, env: Env): Promise<Respo
       if(!session) return page(client.client_name,fields,"Sign-in failed; check your credentials.");
       accountId=session.account_id;
     } else {
-      try { const user=await authenticate(request,env); if(user.role!=="owner" || user.kind!=="user") throw new Error(); accountId=user.accountId; }
+      try {
+        const authHeaders=new Headers(request.headers); authHeaders.set("Origin",origin);
+        const authRequest=new Request(request.url,{method:request.method,headers:authHeaders});
+        const user=await authenticate(authRequest,env); if(user.role!=="owner" || user.kind!=="user") throw new Error(); accountId=user.accountId;
+      }
       catch { return page(client.client_name,fields,"Enter your DocSync email and password to continue."); }
     }
     const code=randomToken(), canPublish=form.get("publish")==="yes", scope=canPublish?"docsync docsync:publish":"docsync";
