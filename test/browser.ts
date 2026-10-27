@@ -236,6 +236,7 @@ try {
   await salesFrame.waitForSelector("#live-sales");
   const salesBefore = await salesFrame.$eval("#live-sales", node => node.textContent);
   await salesFrame.waitForFunction(value => document.getElementById("live-sales")?.textContent !== value, { timeout: 8000 }, salesBefore);
+  await page.screenshot({ path: "/tmp/docsync-sales-theme.png" });
   await page.evaluate(() => {
     const button = [...document.querySelectorAll("nav button")].find((b) =>
       b.textContent?.includes("My documents"),
@@ -259,23 +260,16 @@ try {
   await page.waitForFunction(
     () => document.querySelector("[role=status]")?.textContent === "Saved.",
   );
-  // Unsafe HTML remains isolated during preview and is removed when saved.
-  await page.click(".component-editor summary");
-  await fill(
-    ".component-editor textarea",
-    '<h2>Safe component</h2><script>parent.stolen=true</script><p onclick="parent.stolen=true">Hello</p><img src="https://evil.example/probe">',
-  );
-  await click("Save");
-  await page.waitForFunction(
-    () => document.querySelector("[role=status]")?.textContent === "Saved.",
-  );
+  // Agent-managed implementation source is not exposed in the customer UI.
+  assert.equal(await page.$(".component-editor textarea"), null);
+  assert.ok(!(await page.$eval("body", node => node.textContent || "")).includes("Edit HTML, CSS & JavaScript"));
   assert.equal(await page.evaluate(() => (window as any).stolen), undefined);
   const frame = page.frames().find((x) => x.url() === "about:srcdoc");
   assert.ok(frame);
-  await frame!.waitForSelector("h2");
+  await frame!.waitForSelector("h1");
   assert.equal(
-    await frame!.$eval("h2", (e) => e.textContent),
-    "Safe component",
+    await frame!.$eval("h1", (e) => e.textContent),
+    "Overview",
   );
   assert.equal(await frame!.$("script,img,[onclick]"), null);
   const editorLayout = await page.evaluate(() => {

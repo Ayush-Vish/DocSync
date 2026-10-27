@@ -762,44 +762,11 @@ summary:focus-visible {
   background: #e4e4e7;
 }
 
-.component-editor details {
-  padding: 1rem 1.25rem 1.25rem;
-  border-top: 1px solid var(--border);
-  background: #fcfcfd;
-}
-
-.component-editor summary {
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 500;
+.component-managed-note {
+  margin: 0;
+  padding: 1rem 1.25rem;
   color: var(--muted-foreground);
-}
-
-.component-editor summary:hover {
-  color: var(--foreground);
-}
-
-.component-editor label {
-  display: block;
   font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--muted-foreground);
-  margin-top: 0.75rem;
-}
-
-.component-editor textarea {
-  width: 100%;
-  min-height: 120px;
-  margin-top: 0.25rem;
-  padding: 0.625rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.75rem;
-  line-height: 1.6;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: #fafafa;
-  color: var(--foreground);
-  resize: vertical;
 }
 
 .preview-stack {

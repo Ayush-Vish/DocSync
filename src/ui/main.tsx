@@ -54,7 +54,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardHeader,
@@ -764,6 +763,7 @@ function App() {
     await run(async () => {
       const next = await api<Document>("/documents/" + id);
       setDoc(next);
+      setPreview(false);
       setActiveSlide(0);
       setDirty(false);
       setShare("");
@@ -787,6 +787,7 @@ function App() {
       const next = await api<Document>("/documents", "POST", content);
       setDoc(next);
       setEditorMode(theme.format === "presentation" ? "slide" : "doc");
+      setPreview(theme.format === "document");
       setActiveSlide(0);
       setDirty(false);
       setPublished(null);
@@ -925,6 +926,8 @@ function App() {
             void run(async () => {
               const next = await api<Document>("/documents", "POST", blank());
               setDoc(next);
+              setEditorMode("doc");
+              setPreview(false);
               setView("library");
               setDirty(false);
               setPublished(null);
@@ -1636,7 +1639,7 @@ function App() {
                         <small>
                           {doc.sections[safeActiveSlide].kind === "text"
                             ? "Text"
-                            : "HTML / CSS component"}
+                            : "Interactive slide"}
                         </small>
                       </span>
                       <div className="actions flex items-center gap-1">
@@ -1721,50 +1724,7 @@ function App() {
                         }
                       />
                     ) : (
-                      <div className="component-editor">
-                        <details open>
-                          <summary>Edit HTML, CSS & JavaScript</summary>
-                          <label>
-                            HTML
-                            <textarea
-                              spellCheck={false}
-                              value={doc.sections[safeActiveSlide].html}
-                              onChange={(e) =>
-                                change({
-                                  ...doc,
-                                  sections: doc.sections.map((s, idx) =>
-                                    idx === safeActiveSlide
-                                      ? { ...s, html: e.target.value }
-                                      : s,
-                                  ),
-                                })
-                              }
-                            />
-                          </label>
-                          <label>
-                            CSS
-                            <textarea
-                              spellCheck={false}
-                              value={doc.sections[safeActiveSlide].css}
-                              onChange={(e) =>
-                                change({
-                                  ...doc,
-                                  sections: doc.sections.map((s, idx) =>
-                                    idx === safeActiveSlide
-                                      ? { ...s, css: e.target.value }
-                                      : s,
-                                  ),
-                                })
-                              }
-                            />
-                          </label>
-                          <label>
-                            JavaScript
-                            <textarea spellCheck={false} value={doc.sections[safeActiveSlide].js || ""} onChange={(e) => change({ ...doc, sections: doc.sections.map((s, idx) => idx === safeActiveSlide ? { ...s, js: e.target.value } : s) })} />
-                          </label>
-                          <p className="text-xs text-muted-foreground">Runs inside this artifact only. Account access and network requests are blocked.</p>
-                        </details>
-                      </div>
+                      <p className="component-managed-note">Interactive slide content is managed through your connected agent.</p>
                     )}
                   </article>
                 )}
@@ -1774,7 +1734,7 @@ function App() {
                 <article className="section-card" key={section.id}>
                   <header>
                     <span className="font-medium">
-                      {section.kind === "text" ? "Text" : "HTML component"}{" "}
+                      {section.kind === "text" ? "Text" : "Interactive section"}{" "}
                       <small>{String(index + 1).padStart(2, "0")}</small>
                     </span>
                     <div className="actions flex items-center gap-1">
@@ -1849,48 +1809,6 @@ function App() {
                   ) : (
                     <div className="component-editor">
                       <Preview sections={[section]} />
-                      <details>
-                        <summary>Edit HTML, CSS & JavaScript</summary>
-                        <label>
-                          HTML
-                          <textarea
-                            spellCheck={false}
-                            value={section.html}
-                            onChange={(e) =>
-                              change({
-                                ...doc,
-                                sections: doc.sections.map((s) =>
-                                  s.id === section.id
-                                    ? { ...s, html: e.target.value }
-                                    : s,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
-                        <label>
-                          CSS
-                          <textarea
-                            spellCheck={false}
-                            value={section.css}
-                            onChange={(e) =>
-                              change({
-                                ...doc,
-                                sections: doc.sections.map((s) =>
-                                  s.id === section.id
-                                    ? { ...s, css: e.target.value }
-                                    : s,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
-                        <label>
-                          JavaScript
-                          <textarea spellCheck={false} value={section.js || ""} onChange={(e) => change({ ...doc, sections: doc.sections.map((s) => s.id === section.id ? { ...s, js: e.target.value } : s) })} />
-                        </label>
-                        <p className="text-xs text-muted-foreground">Runs inside this artifact only. Account access and network requests are blocked.</p>
-                      </details>
                     </div>
                   )}
                 </article>
@@ -1939,7 +1857,7 @@ function App() {
                       })
                     }
                   >
-                    ＋ HTML component
+                    ＋ Interactive section
                   </Button>
                 </div>
                 <div className="p-3 bg-muted/40 rounded-lg border border-dashed border-border/80">
