@@ -34,6 +34,7 @@ test("scripted frame applies response sandbox and inline-only code policy", asyn
   assert.ok(policy.includes("connect-src 'none'"));
   assert.ok(policy.includes("frame-ancestors 'self'"));
   assert.ok(!policy.includes("allow-same-origin"));
+  assert.ok(!(await response.text()).includes("__name"));
   const root = await handle(new Request("http://127.0.0.1:8787/"), f.env);
   assert.ok(!(root.headers.get("Content-Security-Policy") || "").includes("script-src 'unsafe-inline'"));
 });
