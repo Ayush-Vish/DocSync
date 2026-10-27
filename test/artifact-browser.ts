@@ -42,14 +42,20 @@ try {
   await galleryFrame.click("nav button");
   assert.match(await galleryFrame.$eval("#live-status", node => node.textContent || ""), /paused/);
   await page.screenshot({ path: "/tmp/docsync-live-homepage.png", fullPage: true });
-  for (const title of ["Service design", "Product pitch", "Delivery review"]) {
+  for (const title of ["Service design", "Sales dashboard", "Product pitch", "Delivery review"]) {
     await page.click(`button[aria-label="Preview ${title} template"]`);
     const frame = await (await page.$("#template-example iframe"))!.contentFrame();
     assert.ok(frame);
     await frame.waitForSelector(".chart-bar");
-    if (title !== "Service design") {
+    if (["Product pitch", "Delivery review"].includes(title)) {
       await frame.click("nav button:nth-child(2)");
       assert.equal(await frame.$eval("[aria-live]", node => node.textContent), "Slide 2 of 3");
+    }
+    if (title === "Sales dashboard") {
+      const sales = await frame.$eval("#live-sales", node => node.textContent);
+      await frame.waitForFunction(value => document.getElementById("live-sales")?.textContent !== value, { timeout: 8000 }, sales);
+      await frame.click(".chart-filters button:nth-child(2)");
+      assert.equal(await frame.$$eval(".filterable-chart .chart-column:not([hidden])", nodes => nodes.length), 3);
     }
     assert.ok(!/\[(?:Author|Date|Name|Company|Presenter|Owner|Source|Concrete|Next)\]/i.test(await frame.$eval("body", node => node.textContent || "")));
   }

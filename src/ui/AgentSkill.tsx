@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 const templates = [
   { id: "editorial-document", title: "Revenue report", type: "REPORT / REVENUE & ACTIVITY", text: "₹9.6L MRR", background: "#fffdf7", color: "#24251f", accent: "#53674d", serif: true },
   { id: "design-document", title: "Service design", type: "DESIGN / SYSTEM HEALTH", text: "108 ms p95", background: "#edf3ff", color: "#1b2b44", accent: "#285cca", serif: false },
+  { id: "sales-dashboard", title: "Sales dashboard", type: "REPORT / SIMULATED SALES", text: "₹18.4L sales", background: "#f5fbf7", color: "#18342a", accent: "#16845b", serif: false },
   { id: "pitch-deck", title: "Product pitch", type: "DECK / GROWTH STORY", text: "1,280 teams", background: "#211d40", color: "#ffffff", accent: "#d1f46b", serif: false },
   { id: "review-slides", title: "Delivery review", type: "SLIDES / TEAM PROGRESS", text: "28 items shipped", background: "#fffaf3", color: "#352a24", accent: "#b45135", serif: true },
 ];

@@ -62,3 +62,13 @@ test("every shipped template converts into valid DocSync sections without losing
     }
   }
 });
+
+test("selectable theme payloads match the downloadable template catalog", () => {
+  const themes = JSON.parse(readFileSync("skills/docsync/themes.json", "utf8")) as { id: string; title: string }[];
+  assert.ok(themes.length >= 5);
+  for (const theme of themes) {
+    const expected = JSON.parse(execFileSync(process.execPath, ["skills/docsync/scripts/to-document.mjs", join("skills/docsync/assets/templates", theme.id), theme.title], { encoding: "utf8" }));
+    const generated = JSON.parse(readFileSync(join("dist/public/downloads/docsync/themes", `${theme.id}.json`), "utf8"));
+    assert.deepEqual(generated, expected);
+  }
+});

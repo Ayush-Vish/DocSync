@@ -61,6 +61,33 @@
     }, 4000);
     window.addEventListener("pagehide", () => window.clearInterval(timer), { once: true });
   }
+  const sales = document.getElementById("live-sales");
+  if (sales) {
+    const orders = document.getElementById("live-orders");
+    const status = document.getElementById("sales-status");
+    const latest = document.getElementById("latest-sales");
+    let revenue = Number(sales.textContent.replace(/[^0-9.]/g, ""));
+    let orderCount = Number(orders.textContent.replaceAll(",", ""));
+    let tick = 0;
+    let paused = false;
+    const pause = button("Pause sales demo", () => {
+      paused = !paused;
+      pause.textContent = paused ? "Resume sales demo" : "Pause sales demo";
+      status.textContent = paused ? "Simulated stream · paused" : "Simulated live · updates every 4 seconds";
+    });
+    const timer = window.setInterval(() => {
+      if (paused || document.hidden) return;
+      revenue += [0.1, 0.2, 0.1, 0.3][tick % 4];
+      orderCount += [3, 5, 4, 7][tick % 4];
+      tick++;
+      const formatted = `₹${revenue.toFixed(1)}L`;
+      sales.textContent = formatted;
+      orders.textContent = orderCount.toLocaleString("en-US");
+      latest.textContent = formatted;
+      status.textContent = `Simulated live · updated ${new Date().toLocaleTimeString()}`;
+    }, 4000);
+    window.addEventListener("pagehide", () => window.clearInterval(timer), { once: true });
+  }
   let active = 0;
   if (slides.length > 1) {
     const previous = button("Previous", () => show(active - 1));

@@ -67,6 +67,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import type { Content, Document } from "../document";
+import themeCatalog from "../../skills/docsync/themes.json";
 import "./style.css";
 
 type Session = { email: string; legacy: boolean };
@@ -76,6 +77,21 @@ type Summary = {
   revision: number;
   updated_at: string;
 };
+type ThemeCatalogItem = {
+  id: string;
+  name: string;
+  format: "document" | "presentation";
+  description: string;
+  title: string;
+  background: string;
+  color: string;
+  accent: string;
+  sample: string;
+};
+
+const themes = themeCatalog as ThemeCatalogItem[];
+const customThemePrompt =
+  "Use DocSync to create a document or presentation with a custom theme. Style direction: [describe colors, typography, mood, density, and audience]. Use only facts I provide. Label any example or simulated data clearly. Add interactive charts only when useful, verify the saved result, and return a share link.";
 
 class ApiError extends Error {
   status: number;
@@ -756,6 +772,28 @@ function App() {
       setPublished(
         (await api("/documents/" + id + "/publish"))?.revision ?? null,
       );
+    });
+  }
+
+  async function createFromTheme(theme: ThemeCatalogItem) {
+    if (!leave()) return;
+    await run(async () => {
+      const response = await fetch(
+        `/downloads/docsync/themes/${theme.id}.json`,
+        { credentials: "same-origin" },
+      );
+      if (!response.ok) throw new Error("Theme could not be loaded.");
+      const content = (await response.json()) as Content;
+      const next = await api<Document>("/documents", "POST", content);
+      setDoc(next);
+      setEditorMode(theme.format === "presentation" ? "slide" : "doc");
+      setActiveSlide(0);
+      setDirty(false);
+      setPublished(null);
+      setShare("");
+      setHistory(null);
+      await refresh();
+      setNotice(`${theme.name} created with fictional example content.`);
     });
   }
 
@@ -1964,6 +2002,67 @@ function App() {
                 />
               </div>
             </div>
+            {!search && (
+              <section className="theme-library" aria-labelledby="theme-library-title">
+                <div className="theme-library-heading">
+                  <div>
+                    <h2 id="theme-library-title">Start with a theme</h2>
+                    <p>Choose a document or HTML presentation. Replace all fictional example content before using it as real data.</p>
+                  </div>
+                  <Badge variant="outline">5 presets + custom</Badge>
+                </div>
+                <div className="theme-grid">
+                  {themes.map((theme) => (
+                    <button
+                      type="button"
+                      className="theme-card"
+                      data-theme-id={theme.id}
+                      key={theme.id}
+                      disabled={busy}
+                      onClick={() => void createFromTheme(theme)}
+                    >
+                      <span
+                        className="theme-preview"
+                        style={{
+                          background: theme.background,
+                          color: theme.color,
+                          borderTopColor: theme.accent,
+                        }}
+                      >
+                        <small>{theme.format === "presentation" ? "PRESENTATION" : "DOCUMENT"}</small>
+                        <strong>{theme.sample}</strong>
+                        <span aria-hidden="true" className="theme-bars">
+                          {[42, 65, 52, 78, 96].map((height) => (
+                            <i key={height} style={{ height: `${height}%`, background: theme.accent }} />
+                          ))}
+                        </span>
+                      </span>
+                      <span className="theme-copy"><strong>{theme.name}</strong><small>{theme.description}</small></span>
+                    </button>
+                  ))}
+                  <details className="theme-card custom-theme-card">
+                    <summary>
+                      <span className="custom-theme-mark"><Sparkles className="h-5 w-5" /></span>
+                      <span className="theme-copy"><strong>Custom via agent</strong><small>Describe the look to Codex, Claude, or Antigravity.</small></span>
+                    </summary>
+                    <p>Paste this into your connected agent and replace the bracketed style direction:</p>
+                    <code>{customThemePrompt}</code>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => void run(async () => {
+                        await navigator.clipboard.writeText(customThemePrompt);
+                        setNotice("Custom theme prompt copied.");
+                      })}
+                    >
+                      <Copy className="mr-1.5 h-3.5 w-3.5" />Copy agent prompt
+                    </Button>
+                  </details>
+                </div>
+              </section>
+            )}
             <div className="library-label">
               <span>{search ? "SEARCH RESULTS" : "ALL DOCUMENTS"}</span>
               <span>{list.length} documents</span>

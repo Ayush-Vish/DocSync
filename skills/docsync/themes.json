@@ -1,0 +1,7 @@
+[
+  { "id": "editorial-document", "name": "Editorial Report", "format": "document", "description": "Warm, readable report for narratives and executive summaries.", "title": "Northstar Revenue Report", "background": "#fffdf7", "color": "#24251f", "accent": "#53674d", "sample": "₹9.6L MRR" },
+  { "id": "design-document", "name": "Technical Blueprint", "format": "document", "description": "Structured design document for systems, decisions, and risks.", "title": "Northstar System Design", "background": "#edf3ff", "color": "#1b2b44", "accent": "#285cca", "sample": "108 ms p95" },
+  { "id": "sales-dashboard", "name": "Sales Dashboard", "format": "document", "description": "Interactive fictional sales report with filters and a simulated live feed.", "title": "Northstar Sales Dashboard", "background": "#f5fbf7", "color": "#18342a", "accent": "#16845b", "sample": "₹18.4L sales" },
+  { "id": "pitch-deck", "name": "Bold Pitch", "format": "presentation", "description": "High-contrast 16:9 story for product and investor pitches.", "title": "Northstar Product Pitch", "background": "#211d40", "color": "#ffffff", "accent": "#d1f46b", "sample": "1,280 teams" },
+  { "id": "review-slides", "name": "Delivery Review", "format": "presentation", "description": "Clear project-review slides for progress, evidence, and actions.", "title": "Northstar Delivery Review", "background": "#fffaf3", "color": "#352a24", "accent": "#b45135", "sample": "28 items shipped" }
+]

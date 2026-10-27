@@ -213,6 +213,170 @@ summary:focus-visible {
   margin: 0;
 }
 
+.theme-library {
+  margin: 0 0 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+}
+
+.theme-library-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.theme-library-heading h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.theme-library-heading p {
+  max-width: 650px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+}
+
+.theme-card {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-card:hover {
+  border-color: #a1a1aa;
+  box-shadow: 0 4px 14px rgba(24, 24, 27, 0.07);
+}
+
+.theme-card:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.theme-preview {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  padding: 0.875rem;
+  border-top: 4px solid;
+}
+
+.theme-preview small {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.theme-preview strong {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+}
+
+.theme-bars {
+  display: flex;
+  height: 28px;
+  align-items: flex-end;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.theme-bars i {
+  width: 12px;
+  border-radius: 2px 2px 0 0;
+  opacity: 0.7;
+}
+
+.theme-copy {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+}
+
+.theme-copy strong {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.theme-copy small {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.custom-theme-card {
+  cursor: default;
+}
+
+.custom-theme-card summary {
+  display: flex;
+  min-height: 100%;
+  cursor: pointer;
+  list-style: none;
+}
+
+.custom-theme-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.custom-theme-mark {
+  display: grid;
+  width: 52px;
+  flex: 0 0 52px;
+  place-items: center;
+  background: var(--secondary);
+  color: var(--muted-foreground);
+}
+
+.custom-theme-card[open] {
+  grid-column: 1 / -1;
+  padding-bottom: 0.875rem;
+}
+
+.custom-theme-card[open] summary {
+  min-height: auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.custom-theme-card > p,
+.custom-theme-card > code,
+.custom-theme-card > button {
+  margin-right: 0.875rem;
+  margin-left: 0.875rem;
+}
+
+.custom-theme-card > p {
+  margin-top: 0.875rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.custom-theme-card > code {
+  display: block;
+  margin-bottom: 0.875rem;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  background: var(--secondary);
+  font: 0.6875rem/1.6 ui-monospace, SFMono-Regular, monospace;
+  white-space: normal;
+}
+
 .library-label {
   display: flex;
   justify-content: space-between;

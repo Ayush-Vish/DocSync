@@ -227,6 +227,22 @@ try {
   });
   await page.waitForSelector(".document-card");
   await page.screenshot({ path: "/tmp/docsync-library.png", fullPage: true });
+  await page.click(".custom-theme-card summary");
+  assert.match(await page.$eval(".custom-theme-card code", node => node.textContent || ""), /custom theme/i);
+  await page.click('[data-theme-id="sales-dashboard"]');
+  await page.waitForFunction(() => (document.querySelector('input[aria-label="Document title"]') as HTMLInputElement)?.value === "Northstar Sales Dashboard");
+  const salesFrame = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
+  assert.ok(salesFrame);
+  await salesFrame.waitForSelector("#live-sales");
+  const salesBefore = await salesFrame.$eval("#live-sales", node => node.textContent);
+  await salesFrame.waitForFunction(value => document.getElementById("live-sales")?.textContent !== value, { timeout: 8000 }, salesBefore);
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll("nav button")].find((b) =>
+      b.textContent?.includes("My documents"),
+    ) as HTMLButtonElement;
+    button.click();
+  });
+  await page.waitForSelector(".document-card");
   await page.evaluate(() => {
     const button = [...document.querySelectorAll(".document-card")].find((b) =>
       b.textContent?.includes("My first report"),

@@ -37,6 +37,8 @@ The landing page and **Connect agent** page provide `/downloads/docsync-skill.zi
 
 Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Claude Code. Connect the DocSync MCP separately. The skill includes editorial documents, technical design documents, pitch decks, and project review slides. Each template has HTML/CSS and shares dependency-free JavaScript preview controls. Its Node.js helper converts marked sections into MCP creation payloads.
 
+Signed-in users can also create these presets from the document library: Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, and Delivery Review. The Custom card provides a portable prompt for Codex, Claude, Antigravity, or another connected agent. The Sales Dashboard uses fictional Northstar figures and a simulated local update stream; it is not connected to real company data.
+
 Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP blocking network, external scripts, forms, popups, and access to the parent app. Each frame receives only its section content through a source-checked message; edits recreate the frame. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
 
 ### MCP connection

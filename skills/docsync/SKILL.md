@@ -11,10 +11,11 @@ Use a familiar Google Docs / Google Slides workflow: draft, edit, review, and sh
 
 - **Document or report:** use `assets/templates/editorial-document/` for readable prose and an executive summary.
 - **Technical design document:** use `assets/templates/design-document/` for requirements, architecture, decisions, and risks.
+- **Interactive sales dashboard:** use `assets/templates/sales-dashboard/` for explicitly simulated company sales metrics, period filters, and a pauseable demo feed.
 - **Pitch / PPT-style presentation:** use `assets/templates/pitch-deck/` for bold 16:9 slides.
 - **Project update / review slides:** use `assets/templates/review-slides/` for progress, evidence, and next actions.
 
-Read only the chosen template's `index.html` and `styles.css`. Adapt its layout and palette to the user's content, like choosing and customizing a Canva template. The bundled designs are original starter layouts, not Canva assets. Replace all sample text and placeholders. Use supplied data; ask about missing facts that would materially change the document.
+Read `themes.json` when the user asks to compare or select a theme. Then read only the chosen template's `index.html` and `styles.css`. Adapt its layout and palette to the user's content, like choosing and customizing a Canva template. The bundled designs are original starter layouts, not Canva assets. Replace all sample text and placeholders. Use supplied data; ask about missing facts that would materially change the document. For a custom theme, start from the closest template and follow the user's palette, typography, mood, density, and audience instructions without changing the DocSync content contract.
 
 ## Author and preview
 
