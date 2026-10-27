@@ -268,8 +268,9 @@ try {
     return { editorWidth: editor.width, frameWidth: frame.width, frameHeight: frame.height };
   });
   assert.ok(editorLayout.editorWidth >= 1100);
-  assert.ok(editorLayout.frameWidth >= 1000);
+  assert.ok(editorLayout.frameWidth >= 800 && editorLayout.frameWidth <= 900);
   assert.ok(editorLayout.frameHeight >= 640);
+  await page.screenshot({ path: "/tmp/docsync-editor.png" });
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const stickyLayout = await page.evaluate(() => ({
     sidebarTop: document.querySelector(".sidebar")!.getBoundingClientRect().top,
@@ -277,7 +278,6 @@ try {
   }));
   assert.equal(Math.round(stickyLayout.sidebarTop), 0);
   assert.equal(Math.round(stickyLayout.topbarTop), 0);
-  await page.screenshot({ path: "/tmp/docsync-editor.png", fullPage: true });
   await click("Share ↗");
   await page.waitForSelector(".share-link a");
   const sharedUrl = await page.$eval(

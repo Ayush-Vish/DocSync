@@ -979,19 +979,27 @@ function App() {
           </button>
         </div>
       </aside>
-      <main className="workspace">
+      <main className={cn("workspace", doc && "document-workspace")}>
         <header className="topbar">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground min-w-0">
-            <span>Workspace</span>
-            <span className="slash">/</span>
-            <span className="text-foreground truncate">
-              {view === "connect"
-                ? "Connect agent"
-                : doc
-                  ? "Document"
-                  : "My documents"}
-            </span>
-          </div>
+          {doc ? (
+            <input
+              className="document-title"
+              aria-label="Document title"
+              maxLength={200}
+              disabled={busy}
+              value={doc.title}
+              placeholder="Document title"
+              onChange={(e) => change({ ...doc, title: e.target.value })}
+            />
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground min-w-0">
+              <span>Workspace</span>
+              <span className="slash">/</span>
+              <span className="text-foreground truncate">
+                {view === "connect" ? "Connect agent" : "My documents"}
+              </span>
+            </div>
+          )}
           <div className="shrink-0">
             {doc ? (
               dirty ? (
@@ -1238,14 +1246,6 @@ function App() {
         ) : doc ? (
           <fieldset className="editor-page" disabled={busy}>
             <div className="editor-heading">
-              <input
-                className="document-title"
-                aria-label="Document title"
-                maxLength={200}
-                value={doc.title}
-                placeholder="Document title"
-                onChange={(e) => change({ ...doc, title: e.target.value })}
-              />
               <div className="actions flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center bg-muted p-0.5 rounded-md border border-border">
