@@ -270,6 +270,13 @@ try {
   assert.ok(editorLayout.editorWidth >= 1100);
   assert.ok(editorLayout.frameWidth >= 1000);
   assert.ok(editorLayout.frameHeight >= 640);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const stickyLayout = await page.evaluate(() => ({
+    sidebarTop: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+    topbarTop: document.querySelector(".topbar")!.getBoundingClientRect().top,
+  }));
+  assert.equal(Math.round(stickyLayout.sidebarTop), 0);
+  assert.equal(Math.round(stickyLayout.topbarTop), 0);
   await page.screenshot({ path: "/tmp/docsync-editor.png", fullPage: true });
   await click("Share ↗");
   await page.waitForSelector(".share-link a");
