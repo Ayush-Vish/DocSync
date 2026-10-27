@@ -1,0 +1,4 @@
+interface:
+  display_name: "DocSync"
+  short_description: "Create HTML documents and decks with DocSync"
+  default_prompt: "Use $docsync to create a polished document or presentation from my notes."

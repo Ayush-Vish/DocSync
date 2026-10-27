@@ -1,0 +1,97 @@
+import assert from "node:assert/strict";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { createServer } from "node:http";
+import puppeteer from "puppeteer-core";
+import { fixture } from "./helpers.ts";
+
+// Exercise the built Worker: artifactRuntime.toString() must survive bundling.
+const { default: worker } = await import(new URL("../dist/worker.mjs", import.meta.url).href);
+const f = await fixture(true);
+const root = resolve("dist/public");
+let exfiltrationRequests = 0;
+f.env.ASSETS = { fetch: async request => {
+  const path = new URL(request.url).pathname;
+  if (path.startsWith("/exfil")) exfiltrationRequests++;
+  const candidate = resolve(root, "." + path);
+  const file = candidate.startsWith(root + "/") && existsSync(candidate) && statSync(candidate).isFile() ? candidate : join(root, "index.html");
+  return new Response(readFileSync(file), { headers: { "Content-Type": file.endsWith(".js") ? "text/javascript" : file.endsWith(".css") ? "text/css" : "text/html" } });
+} };
+const server = createServer(async (request, response) => {
+  const result = await worker.fetch(new Request(`http://${request.headers.host}${request.url}`, { headers: request.headers as Record<string, string> }), f.env);
+  response.writeHead(result.status, Object.fromEntries(result.headers));
+  response.end(Buffer.from(await result.arrayBuffer()));
+});
+await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
+const address = server.address();
+assert.ok(address && typeof address !== "string");
+const origin = `http://127.0.0.1:${address.port}`;
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox"] });
+try {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 1000 });
+  await page.goto(origin, { waitUntil: "networkidle0" });
+  await page.click('a[href="#agent-skill"]');
+  const galleryFrame = await (await page.$("#template-example iframe"))!.contentFrame();
+  assert.ok(galleryFrame);
+  await galleryFrame.waitForSelector("#live-events");
+  const initial = await galleryFrame.$eval("#live-events", node => node.textContent);
+  await galleryFrame.waitForFunction(value => document.getElementById("live-events")?.textContent !== value, { timeout: 8000 }, initial);
+  await galleryFrame.click(".chart-filters button:nth-child(2)");
+  assert.equal(await galleryFrame.$$eval(".filterable-chart .chart-column:not([hidden])", nodes => nodes.length), 3);
+  await galleryFrame.click("nav button");
+  assert.match(await galleryFrame.$eval("#live-status", node => node.textContent || ""), /paused/);
+  await page.screenshot({ path: "/tmp/docsync-live-homepage.png", fullPage: true });
+  for (const title of ["Service design", "Product pitch", "Delivery review"]) {
+    await page.click(`button[aria-label="Preview ${title} template"]`);
+    const frame = await (await page.$("#template-example iframe"))!.contentFrame();
+    assert.ok(frame);
+    await frame.waitForSelector(".chart-bar");
+    if (title !== "Service design") {
+      await frame.click("nav button:nth-child(2)");
+      assert.equal(await frame.$eval("[aria-live]", node => node.textContent), "Slide 2 of 3");
+    }
+    assert.ok(!/\[(?:Author|Date|Name|Company|Presenter|Owner|Source|Concrete|Next)\]/i.test(await frame.$eval("body", node => node.textContent || "")));
+  }
+  await page.setViewport({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.setViewport({ width: 1280, height: 1000 });
+
+  const js = `
+    const count=document.getElementById('count');
+    document.getElementById('increment').addEventListener('click',()=>count.textContent=String(Number(count.textContent)+1));
+    const probes={};
+    try{void parent.document;probes.parent=false}catch{probes.parent=true}
+    try{void document.cookie;probes.cookies=false}catch{probes.cookies=true}
+    try{void localStorage;probes.storage=false}catch{probes.storage=true}
+    window.escapeLiteral='</script><script>window.escaped=true</script>';
+    fetch(${JSON.stringify(origin + "/exfil-fetch")}).then(()=>probes.fetch=false).catch(()=>probes.fetch=true).finally(()=>document.getElementById('probes').textContent=JSON.stringify(probes));
+    const image=new Image();image.src=${JSON.stringify(origin + "/exfil-image")};
+    const external=document.createElement('script');external.src=${JSON.stringify(origin + "/exfil-script")};document.body.append(external);
+  `;
+  const createdResponse = await f.call("/documents", "POST", { title: "Scripted artifact", sections: [{ id: "interactive", kind: "html", html: '<button id="increment" type="button">Add one</button><output id="count">0</output><pre id="probes"></pre>', css: "button{padding:16px}output{padding:16px}", js }] });
+  assert.equal(createdResponse.status, 201);
+  const created = await createdResponse.json() as { id: string; revision: number };
+  const published = await (await f.call(`/documents/${created.id}/publish`, "POST", { expectedRevision: created.revision })).json() as { url: string };
+  await page.goto(origin + new URL(published.url).pathname, { waitUntil: "networkidle0" });
+  await page.waitForSelector('iframe[src="/artifact-frame"]');
+  const artifact = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
+  assert.ok(artifact);
+  await artifact.waitForSelector("#increment");
+  await artifact.click("#increment");
+  assert.equal(await artifact.$eval("#count", node => node.textContent), "1");
+  await artifact.waitForFunction(() => document.getElementById("probes")?.textContent?.includes('"fetch":true'));
+  assert.deepEqual(JSON.parse(await artifact.$eval("#probes", node => node.textContent || "")), { parent: true, cookies: true, storage: true, fetch: true });
+  assert.equal(await artifact.evaluate(() => "escaped" in window), false);
+  assert.equal(exfiltrationRequests, 0);
+  assert.equal(await page.$eval('iframe[src="/artifact-frame"]', node => node.getAttribute("sandbox")), "allow-scripts");
+  const before = page.url();
+  const topNavigationBlocked = await artifact.evaluate(() => { try { window.top!.location.href = "https://example.invalid/artifact-test"; return false; } catch { return true; } });
+  assert.equal(topNavigationBlocked, true);
+  assert.equal(page.url(), before);
+  console.log("Passed: live demo metrics, chart filters, slide navigation, mobile width; published artifact JS works; parent DOM, cookies, storage, external code, fetch, images, top navigation, and HTML breakout are blocked.");
+} finally {
+  await browser.close();
+  server.close();
+  f.close();
+}

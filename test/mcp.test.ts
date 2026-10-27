@@ -9,9 +9,10 @@ import { fixture, sample } from "./helpers.ts";
 test("official MCP client exercises document tools and real Worker API in-process", async (t) => {
   const f = await fixture(true);
   t.after(f.close);
-  t.mock.method(globalThis, "fetch", async (input: any, init: any) =>
-    handle(new Request(input, init), f.env),
-  );
+  t.mock.method(globalThis, "fetch", async (input: any, init: any) => {
+    assert.equal(init?.redirect, "manual");
+    return handle(new Request(input, init), f.env);
+  });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const server = createMcpServer("http://127.0.0.1:8787", f.agentToken);

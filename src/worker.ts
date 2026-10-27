@@ -11,6 +11,7 @@ import {
 import * as accounts from "./accounts.ts";
 import * as store from "./store.ts";
 import { handleRemoteMcp } from "./remote-mcp.ts";
+import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
 
 export const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -70,6 +71,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     handle(new Request(input, init), env),
   );
   if (remote) return remote;
+  if (pathname === "/artifact-frame" && method === "GET") return artifactFrame();
   if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
   if (
     !/^[a-f0-9]{64}$/.test(env.OWNER_KEY_HASH || "") ||
@@ -408,9 +410,12 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("Referrer-Policy", "no-referrer");
   const { pathname } = new URL(request.url);
+  const templatePreview = /^\/downloads\/docsync\/assets\/templates\/[a-z-]+\/(?:index\.html)?$/.test(pathname);
   secured.headers.set(
     "Content-Security-Policy",
-    pathname.startsWith("/oauth/") ? oauthPolicy : appPolicy,
+    pathname === "/artifact-frame" ? artifactPolicy : pathname.startsWith("/oauth/") ? oauthPolicy : templatePreview
+      ? appPolicy.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+      : appPolicy,
   );
   secured.headers.set(
     "Permissions-Policy",

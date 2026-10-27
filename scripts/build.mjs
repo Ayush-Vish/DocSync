@@ -1,5 +1,6 @@
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
+import { buildSkill } from "./build-skill.mjs";
 import {
   chmodSync,
   mkdirSync,
@@ -92,3 +93,4 @@ copyFileSync("dist/docsync-mcp.cjs", "dist/public/downloads/docsync-mcp.cjs");
 for (const name of ["docsync-mcp.cjs", "MCP-LICENSES.txt"])
   copyFileSync(`dist/${name}`, `packages/mcp/${name}`);
 chmodSync("packages/mcp/docsync-mcp.cjs", 0o755);
+buildSkill();

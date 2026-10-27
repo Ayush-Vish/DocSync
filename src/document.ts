@@ -6,6 +6,7 @@ export const sectionSchema = z
     id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
     html: z.string().max(100_000),
     css: z.string().max(30_000),
+    js: z.string().max(50_000).optional(),
   })
   .strict();
 export const contentSchema = z

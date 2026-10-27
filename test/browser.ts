@@ -262,6 +262,14 @@ try {
     "Safe component",
   );
   assert.equal(await frame!.$("script,img,[onclick]"), null);
+  const editorLayout = await page.evaluate(() => {
+    const editor = document.querySelector(".editor-page")!.getBoundingClientRect();
+    const frame = document.querySelector(".component-editor iframe")!.getBoundingClientRect();
+    return { editorWidth: editor.width, frameWidth: frame.width, frameHeight: frame.height };
+  });
+  assert.ok(editorLayout.editorWidth >= 1100);
+  assert.ok(editorLayout.frameWidth >= 1000);
+  assert.ok(editorLayout.frameHeight >= 640);
   await page.screenshot({ path: "/tmp/docsync-editor.png", fullPage: true });
   await click("Share ↗");
   await page.waitForSelector(".share-link a");
@@ -271,11 +279,20 @@ try {
   );
   const reader = await browser.createBrowserContext();
   const publicPage = await reader.newPage();
+  await publicPage.setViewport({ width: 1440, height: 1000 });
   await publicPage.goto(sharedUrl);
   await publicPage.waitForFunction(
     () => document.querySelector("h1")?.textContent === "Browser edited report",
   );
   assert.equal(await publicPage.$(".sidebar"), null);
+  const sharedLayout = await publicPage.evaluate(() => {
+    const reader = document.querySelector(".shared")!.getBoundingClientRect();
+    const frame = document.querySelector(".shared iframe")!.getBoundingClientRect();
+    return { readerWidth: reader.width, frameWidth: frame.width, frameHeight: frame.height };
+  });
+  assert.ok(sharedLayout.readerWidth >= 900);
+  assert.ok(sharedLayout.frameWidth >= 850);
+  assert.ok(sharedLayout.frameHeight >= 640);
   // A stale save must preserve the user's draft.
   await fill('input[aria-label="Document title"]', "Unsaved browser draft");
   const current = parse(

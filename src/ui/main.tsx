@@ -1,5 +1,7 @@
 import React, { useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
+import { AgentSkill } from "./AgentSkill";
+import { ArtifactFrame } from "./ArtifactFrame";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
@@ -64,7 +66,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { frameSource } from "../content";
 import type { Content, Document } from "../document";
 import "./style.css";
 
@@ -151,23 +152,14 @@ const VISUAL_TEMPLATES = [
   },
 ];
 
-function renderFrame(section: Content["sections"][number]): string {
-  try {
-    return frameSource(section);
-  } catch {
-    return `<!doctype html><html><body style="font:14px system-ui,sans-serif;color:#ef4444;padding:24px;">Invalid HTML or CSS syntax. Please check your markup.</body></html>`;
-  }
-}
-
 function Preview({ sections }: { sections: Content["sections"] }) {
   return (
     <div className="preview-stack">
       {sections.map((section) => (
-        <iframe
+        <ArtifactFrame
           key={section.id}
           title={`Preview: ${section.id}`}
-          sandbox=""
-          srcDoc={renderFrame(section)}
+          section={section}
         />
       ))}
     </div>
@@ -214,7 +206,6 @@ function LandingPage({
   onSignIn: () => void;
   onSignUp: () => void;
 }) {
-  const [activeTemplate, setActiveTemplate] = useState(0);
 
   return (
     <div className="landing-page select-none">
@@ -233,6 +224,9 @@ function LandingPage({
             </a>
             <a href="#interactive-preview" className="hover:text-foreground transition-colors">
               Interactive Slides
+            </a>
+            <a href="#agent-skill" className="hover:text-foreground transition-colors">
+              Examples
             </a>
             <a href="#mcp-protocol" className="hover:text-foreground transition-colors">
               Agent Protocol
@@ -274,7 +268,7 @@ function LandingPage({
           </span>
         </h1>
         <p className="subtitle">
-          Write reports, craft interactive 16:9 slide decks with real-time HTML & CSS visualizations, and connect autonomous AI agents natively via Model Context Protocol.
+          Turn your agent’s output into visual reports, design documents, and presentation decks. Review the result in your browser and share it with a link.
         </p>
         <div className="flex items-center justify-center gap-3 flex-wrap w-full max-w-sm sm:max-w-none mx-auto">
           <Button
@@ -298,49 +292,8 @@ function LandingPage({
           ⚡ One free document through your AI agent. No account required to start.
         </p>
 
-        {/* Interactive Live Preview Showcase */}
-        <div id="interactive-preview" className="landing-preview-box">
-          <div className="p-2.5 sm:p-3 bg-muted/30 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
-                Live Interactive Canvas
-              </span>
-              <span className="text-xs text-muted-foreground">·</span>
-              <span className="text-xs text-muted-foreground font-medium truncate">
-                {VISUAL_TEMPLATES[activeTemplate].name}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full w-full sm:w-auto min-w-0 pb-0.5">
-              {VISUAL_TEMPLATES.map((tmpl, idx) => {
-                const Icon = tmpl.icon;
-                return (
-                  <Button
-                    key={tmpl.name}
-                    variant={idx === activeTemplate ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-7 text-xs px-2 sm:px-2.5 font-medium shrink-0"
-                    onClick={() => setActiveTemplate(idx)}
-                  >
-                    <Icon className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
-                    {tmpl.name}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="aspect-[16/9] w-full bg-white">
-            <iframe
-              title="Landing Live Preview"
-              sandbox=""
-              className="w-full h-full border-0 block"
-              srcDoc={renderFrame({
-                id: "preview",
-                kind: "html",
-                html: VISUAL_TEMPLATES[activeTemplate].html,
-                css: VISUAL_TEMPLATES[activeTemplate].css,
-              })}
-            />
-          </div>
+        <div id="interactive-preview" className="w-full">
+          <AgentSkill />
         </div>
       </section>
 
@@ -357,7 +310,7 @@ function LandingPage({
             </div>
             <h3 className="text-base font-semibold mb-2">Interactive Visualizations</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Embed live KPI metrics, dynamic bar charts, and responsive comparison matrices with scoped HTML and CSS without heavy client libraries.
+              Combine KPI summaries, CSS charts, and comparison tables in shareable HTML documents. Try chart controls and simulated live metrics in the examples.
             </p>
           </div>
 
@@ -1088,6 +1041,7 @@ function App() {
             <p className="subtitle">
               Connect Claude, Codex, Antigravity, or any MCP-compatible agent.
             </p>
+            <AgentSkill />
             {claim && (
               <div className="claim-card">
                 <h3 className="tracking-tight">Bring your first document home.</h3>
@@ -1555,10 +1509,9 @@ function App() {
                 {/* 16:9 Slide Canvas */}
                 <div className="slide-canvas">
                   {doc.sections[safeActiveSlide] && (
-                    <iframe
+                    <ArtifactFrame
                       title={`Slide ${safeActiveSlide + 1}`}
-                      sandbox=""
-                      srcDoc={renderFrame(doc.sections[safeActiveSlide])}
+                      section={doc.sections[safeActiveSlide]}
                     />
                   )}
                 </div>
@@ -1732,7 +1685,7 @@ function App() {
                     ) : (
                       <div className="component-editor">
                         <details open>
-                          <summary>Edit HTML & CSS (Real-time)</summary>
+                          <summary>Edit HTML, CSS & JavaScript</summary>
                           <label>
                             HTML
                             <textarea
@@ -1767,6 +1720,11 @@ function App() {
                               }
                             />
                           </label>
+                          <label>
+                            JavaScript
+                            <textarea spellCheck={false} value={doc.sections[safeActiveSlide].js || ""} onChange={(e) => change({ ...doc, sections: doc.sections.map((s, idx) => idx === safeActiveSlide ? { ...s, js: e.target.value } : s) })} />
+                          </label>
+                          <p className="text-xs text-muted-foreground">Runs inside this artifact only. Account access and network requests are blocked.</p>
                         </details>
                       </div>
                     )}
@@ -1854,7 +1812,7 @@ function App() {
                     <div className="component-editor">
                       <Preview sections={[section]} />
                       <details>
-                        <summary>Edit HTML & CSS</summary>
+                        <summary>Edit HTML, CSS & JavaScript</summary>
                         <label>
                           HTML
                           <textarea
@@ -1889,6 +1847,11 @@ function App() {
                             }
                           />
                         </label>
+                        <label>
+                          JavaScript
+                          <textarea spellCheck={false} value={section.js || ""} onChange={(e) => change({ ...doc, sections: doc.sections.map((s) => s.id === section.id ? { ...s, js: e.target.value } : s) })} />
+                        </label>
+                        <p className="text-xs text-muted-foreground">Runs inside this artifact only. Account access and network requests are blocked.</p>
                       </details>
                     </div>
                   )}
@@ -2073,10 +2036,9 @@ function App() {
         >
           <div className="fullscreen-slide">
             {doc.sections[safeActiveSlide] && (
-              <iframe
+              <ArtifactFrame
                 title={`Fullscreen Slide ${safeActiveSlide + 1}`}
-                sandbox=""
-                srcDoc={renderFrame(doc.sections[safeActiveSlide])}
+                section={doc.sections[safeActiveSlide]}
               />
             )}
           </div>

@@ -20,16 +20,26 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 
 - Minimal document library with search, responsive navigation, and an editor.
 - Text sections with headings, bold, italic, underline, lists, quotes, tables, and undo/redo through TipTap.
-- HTML/CSS component sections with source editing and isolated previews. Existing component HTML is preserved instead of being converted to rich text.
+- HTML/CSS/JavaScript component sections with source editing and isolated previews. Existing component HTML is preserved instead of being converted to rich text.
 - Explicit saves, immutable revision history, restore, conflict preservation, and JSON draft download.
 - Fixed-revision public links, republishing with link rotation, and revocation.
 - Email/password accounts, server-side sessions, Google OAuth, and account-scoped document access.
 - One anonymous document per MCP installation, browser claiming, and account tokens with an explicit publishing grant.
 - A self-contained, publishable npm MCP package and a standalone download in **Connect agent**.
 
-Live multi-user editing, comments, uploads, offline sync, pagination, password reset/email verification, and remote HTTP MCP transport are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
+Live multi-user editing, comments, uploads, offline sync, pagination, password reset/email verification, are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
 
 ## Agent onboarding
+
+### Downloadable agent skill and templates
+
+The landing page and **Connect agent** page provide `/downloads/docsync-skill.zip`, an installable `docsync/` skill folder for Codex and Claude Code. Source lives in `skills/docsync/`; `npm run build` packages it and publishes browsable template previews. ZIP creation uses the build-only `fflate` dependency.
+
+Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Claude Code. Connect the DocSync MCP separately. The skill includes editorial documents, technical design documents, pitch decks, and project review slides. Each template has HTML/CSS and shares dependency-free JavaScript preview controls. Its Node.js helper converts marked sections into MCP creation payloads.
+
+Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP blocking network, external scripts, forms, popups, and access to the parent app. Each frame receives only its section content through a source-checked message; edits recreate the frame. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
+
+### MCP connection
 
 A fresh installation needs only the server URL. It generates a random local credential, stores it privately, and registers it with DocSync. The first document can be created, edited, and published without a web account. The database enforces a one-document limit atomically.
 
