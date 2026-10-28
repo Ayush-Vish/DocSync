@@ -121,6 +121,22 @@ try {
   assert.ok(slideFit.width <= 56);
   assert.ok(slideFit.height <= 56);
   assert.match(await page.$eval(".shared-viewer-toolbar span", node => node.textContent || ""), /Slide 1 of 2/);
+  const firstMainSlide = await (await page.$(".shared-slide-workarea .shared-page iframe"))!.contentFrame();
+  assert.ok(firstMainSlide);
+  await firstMainSlide.waitForSelector("h1");
+  assert.ok(await firstMainSlide.evaluate(() => document.documentElement.scrollHeight <= innerHeight));
+  assert.equal(await firstMainSlide.evaluate(() => getComputedStyle(document.documentElement).overflowY), "hidden");
+  await page.click(".shared-header-actions button");
+  await page.waitForSelector(".shared-slideshow-overlay");
+  const slideshowFrame = await (await page.$(".shared-slideshow-canvas iframe"))!.contentFrame();
+  assert.ok(slideshowFrame);
+  await slideshowFrame.waitForSelector("h1");
+  assert.equal(await slideshowFrame.$eval("h1", node => node.textContent), "First slide");
+  await page.evaluate(() => {
+    const exit = [...document.querySelectorAll(".shared-slideshow-controls button")].find(button => button.textContent?.includes("Exit")) as HTMLButtonElement;
+    exit.click();
+  });
+  await page.waitForSelector(".shared-slideshow-overlay", { hidden: true });
   await page.click('button[aria-label="Next slide"]');
   await page.waitForFunction(() => document.querySelector(".shared-viewer-toolbar span")?.textContent?.includes("Slide 2 of 2"));
   const secondSlide = await (await page.$(".shared-page iframe"))!.contentFrame();

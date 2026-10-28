@@ -194,7 +194,15 @@ const documentRoute = () => {
   return match ? { id: match[1], preview: Boolean(match[2]) } : null;
 };
 
-function SharedViewer({ content }: { content: Content }) {
+function SharedViewer({
+  content,
+  slideshow,
+  onSlideshowChange,
+}: {
+  content: Content;
+  slideshow: boolean;
+  onSlideshowChange: (open: boolean) => void;
+}) {
   const [page, setPage] = useState(0);
   const isPresentation = isPresentationContent(content);
   const lastPage = content.sections.length - 1;
@@ -203,15 +211,22 @@ function SharedViewer({ content }: { content: Content }) {
 
   useEffect(() => {
     const navigate = (event: KeyboardEvent) => {
-      if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      if (event.key === "Escape" && slideshow) {
+        onSlideshowChange(false);
+      } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
         setPage((value) => Math.max(0, value - 1));
-      } else if (event.key === "ArrowRight" || event.key === "PageDown") {
+      } else if (
+        event.key === "ArrowRight" ||
+        event.key === "PageDown" ||
+        (slideshow && (event.key === " " || event.key === "Enter"))
+      ) {
+        if (event.key === " ") event.preventDefault();
         setPage((value) => Math.min(lastPage, value + 1));
       }
     };
     window.addEventListener("keydown", navigate);
     return () => window.removeEventListener("keydown", navigate);
-  }, [lastPage]);
+  }, [lastPage, onSlideshowChange, slideshow]);
 
   const controls = (
     <div className="shared-viewer-toolbar" aria-label={`${isPresentation ? "Slide" : "Page"} navigation`}>
@@ -281,6 +296,7 @@ function SharedViewer({ content }: { content: Content }) {
                 key={current.id}
                 title={`Slide ${page + 1}: ${content.title}`}
                 section={current}
+                fitSlide
               />
             </div>
           </div>
@@ -292,6 +308,40 @@ function SharedViewer({ content }: { content: Content }) {
           <span><Presentation className="w-4 h-4" />Present</span>
         </aside>
       </div>
+      {slideshow && (
+        <div className="shared-slideshow-overlay" role="dialog" aria-modal="true" aria-label="Slideshow">
+          <div className="shared-slideshow-canvas">
+            <ArtifactFrame
+              key={`slideshow-${current.id}`}
+              title={`Slideshow slide ${page + 1}: ${content.title}`}
+              section={current}
+              fitSlide
+            />
+          </div>
+          <div className="shared-slideshow-controls">
+            <span>Slide {page + 1} of {content.sections.length}</span>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page === 0}
+              onClick={() => setPage((value) => Math.max(0, value - 1))}
+            >
+              <ChevronLeft className="w-4 h-4" /> Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page === lastPage}
+              onClick={() => setPage((value) => Math.min(lastPage, value + 1))}
+            >
+              Next <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => onSlideshowChange(false)}>
+              <X className="w-4 h-4" /> Exit
+            </Button>
+          </div>
+        </div>
+      )}
     </section>
   );
 
@@ -313,6 +363,25 @@ function SharedViewer({ content }: { content: Content }) {
 
 function SharedWorkspace({ content, error }: { content: Content | null; error: string }) {
   const isPresentation = content ? isPresentationContent(content) : false;
+  const [slideshow, setSlideshow] = useState(false);
+
+  const changeSlideshow = (open: boolean) => {
+    setSlideshow(open);
+    if (open) {
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
+    } else if (document.fullscreenElement) {
+      void document.exitFullscreen?.().catch(() => undefined);
+    }
+  };
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      if (!document.fullscreenElement) setSlideshow(false);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
   return (
     <div className="app-shell shared-app-shell">
       <aside className="sidebar shared-sidebar">
@@ -334,9 +403,16 @@ function SharedWorkspace({ content, error }: { content: Content | null; error: s
       <main className="workspace document-workspace shared-workspace">
         <header className="topbar">
           <strong className="shared-document-title">{content?.title || "Shared document"}</strong>
-          <Badge variant="outline" className="text-muted-foreground text-xs font-normal gap-1.5">
-            <Eye className="w-3 h-3" /> Read only
-          </Badge>
+          <div className="shared-header-actions">
+            {isPresentation && (
+              <Button variant="outline" size="sm" onClick={() => changeSlideshow(true)}>
+                <Presentation className="w-3.5 h-3.5" /> Slideshow
+              </Button>
+            )}
+            <Badge variant="outline" className="text-muted-foreground text-xs font-normal gap-1.5">
+              <Eye className="w-3 h-3" /> Read only
+            </Badge>
+          </div>
         </header>
         {error && (
           <div role="alert" className="error banner">
@@ -354,7 +430,13 @@ function SharedWorkspace({ content, error }: { content: Content | null; error: s
             </div>
           </div>
           <main className="shared">
-            {content && <SharedViewer content={content} />}
+            {content && (
+              <SharedViewer
+                content={content}
+                slideshow={slideshow}
+                onSlideshowChange={changeSlideshow}
+              />
+            )}
           </main>
         </section>
       </main>

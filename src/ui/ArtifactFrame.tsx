@@ -1,15 +1,24 @@
 import { cleanCss, cleanHtml, frameSource } from "../content";
 import type { Content } from "../document";
 
-export function ArtifactFrame({ section, title }: { section: Content["sections"][number]; title: string }) {
+const fittedSlideCss = `
+html,body{width:100%;height:100%;overflow:hidden!important}
+body{display:flex!important;padding:16px!important}
+#artifact{width:100%;height:100%;display:flex}
+body>.slide,#artifact>.slide{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;aspect-ratio:auto!important;overflow:hidden!important}
+`;
+
+export function ArtifactFrame({ section, title, fitSlide = false }: { section: Content["sections"][number]; title: string; fitSlide?: boolean }) {
   try {
-    if (!section.js) return <iframe title={title} sandbox="" srcDoc={frameSource(section)} />;
-    const payload = { type: "docsync:render-v1", html: cleanHtml(section.html), css: cleanCss(section.css), js: section.js };
+    const framed = fitSlide ? { ...section, css: section.css + fittedSlideCss } : section;
+    if (!framed.js) return <iframe title={title} sandbox="" scrolling={fitSlide ? "no" : undefined} srcDoc={frameSource(framed)} />;
+    const payload = { type: "docsync:render-v1", html: cleanHtml(framed.html), css: cleanCss(framed.css), js: framed.js };
     return <iframe
       key={JSON.stringify(payload)}
       title={title}
       src="/artifact-frame"
       sandbox="allow-scripts"
+      scrolling={fitSlide ? "no" : undefined}
       referrerPolicy="no-referrer"
       onLoad={event => {
         // Opaque sandbox origins require '*'; the specific contentWindow is the
