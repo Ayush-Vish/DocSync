@@ -1,7 +1,7 @@
 import React, { useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentSkill } from "./AgentSkill";
-import { ArtifactFrame } from "./ArtifactFrame";
+import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
@@ -184,11 +184,12 @@ function Preview({ sections }: { sections: Content["sections"] }) {
 const slideMarkup = (html: string) =>
   /class\s*=\s*["'][^"']*\bslide\b[^"']*["']/i.test(html);
 
+const isPresentationContent = (content: Content) =>
+  content.sections.every((section) => slideMarkup(section.html));
+
 function SharedViewer({ content }: { content: Content }) {
   const [page, setPage] = useState(0);
-  const isPresentation = content.sections.every((section) =>
-    slideMarkup(section.html),
-  );
+  const isPresentation = isPresentationContent(content);
   const lastPage = content.sections.length - 1;
   const current = content.sections[Math.min(page, lastPage)];
   const itemName = isPresentation ? "slide" : "page";
@@ -205,49 +206,134 @@ function SharedViewer({ content }: { content: Content }) {
     return () => window.removeEventListener("keydown", navigate);
   }, [lastPage]);
 
-  return (
-    <section
-      className={cn(
-        "shared-viewer",
-        isPresentation
-          ? "shared-slide-viewer"
-          : "shared-document-viewer",
+  const controls = (
+    <div className="shared-viewer-toolbar" aria-label={`${isPresentation ? "Slide" : "Page"} navigation`}>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label={`Previous ${itemName}`}
+        disabled={page === 0}
+        onClick={() => setPage((value) => Math.max(0, value - 1))}
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </Button>
+      <span className="shared-page-indicator" aria-live="polite">
+        {isPresentation ? "Slide" : "Page"} {page + 1} of {content.sections.length}
+      </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-label={`Next ${itemName}`}
+        disabled={page === lastPage}
+        onClick={() => setPage((value) => Math.min(lastPage, value + 1))}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </Button>
+      {isPresentation && (
+        <>
+          <i className="shared-toolbar-divider" aria-hidden="true" />
+          <span className="shared-tool-button"><Search className="w-3.5 h-3.5" /> Fit</span>
+          <i className="shared-toolbar-divider" aria-hidden="true" />
+          <span className="shared-icon-tool" aria-label="Undo unavailable in read-only view"><Undo2 className="w-4 h-4" /></span>
+          <span className="shared-icon-tool" aria-label="Redo unavailable in read-only view"><Redo2 className="w-4 h-4" /></span>
+          <i className="shared-toolbar-divider" aria-hidden="true" />
+          <span className="shared-tool-label">Background</span>
+          <span className="shared-tool-label">Layout</span>
+          <span className="shared-tool-label">Theme</span>
+          <span className="shared-tool-label">Transition</span>
+        </>
       )}
-      aria-label={isPresentation ? "Presentation viewer" : "Document viewer"}
-    >
-      <div className="shared-viewer-toolbar">
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={`Previous ${itemName}`}
-          disabled={page === 0}
-          onClick={() => setPage((value) => Math.max(0, value - 1))}
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span aria-live="polite">
-          {isPresentation ? "Slide" : "Page"} {page + 1} of {content.sections.length}
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={`Next ${itemName}`}
-          disabled={page === lastPage}
-          onClick={() => setPage((value) => Math.min(lastPage, value + 1))}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
+    </div>
+  );
+
+  if (isPresentation) return (
+    <section className="shared-viewer shared-slide-viewer" aria-label="Presentation viewer">
+      {controls}
+      <div className="shared-slide-layout">
+        <aside className="shared-slide-filmstrip" aria-label="Slides">
+          {content.sections.map((section, index) => (
+            <button
+              type="button"
+              key={section.id}
+              className={cn("shared-slide-thumbnail", index === page && "active")}
+              aria-label={`Show slide ${index + 1}`}
+              aria-current={index === page ? "page" : undefined}
+              onClick={() => setPage(index)}
+            >
+              <span>{index + 1}</span>
+              <span className="shared-slide-thumbnail-preview">
+                <ArtifactThumbnail title={`Slide ${index + 1} thumbnail`} section={section} />
+              </span>
+            </button>
+          ))}
+        </aside>
+        <div className="shared-slide-workarea">
+          <div className="shared-page-stage">
+            <div className="shared-page">
+              <ArtifactFrame
+                key={current.id}
+                title={`Slide ${page + 1}: ${content.title}`}
+                section={current}
+              />
+            </div>
+          </div>
+          <div className="shared-speaker-notes">Shared presentation · Read only</div>
+        </div>
+        <aside className="shared-tools-rail" aria-label="Presentation tools">
+          <span><LayoutGrid className="w-4 h-4" />Theme</span>
+          <span><Columns className="w-4 h-4" />Layout</span>
+          <span><Presentation className="w-4 h-4" />Present</span>
+        </aside>
       </div>
+    </section>
+  );
+
+  return (
+    <section className="shared-viewer shared-document-viewer" aria-label="Document viewer">
+      {controls}
       <div className="shared-page-stage">
         <div className="shared-page">
           <ArtifactFrame
             key={current.id}
-            title={`${isPresentation ? "Slide" : "Page"} ${page + 1}: ${content.title}`}
+            title={`Page ${page + 1}: ${content.title}`}
             section={current}
           />
         </div>
       </div>
     </section>
+  );
+}
+
+function SharedHeader({ content }: { content: Content | null }) {
+  const isPresentation = content ? isPresentationContent(content) : false;
+  const menus = isPresentation
+    ? ["File", "Edit", "View", "Insert", "Format", "Slide", "Arrange", "Tools", "Help"]
+    : ["File", "Edit", "View", "Insert", "Format", "Tools", "Help"];
+
+  return (
+    <header className="share-header">
+      <div className="share-title-area">
+        {brand}
+        <div className="share-file-meta">
+          <div className="share-file-title">
+            <strong>{content?.title || "Shared document"}</strong>
+            <span aria-hidden="true">☆</span>
+          </div>
+          <nav className="share-menu" aria-label="Document menu">
+            {menus.map((menu) => <span key={menu}>{menu}</span>)}
+          </nav>
+        </div>
+      </div>
+      <div className="share-header-actions">
+        {isPresentation && (
+          <span className="share-slideshow"><Presentation className="w-4 h-4" /> Slideshow</span>
+        )}
+        <Badge variant="secondary" className="gap-1 font-normal text-xs">
+          <Eye className="w-3 h-3 text-muted-foreground" />
+          <span>Read only</span>
+        </Badge>
+      </div>
+    </header>
   );
 }
 
@@ -936,16 +1022,9 @@ function App() {
 
   if (sharePath)
     return (
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
-        <header className="share-header">
-          {brand}
-          <Badge variant="secondary" className="gap-1 font-normal text-xs">
-            <Eye className="w-3 h-3 text-muted-foreground" />
-            <span>Shared document · Read only</span>
-          </Badge>
-        </header>
-        <main className="shared flex-1">
-          <h1 className="tracking-tight">{shared?.title || "Shared document"}</h1>
+      <div className="share-shell">
+        <SharedHeader content={shared} />
+        <main className="shared">
           {error && (
             <div role="alert" className="error mb-6">
               {error}

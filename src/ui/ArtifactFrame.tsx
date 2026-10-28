@@ -21,3 +21,11 @@ export function ArtifactFrame({ section, title }: { section: Content["sections"]
     return <iframe title={title} sandbox="" srcDoc="<!doctype html><p>Invalid HTML or CSS. Check the source before previewing.</p>" />;
   }
 }
+
+export function ArtifactThumbnail({ section, title }: { section: Content["sections"][number]; title: string }) {
+  try {
+    return <iframe title={title} sandbox="" loading="lazy" srcDoc={frameSource(section)} />;
+  } catch {
+    return <iframe title={title} sandbox="" srcDoc="<!doctype html><p>Preview unavailable.</p>" />;
+  }
+}
