@@ -80,6 +80,7 @@ try {
   const created = await createdResponse.json() as { id: string; revision: number };
   const published = await (await f.call(`/documents/${created.id}/publish`, "POST", { expectedRevision: created.revision })).json() as { url: string };
   await page.goto(origin + new URL(published.url).pathname, { waitUntil: "networkidle0" });
+  await page.waitForSelector(".shared-document-viewer");
   await page.waitForSelector('iframe[src="/artifact-frame"]');
   const artifact = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
   assert.ok(artifact);
@@ -95,7 +96,28 @@ try {
   const topNavigationBlocked = await artifact.evaluate(() => { try { window.top!.location.href = "https://example.invalid/artifact-test"; return false; } catch { return true; } });
   assert.equal(topNavigationBlocked, true);
   assert.equal(page.url(), before);
-  console.log("Passed: live demo metrics, chart filters, slide navigation, mobile width; published artifact JS works; parent DOM, cookies, storage, external code, fetch, images, top navigation, and HTML breakout are blocked.");
+
+  const deckResponse = await f.call("/documents", "POST", {
+    title: "Two slide deck",
+    sections: [
+      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1></article>', css: "" },
+      { id: "second-slide", kind: "html", html: '<article class="slide"><h1>Second slide</h1></article>', css: "" },
+    ],
+  });
+  assert.equal(deckResponse.status, 201);
+  const deck = await deckResponse.json() as { id: string; revision: number };
+  const deckPublication = await (await f.call(`/documents/${deck.id}/publish`, "POST", { expectedRevision: deck.revision })).json() as { url: string };
+  await page.goto(origin + new URL(deckPublication.url).pathname, { waitUntil: "networkidle0" });
+  await page.waitForSelector(".shared-slide-viewer");
+  assert.equal(await page.$$eval(".shared-page iframe", nodes => nodes.length), 1);
+  assert.match(await page.$eval(".shared-viewer-toolbar span", node => node.textContent || ""), /Slide 1 of 2/);
+  await page.click('button[aria-label="Next slide"]');
+  await page.waitForFunction(() => document.querySelector(".shared-viewer-toolbar span")?.textContent?.includes("Slide 2 of 2"));
+  const secondSlide = await (await page.$(".shared-page iframe"))!.contentFrame();
+  assert.ok(secondSlide);
+  await secondSlide.waitForSelector("h1");
+  assert.equal(await secondSlide.$eval("h1", node => node.textContent), "Second slide");
+  console.log("Passed: live demo metrics, chart filters, slide navigation, one-page shared viewers, mobile width; published artifact JS works; parent DOM, cookies, storage, external code, fetch, images, top navigation, and HTML breakout are blocked.");
 } finally {
   await browser.close();
   server.close();

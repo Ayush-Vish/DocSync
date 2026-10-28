@@ -181,6 +181,76 @@ function Preview({ sections }: { sections: Content["sections"] }) {
   );
 }
 
+const slideMarkup = (html: string) =>
+  /class\s*=\s*["'][^"']*\bslide\b[^"']*["']/i.test(html);
+
+function SharedViewer({ content }: { content: Content }) {
+  const [page, setPage] = useState(0);
+  const isPresentation = content.sections.every((section) =>
+    slideMarkup(section.html),
+  );
+  const lastPage = content.sections.length - 1;
+  const current = content.sections[Math.min(page, lastPage)];
+  const itemName = isPresentation ? "slide" : "page";
+
+  useEffect(() => {
+    const navigate = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        setPage((value) => Math.max(0, value - 1));
+      } else if (event.key === "ArrowRight" || event.key === "PageDown") {
+        setPage((value) => Math.min(lastPage, value + 1));
+      }
+    };
+    window.addEventListener("keydown", navigate);
+    return () => window.removeEventListener("keydown", navigate);
+  }, [lastPage]);
+
+  return (
+    <section
+      className={cn(
+        "shared-viewer",
+        isPresentation
+          ? "shared-slide-viewer"
+          : "shared-document-viewer",
+      )}
+      aria-label={isPresentation ? "Presentation viewer" : "Document viewer"}
+    >
+      <div className="shared-viewer-toolbar">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Previous ${itemName}`}
+          disabled={page === 0}
+          onClick={() => setPage((value) => Math.max(0, value - 1))}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <span aria-live="polite">
+          {isPresentation ? "Slide" : "Page"} {page + 1} of {content.sections.length}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Next ${itemName}`}
+          disabled={page === lastPage}
+          onClick={() => setPage((value) => Math.min(lastPage, value + 1))}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="shared-page-stage">
+        <div className="shared-page">
+          <ArtifactFrame
+            key={current.id}
+            title={`${isPresentation ? "Slide" : "Page"} ${page + 1}: ${content.title}`}
+            section={current}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RichText({
   html,
   onChange,
@@ -881,7 +951,7 @@ function App() {
               {error}
             </div>
           )}
-          {shared && <Preview sections={shared.sections} />}
+          {shared && <SharedViewer content={shared} />}
         </main>
       </div>
     );

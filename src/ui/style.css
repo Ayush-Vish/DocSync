@@ -1208,9 +1208,9 @@ blockquote {
 
 .shared {
   width: 100%;
-  max-width: 1100px;
-  margin: 2.5rem auto;
-  padding: 0 2rem 3rem;
+  max-width: 1280px;
+  margin: 2rem auto;
+  padding: 0 2rem 2rem;
 }
 
 .shared h1 {
@@ -1220,14 +1220,70 @@ blockquote {
   margin: 0 0 1.5rem 0;
 }
 
-.shared .preview-stack {
+.shared-viewer {
+  overflow: hidden;
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
+  background: #eef0f3;
   box-shadow: 0 18px 48px rgba(24, 24, 27, 0.08);
 }
 
-.shared .preview-stack iframe {
-  height: calc(100dvh - 11rem);
-  min-height: 640px;
+.shared-viewer-toolbar {
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: #ffffff;
+}
+
+.shared-viewer-toolbar span {
+  min-width: 8rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.shared-viewer-toolbar button {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.shared-page-stage {
+  display: grid;
+  place-items: center;
+  min-height: calc(100dvh - 14rem);
+  padding: 2rem;
+}
+
+.shared-page {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d8dbe0;
+  box-shadow: 0 4px 18px rgba(24, 24, 27, 0.12);
+}
+
+.shared-page iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: #ffffff;
+}
+
+.shared-slide-viewer .shared-page {
+  width: min(100%, 1120px);
+  aspect-ratio: 16 / 9;
+}
+
+.shared-document-viewer .shared-page {
+  width: min(100%, 816px);
+  height: calc(100dvh - 18rem);
+  min-height: 680px;
 }
 
 /* Loading */
@@ -1658,7 +1714,7 @@ blockquote {
 
   .shared {
     margin: 1.5rem auto;
-    padding: 0 1rem 2rem;
+    padding: 0 0.75rem 1.5rem;
   }
 
   .shared h1 {
@@ -1669,8 +1725,13 @@ blockquote {
     padding: 0 1rem;
   }
 
-  .shared .preview-stack iframe {
-    height: calc(100dvh - 9rem);
+  .shared-page-stage {
+    min-height: calc(100dvh - 12rem);
+    padding: 0.75rem;
+  }
+
+  .shared-document-viewer .shared-page {
+    height: calc(100dvh - 13.5rem);
     min-height: 520px;
   }
 }
