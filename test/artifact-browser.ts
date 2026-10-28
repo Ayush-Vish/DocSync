@@ -109,8 +109,16 @@ try {
   const deckPublication = await (await f.call(`/documents/${deck.id}/publish`, "POST", { expectedRevision: deck.revision })).json() as { url: string };
   await page.goto(origin + new URL(deckPublication.url).pathname, { waitUntil: "networkidle0" });
   await page.waitForSelector(".shared-slide-viewer");
+  assert.ok(await page.$(".shared-app-shell"));
+  assert.ok(await page.$(".shared-editor-page"));
   assert.equal(await page.$$eval(".shared-slide-workarea .shared-page iframe", nodes => nodes.length), 1);
   assert.equal(await page.$$eval(".shared-slide-thumbnail", nodes => nodes.length), 2);
+  const slideFit = await page.evaluate(() => {
+    const stage = document.querySelector(".shared-page-stage")!.getBoundingClientRect();
+    const slide = document.querySelector(".shared-slide-workarea .shared-page")!.getBoundingClientRect();
+    return stage.width - slide.width;
+  });
+  assert.ok(slideFit <= 56);
   assert.match(await page.$eval(".shared-viewer-toolbar span", node => node.textContent || ""), /Slide 1 of 2/);
   await page.click('button[aria-label="Next slide"]');
   await page.waitForFunction(() => document.querySelector(".shared-viewer-toolbar span")?.textContent?.includes("Slide 2 of 2"));

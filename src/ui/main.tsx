@@ -187,6 +187,13 @@ const slideMarkup = (html: string) =>
 const isPresentationContent = (content: Content) =>
   content.sections.every((section) => slideMarkup(section.html));
 
+const documentRoute = () => {
+  const match = location.pathname.match(
+    /^\/documents\/([a-f0-9-]{36})(\/preview)?$/,
+  );
+  return match ? { id: match[1], preview: Boolean(match[2]) } : null;
+};
+
 function SharedViewer({ content }: { content: Content }) {
   const [page, setPage] = useState(0);
   const isPresentation = isPresentationContent(content);
@@ -304,36 +311,54 @@ function SharedViewer({ content }: { content: Content }) {
   );
 }
 
-function SharedHeader({ content }: { content: Content | null }) {
+function SharedWorkspace({ content, error }: { content: Content | null; error: string }) {
   const isPresentation = content ? isPresentationContent(content) : false;
-  const menus = isPresentation
-    ? ["File", "Edit", "View", "Insert", "Format", "Slide", "Arrange", "Tools", "Help"]
-    : ["File", "Edit", "View", "Insert", "Format", "Tools", "Help"];
-
   return (
-    <header className="share-header">
-      <div className="share-title-area">
+    <div className="app-shell shared-app-shell">
+      <aside className="sidebar shared-sidebar">
         {brand}
-        <div className="share-file-meta">
-          <div className="share-file-title">
-            <strong>{content?.title || "Shared document"}</strong>
-            <span aria-hidden="true">☆</span>
-          </div>
-          <nav className="share-menu" aria-label="Document menu">
-            {menus.map((menu) => <span key={menu}>{menu}</span>)}
-          </nav>
+        <div className="shared-sidebar-item">
+          <Eye className="w-4 h-4" />
+          <span>Shared {isPresentation ? "presentation" : "document"}</span>
         </div>
-      </div>
-      <div className="share-header-actions">
-        {isPresentation && (
-          <span className="share-slideshow"><Presentation className="w-4 h-4" /> Slideshow</span>
+        <div className="sidebar-note mt-auto rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 font-medium text-foreground mb-1">
+            <span className="status-dot w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+            Read-only shared view
+          </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground mt-1">
+            Content and interactive controls are available. Editing remains private.
+          </p>
+        </div>
+      </aside>
+      <main className="workspace document-workspace shared-workspace">
+        <header className="topbar">
+          <strong className="shared-document-title">{content?.title || "Shared document"}</strong>
+          <Badge variant="outline" className="text-muted-foreground text-xs font-normal gap-1.5">
+            <Eye className="w-3 h-3" /> Read only
+          </Badge>
+        </header>
+        {error && (
+          <div role="alert" className="error banner">
+            {error}
+          </div>
         )}
-        <Badge variant="secondary" className="gap-1 font-normal text-xs">
-          <Eye className="w-3 h-3 text-muted-foreground" />
-          <span>Read only</span>
-        </Badge>
-      </div>
-    </header>
+        <section className="shared-editor-page">
+          <div className="shared-editor-heading">
+            <div className="shared-editor-actions">
+              <span className="shared-format-chip">
+                {isPresentation ? <Presentation className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}
+                {isPresentation ? "Slides (PPT)" : "Document"}
+              </span>
+              <span className="shared-format-chip active"><Eye className="w-3.5 h-3.5" /> Preview</span>
+            </div>
+          </div>
+          <main className="shared">
+            {content && <SharedViewer content={content} />}
+          </main>
+        </section>
+      </main>
+    </div>
   );
 }
 
@@ -830,6 +855,8 @@ function App() {
         try {
           setSession(await api("/session"));
           setDocuments(await api("/documents"));
+          const route = documentRoute();
+          if (route) await loadDocument(route.id, false, route.preview);
         } catch (e) {
           if (!(e instanceof ApiError && e.status === 401)) throw e;
         }
@@ -877,10 +904,28 @@ function App() {
       setAuthPage(isAuthRoute());
       if (location.pathname === "/signup") setAuthMode("signup");
       else if (location.pathname === "/login") setAuthMode("signin");
+      if (!session) return;
+      const route = documentRoute();
+      if (dirty && doc && !confirm("Discard your unsaved changes? Download a draft first if you want to keep them.")) {
+        window.history.pushState(null, "", `/documents/${doc.id}${preview ? "/preview" : ""}`);
+        return;
+      }
+      if (route) {
+        void run(() => loadDocument(route.id, false, route.preview));
+      } else if (location.pathname === "/connect") {
+        setDoc(null);
+        setDirty(false);
+        setView("connect");
+      } else if (location.pathname === "/") {
+        setDoc(null);
+        setDirty(false);
+        setPreview(false);
+        setView("library");
+      }
     };
     window.addEventListener("popstate", handlePop);
     return () => window.removeEventListener("popstate", handlePop);
-  }, []);
+  }, [dirty, doc, preview, session]);
 
   const goToLogin = () => {
     setAuthMode("signin");
@@ -914,21 +959,27 @@ function App() {
     setShare("");
   }
 
+  async function loadDocument(id: string, navigate: boolean, openPreview: boolean) {
+    const next = await api<Document>("/documents/" + id);
+    setDoc(next);
+    setPreview(openPreview);
+    setEditorMode(isPresentationContent(next) ? "slide" : "doc");
+    setActiveSlide(0);
+    setDirty(false);
+    setShare("");
+    setHistory(null);
+    setView("library");
+    setPublished(
+      (await api("/documents/" + id + "/publish"))?.revision ?? null,
+    );
+    if (navigate) {
+      window.history.pushState(null, "", `/documents/${id}${openPreview ? "/preview" : ""}`);
+    }
+  }
+
   async function open(id: string) {
     if (!leave()) return;
-    await run(async () => {
-      const next = await api<Document>("/documents/" + id);
-      setDoc(next);
-      setPreview(false);
-      setActiveSlide(0);
-      setDirty(false);
-      setShare("");
-      setHistory(null);
-      setView("library");
-      setPublished(
-        (await api("/documents/" + id + "/publish"))?.revision ?? null,
-      );
-    });
+    await run(() => loadDocument(id, true, false));
   }
 
   async function createFromTheme(theme: ThemeCatalogItem) {
@@ -949,6 +1000,11 @@ function App() {
       setPublished(null);
       setShare("");
       setHistory(null);
+      window.history.pushState(
+        null,
+        "",
+        `/documents/${next.id}${theme.format === "document" ? "/preview" : ""}`,
+      );
       await refresh();
       setNotice(`${theme.name} created with fictional example content.`);
     });
@@ -986,6 +1042,7 @@ function App() {
     setDoc(null);
     setDirty(false);
     setView("connect");
+    window.history.pushState(null, "", "/connect");
     await run(async () => {
       setTokenActive((await api("/agent-token")).active);
     });
@@ -1021,19 +1078,7 @@ function App() {
     );
 
   if (sharePath)
-    return (
-      <div className="share-shell">
-        <SharedHeader content={shared} />
-        <main className="shared">
-          {error && (
-            <div role="alert" className="error mb-6">
-              {error}
-            </div>
-          )}
-          {shared && <SharedViewer content={shared} />}
-        </main>
-      </div>
-    );
+    return <SharedWorkspace content={shared} error={error} />;
 
   if (!session) {
     if (!authPage) {
@@ -1081,6 +1126,7 @@ function App() {
               setDirty(false);
               setPublished(null);
               setShare("");
+              window.history.pushState(null, "", `/documents/${next.id}`);
               await refresh();
             });
           }}
@@ -1103,6 +1149,8 @@ function App() {
                 setDoc(null);
                 setDirty(false);
                 setView("library");
+                setPreview(false);
+                window.history.pushState(null, "", "/");
               }
             }}
           >
@@ -1474,7 +1522,15 @@ function App() {
                       size="sm"
                       className="h-7 text-xs px-2.5"
                       disabled={busy}
-                      onClick={() => setPreview(!preview)}
+                      onClick={() => {
+                        const nextPreview = !preview;
+                        setPreview(nextPreview);
+                        window.history.pushState(
+                          null,
+                          "",
+                          `/documents/${doc.id}${nextPreview ? "/preview" : ""}`,
+                        );
+                      }}
                     >
                       {preview ? <Edit3Icon className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
                       {preview ? "Edit" : "Preview"}

@@ -231,6 +231,7 @@ try {
   assert.match(await page.$eval(".custom-theme-card code", node => node.textContent || ""), /custom theme/i);
   await page.click('[data-theme-id="sales-dashboard"]');
   await page.waitForFunction(() => (document.querySelector('input[aria-label="Document title"]') as HTMLInputElement)?.value === "Northstar Sales Dashboard");
+  assert.match(new URL(page.url()).pathname, /^\/documents\/[a-f0-9-]{36}\/preview$/);
   const salesFrame = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
   assert.ok(salesFrame);
   await salesFrame.waitForSelector("#live-sales");
@@ -251,6 +252,15 @@ try {
     button.click();
   });
   await page.waitForSelector(".editor-page");
+  assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
+  await click("Preview");
+  await page.waitForSelector(".preview-stack");
+  assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}/preview`);
+  await page.reload({ waitUntil: "networkidle0" });
+  await page.waitForSelector(".preview-stack");
+  assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}/preview`);
+  await click("Edit");
+  assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
   await fill('input[aria-label="Document title"]', "Browser edited report");
   await click("＋ Text section");
   await page.waitForSelector("[contenteditable=true]");
@@ -299,16 +309,17 @@ try {
   await publicPage.setViewport({ width: 1440, height: 1000 });
   await publicPage.goto(sharedUrl);
   await publicPage.waitForFunction(
-    () => document.querySelector("h1")?.textContent === "Browser edited report",
+    () => document.querySelector(".shared-document-title")?.textContent === "Browser edited report",
   );
-  assert.equal(await publicPage.$(".sidebar"), null);
+  assert.ok(await publicPage.$(".shared-app-shell .sidebar"));
+  assert.ok(await publicPage.$(".shared-editor-page"));
   const sharedLayout = await publicPage.evaluate(() => {
     const reader = document.querySelector(".shared")!.getBoundingClientRect();
     const frame = document.querySelector(".shared iframe")!.getBoundingClientRect();
     return { readerWidth: reader.width, frameWidth: frame.width, frameHeight: frame.height };
   });
   assert.ok(sharedLayout.readerWidth >= 900);
-  assert.ok(sharedLayout.frameWidth >= 850);
+  assert.ok(sharedLayout.frameWidth >= 760);
   assert.ok(sharedLayout.frameHeight >= 640);
   // A stale save must preserve the user's draft.
   await fill('input[aria-label="Document title"]', "Unsaved browser draft");
