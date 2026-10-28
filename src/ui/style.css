@@ -1448,8 +1448,8 @@ blockquote {
 
 .shared-slide-viewer .shared-page {
   width: calc(100% - 1rem);
+  height: calc(100% - 1rem);
   max-width: 1400px;
-  aspect-ratio: 16 / 9;
 }
 
 .shared-speaker-notes {
@@ -1785,7 +1785,8 @@ blockquote {
   }
 
   .shared-slide-viewer .shared-page {
-    width: min(100%, calc((100dvh - 13rem) * 16 / 9));
+    width: calc(100% - 0.5rem);
+    height: calc(100% - 0.5rem);
   }
 
   .shared-speaker-notes {

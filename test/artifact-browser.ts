@@ -100,8 +100,8 @@ try {
   const deckResponse = await f.call("/documents", "POST", {
     title: "Two slide deck",
     sections: [
-      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1></article>', css: "" },
-      { id: "second-slide", kind: "html", html: '<article class="slide"><h1>Second slide</h1></article>', css: "" },
+      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9}" },
+      { id: "second-slide", kind: "html", html: '<article class="slide"><h1>Second slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9}" },
     ],
   });
   assert.equal(deckResponse.status, 201);
@@ -116,9 +116,10 @@ try {
   const slideFit = await page.evaluate(() => {
     const stage = document.querySelector(".shared-page-stage")!.getBoundingClientRect();
     const slide = document.querySelector(".shared-slide-workarea .shared-page")!.getBoundingClientRect();
-    return stage.width - slide.width;
+    return { width: stage.width - slide.width, height: stage.height - slide.height };
   });
-  assert.ok(slideFit <= 56);
+  assert.ok(slideFit.width <= 56);
+  assert.ok(slideFit.height <= 56);
   assert.match(await page.$eval(".shared-viewer-toolbar span", node => node.textContent || ""), /Slide 1 of 2/);
   await page.click('button[aria-label="Next slide"]');
   await page.waitForFunction(() => document.querySelector(".shared-viewer-toolbar span")?.textContent?.includes("Slide 2 of 2"));
@@ -126,6 +127,7 @@ try {
   assert.ok(secondSlide);
   await secondSlide.waitForSelector("h1");
   assert.equal(await secondSlide.$eval("h1", node => node.textContent), "Second slide");
+  assert.ok(await secondSlide.evaluate(() => document.documentElement.scrollHeight <= innerHeight));
   await page.setViewport({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   console.log("Passed: live demo metrics, chart filters, slide navigation, one-page shared viewers, mobile width; published artifact JS works; parent DOM, cookies, storage, external code, fetch, images, top navigation, and HTML breakout are blocked.");
