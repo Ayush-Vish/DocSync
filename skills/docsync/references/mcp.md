@@ -1,5 +1,13 @@
 # MCP contract and renderer limits
 
+Before designing a new artifact, call `get_template_options` and share its gallery URL.
+Ask the user to reply with a template name or let the agent choose a custom design.
+Skip this question if the user already chose a template or delegated design.
+Gallery previews do not send a choice back to the agent; the user replies in chat.
+For a selected template, fetch its `contentUrl` and adapt the content to the user's
+facts. Otherwise create a custom design from their request. The gallery is at
+`/templates` and requires no sign-in. These are DocSync templates, not third-party branded templates.
+
 ## Paged documents
 
 Create reports with `format: "document"` and `pages: [{id, kind, html, css, js?}, ...]`.
@@ -17,6 +25,7 @@ Use the DocSync tools exposed by the current client; prefixes vary between Codex
 | Tool | Inputs / purpose |
 | --- | --- |
 | `get_connection` | No arguments. Check permissions and local-only vs public links. |
+| `get_template_options` | `format`: `document`, `presentation`, or `all`. Returns the public template gallery, preview and content links, and a template-or-custom question. |
 | `list_documents` | No arguments. Find existing documents. |
 | `get_document` | `id`. Read title, sections, and current revision. |
 | `create_document` | `title`, `sections`. Creates a private draft. |

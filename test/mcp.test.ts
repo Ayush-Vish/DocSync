@@ -28,11 +28,20 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "create_document",
     "get_connection",
     "get_document",
+    "get_template_options",
     "list_documents",
     "publish_document",
     "update_document",
   ]);
   const parse = (r: any) => JSON.parse(r.content[0].text);
+  for (const format of ["document", "presentation", "all"]) {
+    const options = parse(await client.callTool({ name: "get_template_options", arguments: { format } }));
+    assert.equal(options.galleryUrl, `http://127.0.0.1:8787/templates?format=${format}`);
+    assert.equal(options.linkAccess, "local_only");
+    assert.ok(options.templates.length > 0);
+    assert.ok(options.templates.every((theme: any) => format === "all" || theme.format === format));
+    assert.match(options.guidance, /custom design/);
+  }
   const connection = parse(
     await client.callTool({ name: "get_connection", arguments: {} }),
   );

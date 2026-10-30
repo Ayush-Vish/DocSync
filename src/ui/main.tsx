@@ -1,6 +1,7 @@
 import React, { useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentSkill } from "./AgentSkill";
+import { TemplateGallery } from "./TemplateGallery";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -2253,4 +2254,4 @@ function Edit3Icon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(location.pathname === "/templates" ? <TemplateGallery /> : <App />);
