@@ -336,7 +336,7 @@ async function route(request: Request, env: Env): Promise<Response> {
           env.DB,
           id,
           revision(input.expectedRevision),
-          { title: snapshot.title, sections: snapshot.sections },
+          { title: snapshot.title, format: snapshot.format, sections: snapshot.sections },
           principal.accountId,
         ),
       );

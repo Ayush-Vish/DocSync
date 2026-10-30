@@ -788,6 +788,41 @@ summary:focus-visible {
   display: block;
 }
 
+.preview-stack {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.document-paper {
+  margin: 0 auto 24px;
+  background: white;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px #18181b14;
+}
+
+.document-paper > footer {
+  padding: 12px 24px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-align: right;
+}
+
+.document-pages-scroll {
+  overflow: auto;
+  padding: 24px;
+  min-height: 0;
+  flex: 1;
+}
+
+.document-paper iframe,
+.editor-page .document-paper iframe {
+  height: 1056px;
+  min-height: 1056px;
+}
+
 .editor-page .preview-stack iframe {
   height: calc(100dvh - 15rem);
   min-height: 640px;

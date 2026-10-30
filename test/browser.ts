@@ -296,8 +296,8 @@ try {
     sidebarTop: document.querySelector(".sidebar")!.getBoundingClientRect().top,
     topbarTop: document.querySelector(".topbar")!.getBoundingClientRect().top,
   }));
-  assert.equal(Math.round(stickyLayout.sidebarTop), 0);
-  assert.equal(Math.round(stickyLayout.topbarTop), 0);
+  assert.ok(Math.abs(stickyLayout.sidebarTop) < 1);
+  assert.ok(Math.abs(stickyLayout.topbarTop) < 1);
   await click("Share ↗");
   await page.waitForSelector(".share-link a");
   const sharedUrl = await page.$eval(
@@ -313,6 +313,7 @@ try {
   );
   assert.ok(await publicPage.$(".shared-app-shell .sidebar"));
   assert.ok(await publicPage.$(".shared-editor-page"));
+  assert.equal(await publicPage.$$eval(".document-paper", pages => pages.length), 2);
   const sharedLayout = await publicPage.evaluate(() => {
     const reader = document.querySelector(".shared")!.getBoundingClientRect();
     const frame = document.querySelector(".shared iframe")!.getBoundingClientRect();

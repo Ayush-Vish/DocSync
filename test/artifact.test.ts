@@ -4,6 +4,26 @@ import { fixture } from "./helpers.ts";
 import { cleanHtml, validateContent } from "../src/content.ts";
 import { handle } from "../src/worker.ts";
 
+test("explicit pages preserve order, sanitization and format through publishing", async (t) => {
+  const f = await fixture(true);
+  t.after(f.close);
+  const pages = [
+    { id: "cover", html: '<h1 onclick="bad()">Cover</h1>', css: "" },
+    { id: "details", html: "<p>Second page</p>", css: "" },
+  ];
+  const response = await f.call("/documents", "POST", { title: "Paged report", pages });
+  assert.equal(response.status, 201);
+  const doc = await response.json() as { id: string; revision: number };
+  const publication = await (await f.call(`/documents/${doc.id}/publish`, "POST", { expectedRevision: doc.revision })).json() as { url: string };
+  const saved = await (await f.call(`/shared/${publication.url.split('/').at(-1)}`, "GET", undefined, "anonymous")).json() as ReturnType<typeof validateContent>;
+  assert.equal(saved.format, "document");
+  assert.deepEqual(saved.sections.map(page => page.id), ["cover", "details"]);
+  assert.equal(saved.sections[0].html, "<h1>Cover</h1>");
+  for (const invalid of [{ pages, sections: pages }, { pages, format: "presentation" }, { sections: [] }, { pages: [pages[0], pages[0]] }]) {
+    assert.throws(() => validateContent({ title: "Invalid", ...invalid }));
+  }
+});
+
 test("JavaScript survives create, read, and published snapshots with a size limit", async (t) => {
   const f = await fixture(true);
   t.after(f.close);

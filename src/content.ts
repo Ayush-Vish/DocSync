@@ -52,9 +52,14 @@ export function validateContent(input: unknown): Content {
   const parsed = contentSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(400, 'Invalid document', parsed.error.flatten());
   const value = parsed.data;
+  if (value.pages && value.sections.length) throw new HttpError(400, 'Provide pages or sections, not both');
+  if (value.pages && value.format === 'presentation') throw new HttpError(400, 'Presentations use sections, not pages');
+  const sections = value.pages ?? value.sections;
+  if (!sections.length) throw new HttpError(400, 'Document must contain at least one page or section');
+  value.sections = sections;
   if (new Set(value.sections.map(s => s.id)).size !== value.sections.length) throw new HttpError(400, 'Section IDs must be unique');
   if (new TextEncoder().encode(JSON.stringify(value)).length > 500_000) throw new HttpError(413, 'Document exceeds 500 KB');
-  return { title: value.title, sections: value.sections.map(s => ({ ...s, html: cleanHtml(s.html), css: cleanCss(s.css) })) };
+  return { title: value.title, ...(value.format || value.pages ? { format: value.format ?? 'document' } : {}), sections: sections.map(s => ({ ...s, html: cleanHtml(s.html), css: cleanCss(s.css) })) };
 }
 
 export const framePolicy = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; connect-src 'none'; script-src 'none'; base-uri 'none'; form-action 'none'";

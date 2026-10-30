@@ -12,7 +12,9 @@ export const sectionSchema = z
 export const contentSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
-    sections: z.array(sectionSchema).min(1).max(40),
+    format: z.enum(["document", "presentation"]).optional().describe("Document renders as separate paper pages; presentation renders as slides."),
+    pages: z.array(sectionSchema).min(1).max(40).optional().describe("Ordered document pages. Each item is one complete page with a stable id and self-contained HTML/CSS/JS. Use pages OR sections, never both. Split long reports across pages."),
+    sections: z.array(sectionSchema).max(40).default([]).describe("Legacy document pages or presentation slides. Omit when providing pages."),
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;

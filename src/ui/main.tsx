@@ -170,12 +170,11 @@ const VISUAL_TEMPLATES = [
 function Preview({ sections }: { sections: Content["sections"] }) {
   return (
     <div className="preview-stack">
-      {sections.map((section) => (
-        <ArtifactFrame
-          key={section.id}
-          title={`Preview: ${section.id}`}
-          section={section}
-        />
+      {sections.map((section, index) => (
+        <section className="document-paper" key={section.id} aria-label={`Page ${index + 1}`}>
+          <ArtifactFrame title={`Page ${index + 1}: ${section.id}`} section={section} />
+          <footer>Page {index + 1} of {sections.length}</footer>
+        </section>
       ))}
     </div>
   );
@@ -185,7 +184,7 @@ const slideMarkup = (html: string) =>
   /class\s*=\s*["'][^"']*\bslide\b[^"']*["']/i.test(html);
 
 const isPresentationContent = (content: Content) =>
-  content.sections.every((section) => slideMarkup(section.html));
+  content.format ? content.format === "presentation" : content.sections.every((section) => slideMarkup(section.html));
 
 const documentRoute = () => {
   const match = location.pathname.match(
@@ -347,15 +346,8 @@ function SharedViewer({
 
   return (
     <section className="shared-viewer shared-document-viewer" aria-label="Document viewer">
-      {controls}
-      <div className="shared-page-stage">
-        <div className="shared-page">
-          <ArtifactFrame
-            key={current.id}
-            title={`Page ${page + 1}: ${content.title}`}
-            section={current}
-          />
-        </div>
+      <div className="document-pages-scroll">
+        <Preview sections={content.sections} />
       </div>
     </section>
   );
@@ -1097,6 +1089,7 @@ function App() {
     await run(async () => {
       const updated = await api<Document>("/documents/" + doc.id, "PUT", {
         title: doc.title,
+        format: doc.format,
         sections: doc.sections,
         expectedRevision: doc.revision,
       });

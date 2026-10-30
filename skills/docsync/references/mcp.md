@@ -1,5 +1,17 @@
 # MCP contract and renderer limits
 
+## Paged documents
+
+Create reports with `format: "document"` and `pages: [{id, kind, html, css, js?}, ...]`.
+Each item is one paper page, in reading order. Split long prose at semantic boundaries;
+do not put an entire report in one HTML string. Keep each page self-contained and
+within the visible paper height (1056 CSS pixels). Verify every page after saving.
+Use `format: "presentation"` with `sections` for slides.
+Send either `pages` or `sections`, never both. The server normalizes pages to the
+existing `sections` field in saved responses; preserve those IDs and `format` when updating.
+Legacy documents remain readable as one paper page per section. Existing long HTML
+is not automatically split, because doing so can break interactive scripts.
+
 Use the DocSync tools exposed by the current client; prefixes vary between Codex and Claude. Skills and MCP connections are installed separately.
 
 | Tool | Inputs / purpose |
