@@ -1,5 +1,6 @@
 import { cleanCss, cleanHtml, frameSource } from "../content";
 import type { Content } from "../document";
+import { useEffect, useRef, useState } from "react";
 
 const fittedSlideCss = `
 html,body{width:100%;height:100%;overflow:hidden!important}
@@ -17,16 +18,31 @@ body>.page,#artifact>.page{margin:0!important;max-width:none!important;min-heigh
 `;
 
 export function ArtifactFrame({ section, title, fitSlide = false, documentPage = false }: { section: Content["sections"][number]; title: string; fitSlide?: boolean; documentPage?: boolean }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(1056);
+  useEffect(() => {
+    if (!documentPage) return;
+    const resize = (event: MessageEvent) => {
+      if (event.source !== frame.current?.contentWindow || event.data?.type !== "docsync:height-v1") return;
+      const next = event.data.height;
+      if (typeof next === "number" && Number.isFinite(next) && next > 0 && next <= 100000)
+        setHeight(Math.max(1056, Math.ceil(next)));
+    };
+    window.addEventListener("message", resize);
+    return () => window.removeEventListener("message", resize);
+  }, [documentPage]);
   try {
     const framed = { ...section, css: section.css + (fitSlide ? fittedSlideCss : documentPage ? documentPageCss : "") };
-    if (!framed.js) return <iframe title={title} sandbox="" scrolling={fitSlide ? "no" : undefined} srcDoc={frameSource(framed)} />;
-    const payload = { type: "docsync:render-v1", html: cleanHtml(framed.html), css: cleanCss(framed.css), js: framed.js };
+    if (!framed.js && !documentPage) return <iframe title={title} sandbox="" scrolling={fitSlide ? "no" : undefined} srcDoc={frameSource(framed)} />;
+    const payload = { type: "docsync:render-v1", html: cleanHtml(framed.html), css: cleanCss(framed.css), js: framed.js || "", autoHeight: documentPage };
     return <iframe
+      ref={frame}
+      style={documentPage ? { height } : undefined}
       key={JSON.stringify(payload)}
       title={title}
       src="/artifact-frame"
       sandbox="allow-scripts"
-      scrolling={fitSlide ? "no" : undefined}
+      scrolling={fitSlide || documentPage ? "no" : undefined}
       referrerPolicy="no-referrer"
       onLoad={event => {
         // Opaque sandbox origins require '*'; the specific contentWindow is the

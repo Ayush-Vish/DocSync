@@ -28,6 +28,29 @@ const artifactRuntime = String.raw`(() => {
     const script = document.createElement("script");
     script.textContent = data.js;
     document.body.append(script);
+    if (data.autoHeight === true) {
+      let queued = false;
+      let previous = 0;
+      const measure = () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          const body = document.body;
+          const artifact = document.getElementById("artifact");
+          const height = Math.ceil(Math.max(body.getBoundingClientRect().height,
+            artifact.getBoundingClientRect().top + artifact.scrollHeight + parseFloat(getComputedStyle(body).paddingBottom)));
+          if (height !== previous) {
+            previous = height;
+            window.parent.postMessage({ type: "docsync:height-v1", height }, "*");
+          }
+        });
+      };
+      const observer = new ResizeObserver(measure);
+      observer.observe(document.body);
+      observer.observe(document.getElementById("artifact"));
+      measure();
+    }
   });
 })()`;
 

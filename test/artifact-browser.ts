@@ -87,6 +87,16 @@ try {
   await artifact.waitForSelector("#increment");
   await artifact.click("#increment");
   assert.equal(await artifact.$eval("#count", node => node.textContent), "1");
+  await artifact.evaluate(() => {
+    const extra = document.createElement("div");
+    extra.id = "height-probe";
+    extra.style.height = "1800px";
+    document.getElementById("artifact")!.append(extra);
+  });
+  await page.waitForFunction(() => document.querySelector(".document-paper iframe")!.getBoundingClientRect().height > 1800);
+  assert.ok(await artifact.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1));
+  await artifact.evaluate(() => document.getElementById("height-probe")!.remove());
+  await page.waitForFunction(() => document.querySelector(".document-paper iframe")!.getBoundingClientRect().height === 1056);
   await artifact.waitForFunction(() => document.getElementById("probes")?.textContent?.includes('"fetch":true'));
   assert.deepEqual(JSON.parse(await artifact.$eval("#probes", node => node.textContent || "")), { parent: true, cookies: true, storage: true, fetch: true });
   assert.equal(await artifact.evaluate(() => "escaped" in window), false);

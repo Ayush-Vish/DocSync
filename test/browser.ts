@@ -238,6 +238,8 @@ try {
   const salesFrame = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
   assert.ok(salesFrame);
   await salesFrame.waitForSelector("#live-sales");
+  await page.waitForFunction(() => document.querySelector(".document-paper iframe")!.getBoundingClientRect().height > 1056);
+  assert.ok(await salesFrame.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1));
   assert.equal(await salesFrame.$eval('nav[aria-label="Preview controls"]', node => getComputedStyle(node).display), "none");
   assert.equal(await salesFrame.$eval("html", node => getComputedStyle(node).scrollbarWidth), "none");
   const salesBefore = await salesFrame.$eval("#live-sales", node => node.textContent);
@@ -275,14 +277,14 @@ try {
   assert.equal(await page.$(".component-editor textarea"), null);
   assert.ok(!(await page.$eval("body", node => node.textContent || "")).includes("Edit HTML, CSS & JavaScript"));
   assert.equal(await page.evaluate(() => (window as any).stolen), undefined);
-  const frame = page.frames().find((x) => x.url() === "about:srcdoc");
+  const frame = page.frames().find((x) => x.url().endsWith("/artifact-frame"));
   assert.ok(frame);
   await frame!.waitForSelector("h1");
   assert.equal(
     await frame!.$eval("h1", (e) => e.textContent),
     "Overview",
   );
-  assert.equal(await frame!.$("script,img,[onclick]"), null);
+  assert.equal(await frame!.$("#artifact script,img,[onclick]"), null);
   const editorLayout = await page.evaluate(() => {
     const editor = document.querySelector(".editor-page")!.getBoundingClientRect();
     const frame = document.querySelector(".document-paper iframe")!.getBoundingClientRect();
