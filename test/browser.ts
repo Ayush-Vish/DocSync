@@ -138,7 +138,10 @@ try {
   assert.equal(connection.trial, true);
   const created = await trial.callTool({
     name: "create_document",
-    arguments: sample("My first report"),
+    arguments: { ...sample("My first report"), sections: [
+      ...sample("My first report").sections,
+      { id: "second-page", kind: "text", html: "<p>A clear view of the coming year.</p>", css: "" },
+    ] },
   });
   assert.equal(created.isError, false);
   const doc = parse(created);
@@ -235,6 +238,8 @@ try {
   const salesFrame = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
   assert.ok(salesFrame);
   await salesFrame.waitForSelector("#live-sales");
+  assert.equal(await salesFrame.$eval('nav[aria-label="Preview controls"]', node => getComputedStyle(node).display), "none");
+  assert.equal(await salesFrame.$eval("html", node => getComputedStyle(node).scrollbarWidth), "none");
   const salesBefore = await salesFrame.$eval("#live-sales", node => node.textContent);
   await salesFrame.waitForFunction(value => document.getElementById("live-sales")?.textContent !== value, { timeout: 8000 }, salesBefore);
   await page.screenshot({ path: "/tmp/docsync-sales-theme.png" });
@@ -262,10 +267,6 @@ try {
   await click("Edit");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
   await fill('input[aria-label="Document title"]', "Browser edited report");
-  await click("＋ Text section");
-  await page.waitForSelector("[contenteditable=true]");
-  await page.click("[contenteditable=true]");
-  await page.keyboard.type("A clear view of the coming year.");
   await click("Save");
   await page.waitForFunction(
     () => document.querySelector("[role=status]")?.textContent === "Saved.",
@@ -284,12 +285,15 @@ try {
   assert.equal(await frame!.$("script,img,[onclick]"), null);
   const editorLayout = await page.evaluate(() => {
     const editor = document.querySelector(".editor-page")!.getBoundingClientRect();
-    const frame = document.querySelector(".component-editor iframe")!.getBoundingClientRect();
+    const frame = document.querySelector(".document-paper iframe")!.getBoundingClientRect();
     return { editorWidth: editor.width, frameWidth: frame.width, frameHeight: frame.height };
   });
   assert.ok(editorLayout.editorWidth >= 1100);
   assert.ok(editorLayout.frameWidth >= 800 && editorLayout.frameWidth <= 900);
   assert.ok(editorLayout.frameHeight >= 640);
+  assert.equal(await page.$eval(".sidebar", node => getComputedStyle(node).display), "none");
+  assert.equal(await page.$(".section-card"), null);
+  assert.ok(!(await page.$eval(".editor-page", node => node.textContent || "")).includes("Quick-Insert"));
   await page.screenshot({ path: "/tmp/docsync-editor.png" });
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const stickyLayout = await page.evaluate(() => ({
@@ -311,7 +315,7 @@ try {
   await publicPage.waitForFunction(
     () => document.querySelector(".shared-document-title")?.textContent === "Browser edited report",
   );
-  assert.ok(await publicPage.$(".shared-app-shell .sidebar"));
+  assert.equal(await publicPage.$eval(".sidebar", node => getComputedStyle(node).display), "none");
   assert.ok(await publicPage.$(".shared-editor-page"));
   assert.equal(await publicPage.$$eval(".document-paper", pages => pages.length), 2);
   const sharedLayout = await publicPage.evaluate(() => {
@@ -361,6 +365,7 @@ try {
     ),
   );
   await page.screenshot({ path: "/tmp/docsync-mobile.png", fullPage: true });
+  await click("← My documents");
   await page.click('button[aria-label="Sign out"]');
   await page.waitForSelector("input[name=email]");
   assert.deepEqual(errors, []);

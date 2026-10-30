@@ -141,6 +141,14 @@ summary:focus-visible {
   background-color: var(--background);
 }
 
+.app-shell.document-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.document-shell > .sidebar {
+  display: none;
+}
+
 .sidebar {
   height: 100dvh;
   position: sticky;
@@ -797,10 +805,10 @@ summary:focus-visible {
 }
 
 .document-paper {
-  margin: 0 auto 24px;
+  margin: 0 auto 8px;
   background: white;
   border: 1px solid var(--border);
-  box-shadow: 0 2px 8px #18181b14;
+  box-shadow: none;
 }
 
 .document-paper > footer {
@@ -823,7 +831,7 @@ summary:focus-visible {
   min-height: 1056px;
 }
 
-.editor-page .preview-stack iframe {
+.editor-page .preview-stack:not(:has(.document-paper)) iframe {
   height: calc(100dvh - 15rem);
   min-height: 640px;
 }

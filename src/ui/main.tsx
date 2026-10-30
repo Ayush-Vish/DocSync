@@ -172,8 +172,7 @@ function Preview({ sections }: { sections: Content["sections"] }) {
     <div className="preview-stack">
       {sections.map((section, index) => (
         <section className="document-paper" key={section.id} aria-label={`Page ${index + 1}`}>
-          <ArtifactFrame title={`Page ${index + 1}: ${section.id}`} section={section} />
-          <footer>Page {index + 1} of {sections.length}</footer>
+          <ArtifactFrame title={`Page ${index + 1}: ${section.id}`} section={section} documentPage />
         </section>
       ))}
     </div>
@@ -375,7 +374,7 @@ function SharedWorkspace({ content, error }: { content: Content | null; error: s
   }, []);
 
   return (
-    <div className="app-shell shared-app-shell">
+    <div className="app-shell shared-app-shell document-shell">
       <aside className="sidebar shared-sidebar">
         {brand}
         <div className="shared-sidebar-item">
@@ -1184,7 +1183,7 @@ function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={cn("app-shell", doc && "document-shell")}>
       <aside className="sidebar">
         {brand}
         <Button
@@ -1294,6 +1293,14 @@ function App() {
       </aside>
       <main className={cn("workspace", doc && "document-workspace")}>
         <header className="topbar">
+          {doc && <Button variant="ghost" size="sm" onClick={() => {
+            if (!leave()) return;
+            setDoc(null);
+            setDirty(false);
+            setView("library");
+            setPreview(false);
+            window.history.pushState(null, "", "/");
+          }}>← My documents</Button>}
           {doc ? (
             <input
               className="document-title"
@@ -2010,173 +2017,7 @@ function App() {
                 )}
               </div>
             ) : (
-              doc.sections.map((section, index) => (
-                <article className="section-card" key={section.id}>
-                  <header>
-                    <span className="font-medium">
-                      {section.kind === "text" ? "Text" : "Interactive section"}{" "}
-                      <small>{String(index + 1).padStart(2, "0")}</small>
-                    </span>
-                    <div className="actions flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        aria-label={`Move section ${index + 1} up`}
-                        disabled={index === 0}
-                        onClick={() => {
-                          const sections = [...doc.sections];
-                          [sections[index - 1], sections[index]] = [
-                            sections[index],
-                            sections[index - 1],
-                          ];
-                          change({ ...doc, sections });
-                        }}
-                      >
-                        <ArrowUp className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                        aria-label={`Move section ${index + 1} down`}
-                        disabled={index === doc.sections.length - 1}
-                        onClick={() => {
-                          const sections = [...doc.sections];
-                          [sections[index + 1], sections[index]] = [
-                            sections[index],
-                            sections[index + 1],
-                          ];
-                          change({ ...doc, sections });
-                        }}
-                      >
-                        <ArrowDown className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        disabled={doc.sections.length === 1}
-                        onClick={() => {
-                          if (confirm("Remove this section?"))
-                            change({
-                              ...doc,
-                              sections: doc.sections.filter(
-                                (s) => s.id !== section.id,
-                              ),
-                            });
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Remove
-                      </Button>
-                    </div>
-                  </header>
-                  {section.kind === "text" ? (
-                    <RichText
-                      key={section.id + "-" + doc.revision}
-                      disabled={busy}
-                      html={section.html}
-                      onChange={(html) =>
-                        change({
-                          ...doc,
-                          sections: doc.sections.map((s) =>
-                            s.id === section.id ? { ...s, html } : s,
-                          ),
-                        })
-                      }
-                    />
-                  ) : (
-                    <div className="component-editor">
-                      <Preview sections={[section]} />
-                    </div>
-                  )}
-                </article>
-              ))
-            )}
-            {!preview && editorMode === "doc" && (
-              <div className="space-y-4 mt-6">
-                <div className="add-section">
-                  <Button
-                    variant="outline"
-                    className="border-dashed text-xs h-8"
-                    disabled={doc.sections.length >= 40}
-                    onClick={() =>
-                      change({
-                        ...doc,
-                        sections: [
-                          ...doc.sections,
-                          {
-                            id: crypto.randomUUID(),
-                            kind: "text",
-                            html: "<p></p>",
-                            css: "",
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    ＋ Text section
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-dashed text-xs h-8"
-                    disabled={doc.sections.length >= 40}
-                    onClick={() =>
-                      change({
-                        ...doc,
-                        sections: [
-                          ...doc.sections,
-                          {
-                            id: crypto.randomUUID(),
-                            kind: "html",
-                            html: "<section><h2>A new perspective</h2><p>Add your component here.</p></section>",
-                            css: "section{padding:24px;background:#f5f6f0;border-radius:12px}",
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    ＋ Interactive section
-                  </Button>
-                </div>
-                <div className="p-3 bg-muted/40 rounded-lg border border-dashed border-border/80">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                    Quick-Insert Interactive Visualizations
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {VISUAL_TEMPLATES.map((tmpl) => {
-                      const Icon = tmpl.icon;
-                      return (
-                        <Button
-                          key={tmpl.name}
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs font-normal bg-background"
-                          disabled={doc.sections.length >= 40}
-                          onClick={() =>
-                            change({
-                              ...doc,
-                              sections: [
-                                ...doc.sections,
-                                {
-                                  id: crypto.randomUUID(),
-                                  kind: "html",
-                                  html: tmpl.html,
-                                  css: tmpl.css,
-                                },
-                              ],
-                            })
-                          }
-                        >
-                          <Icon className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                          {tmpl.name}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              <Preview sections={doc.sections} />
             )}
           </fieldset>
         ) : (

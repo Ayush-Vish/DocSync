@@ -8,9 +8,17 @@ body{display:flex!important;padding:16px!important}
 body>.slide,#artifact>.slide{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;aspect-ratio:auto!important;overflow:hidden!important}
 `;
 
-export function ArtifactFrame({ section, title, fitSlide = false }: { section: Content["sections"][number]; title: string; fitSlide?: boolean }) {
+const documentPageCss = `
+html,body,*{scrollbar-width:none!important}
+::-webkit-scrollbar{display:none!important}
+body>nav[aria-label="Preview controls"]{display:none!important}
+body:has(>.page),body:has(>#artifact>.page){padding:0!important;background:white!important}
+body>.page,#artifact>.page{margin:0!important;max-width:none!important;min-height:1056px;box-shadow:none!important}
+`;
+
+export function ArtifactFrame({ section, title, fitSlide = false, documentPage = false }: { section: Content["sections"][number]; title: string; fitSlide?: boolean; documentPage?: boolean }) {
   try {
-    const framed = fitSlide ? { ...section, css: section.css + fittedSlideCss } : section;
+    const framed = { ...section, css: section.css + (fitSlide ? fittedSlideCss : documentPage ? documentPageCss : "") };
     if (!framed.js) return <iframe title={title} sandbox="" scrolling={fitSlide ? "no" : undefined} srcDoc={frameSource(framed)} />;
     const payload = { type: "docsync:render-v1", html: cleanHtml(framed.html), css: cleanCss(framed.css), js: framed.js };
     return <iframe
