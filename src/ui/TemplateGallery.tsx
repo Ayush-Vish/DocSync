@@ -1,11 +1,10 @@
 import { useState } from "react";
 import themes from "../../skills/docsync/themes.json";
 
-export function TemplateGallery() {
-  const requested = new URLSearchParams(location.search).get("format");
+export function TemplateGallery({ initialFormat: requested, initialTemplate }: { initialFormat?: string | null; initialTemplate?: string | null }) {
   const [format, setFormat] = useState(requested === "document" || requested === "presentation" ? requested : "all");
   const options = themes.filter(theme => format === "all" || theme.format === format);
-  const [selectedId, setSelectedId] = useState(options[0].id);
+  const [selectedId, setSelectedId] = useState(initialTemplate || options[0].id);
   const selected = options.find(theme => theme.id === selectedId) || options[0];
   return <main className="mx-auto max-w-6xl p-6 sm:p-10">
     <a href="/" className="text-sm underline">DocSync</a>
@@ -26,7 +25,7 @@ export function TemplateGallery() {
       <h2 className="text-xl font-semibold">{selected.name}</h2>
       <p className="my-3">To use this design, tell your agent: “Use the {selected.name} template ({selected.id}).”</p>
       <p className="mb-4 text-sm text-muted-foreground">Preview figures are fictional examples. Your agent will use your information.</p>
-      <iframe key={selected.id} title={`${selected.name} preview`} src={`/downloads/docsync/assets/templates/${selected.id}/index.html`} sandbox="allow-scripts" className="h-[850px] w-full border bg-white" />
+      <iframe key={selected.id} title={`${selected.name} preview`} src={`/downloads/docsync/assets/templates/${selected.id}/index.html`} sandbox="allow-scripts" loading="lazy" className="h-[850px] w-full border bg-white" />
     </section>
   </main>;
 }

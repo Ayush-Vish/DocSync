@@ -34,6 +34,7 @@ const assets = {
       js: "text/javascript",
       css: "text/css",
       svg: "image/svg+xml",
+      png: "image/png",
       cjs: "application/octet-stream",
     };
     return new Response(request.method === "HEAD" ? null : readFileSync(file), {

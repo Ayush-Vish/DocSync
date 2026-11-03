@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#fafbf8"/>
+  <rect x="72" y="64" width="44" height="44" rx="9" fill="#285344"/>
+  <text x="80" y="96" fill="white" font-family="monospace" font-size="30" font-weight="bold">d.</text>
+  <text x="130" y="96" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#202b24">DocSync</text>
+  <text x="72" y="216" font-family="Arial, sans-serif" font-size="15" letter-spacing="3" fill="#626960">YOUR IDEAS, READY TO SHARE</text>
+  <text x="68" y="310" font-family="Arial, sans-serif" font-size="80" letter-spacing="-4" fill="#202b24">Less busywork.</text>
+  <text x="68" y="402" font-family="Georgia, serif" font-style="italic" font-size="82" letter-spacing="-3" fill="#285344">More shared clarity.</text>
+  <path d="M72 461H1128" stroke="#dfe4dc"/>
+  <text x="72" y="518" font-family="Arial, sans-serif" font-size="25" fill="#626960">Documents, reports, and presentations with your AI agent.</text>
+  <text x="72" y="562" font-family="Arial, sans-serif" font-size="19" fill="#285344">Draft. Refine. Share.</text>
+</svg>

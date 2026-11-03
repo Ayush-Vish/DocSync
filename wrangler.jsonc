@@ -2,6 +2,6 @@
   "name": "docsync",
   "main": "dist/worker.mjs",
   "compatibility_date": "2026-10-01",
-  "assets": { "directory": "dist/public", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "single-page-application" },
+  "assets": { "directory": "dist/public", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none", "not_found_handling": "none" },
   "d1_databases": [{ "binding": "DB", "database_name": "docsync", "database_id": "7cb08718-9256-42c7-a09f-32f77826f3d7", "migrations_dir": "migrations" }]
 }

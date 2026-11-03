@@ -1,7 +1,6 @@
 import React, { useEffect, useState, type FormEvent } from "react";
-import { createRoot } from "react-dom/client";
+import { LandingPage } from "./LandingPage";
 import { AgentSkill } from "./AgentSkill";
-import { TemplateGallery } from "./TemplateGallery";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -68,7 +67,6 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import type { Content, Document } from "../document";
 import themeCatalog from "../../skills/docsync/themes.json";
-import "./style.css";
 
 type Session = { email: string; legacy: boolean };
 type Summary = {
@@ -469,209 +467,6 @@ function RichText({
   return <EditorContent editor={editor} />;
 }
 
-function LandingPage({
-  onSignIn,
-  onSignUp,
-}: {
-  onSignIn: () => void;
-  onSignUp: () => void;
-}) {
-
-  return (
-    <div className="landing-page select-none">
-      {/* Sticky Navigation Bar */}
-      <header className="landing-nav">
-        <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-4 sm:px-6">
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {brand}
-            <Badge variant="secondary" className="text-[10px] font-mono px-1.5 py-0 hidden xs:inline-flex">
-              v0.3.0
-            </Badge>
-          </div>
-          <div className="hidden md:flex items-center gap-6 text-xs text-muted-foreground font-medium">
-            <a href="#features" className="hover:text-foreground transition-colors">
-              Features
-            </a>
-            <a href="#interactive-preview" className="hover:text-foreground transition-colors">
-              Interactive Slides
-            </a>
-            <a href="#agent-skill" className="hover:text-foreground transition-colors">
-              Examples
-            </a>
-            <a href="#mcp-protocol" className="hover:text-foreground transition-colors">
-              Agent Protocol
-            </a>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs h-8 px-2 sm:px-3"
-              onClick={onSignIn}
-            >
-              Sign in
-            </Button>
-            <Button
-              variant="default"
-              size="sm"
-              className="text-xs h-8 px-2.5 sm:px-3.5 font-medium"
-              onClick={onSignUp}
-            >
-              <span className="hidden sm:inline">Get Started Free</span>
-              <span className="sm:hidden">Get Started</span>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <section className="landing-hero">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/80 text-[10px] sm:text-[11px] font-medium text-muted-foreground border border-border mb-4 text-center max-w-full leading-normal">
-          <Sparkles className="w-3.5 h-3.5 text-foreground shrink-0" />
-          <span className="truncate sm:whitespace-normal">MINIMALIST WORKSPACE FOR HUMANS & AI AGENTS</span>
-        </div>
-        <h1>
-          A clearer space for your ideas.
-          <br />
-          <span className="text-muted-foreground font-normal">
-            Documents and presentations in sync.
-          </span>
-        </h1>
-        <p className="subtitle">
-          Turn your agent’s output into visual reports, design documents, and presentation decks. Review the result in your browser and share it with a link.
-        </p>
-        <div className="flex items-center justify-center gap-3 flex-wrap w-full max-w-sm sm:max-w-none mx-auto">
-          <Button
-            size="lg"
-            className="h-10 px-6 text-xs font-medium gap-2 w-full sm:w-auto"
-            onClick={onSignUp}
-          >
-            Get Started Free
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="h-10 px-5 text-xs font-medium w-full sm:w-auto"
-            onClick={onSignIn}
-          >
-            Sign In to Workspace
-          </Button>
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-3">
-          ⚡ One free document through your AI agent. No account required to start.
-        </p>
-
-        <div id="interactive-preview" className="w-full">
-          <AgentSkill />
-        </div>
-      </section>
-
-      {/* Features Bento Grid */}
-      <section id="features" className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-10 sm:py-12 box-border">
-        <div className="text-center mb-10">
-          <p className="eyebrow">DESIGNED FOR CLARITY</p>
-          <h2 className="text-2xl font-bold tracking-tight">Everything you need to communicate clearly.</h2>
-        </div>
-        <div className="landing-features-grid">
-          <div className="landing-feature-card">
-            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
-              <BarChart3 className="w-4 h-4 text-foreground" />
-            </div>
-            <h3 className="text-base font-semibold mb-2">Interactive Visualizations</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Combine KPI summaries, CSS charts, and comparison tables in shareable HTML documents. Try chart controls and simulated live metrics in the examples.
-            </p>
-          </div>
-
-          <div className="landing-feature-card">
-            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
-              <Presentation className="w-4 h-4 text-foreground" />
-            </div>
-            <h3 className="text-base font-semibold mb-2">Dual Doc & PPT Deck Mode</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Toggle between long-form editorial writing and a 16:9 presentation slide deck with a single click. Fullscreen presenter mode included.
-            </p>
-          </div>
-
-          <div className="landing-feature-card">
-            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
-              <Bot className="w-4 h-4 text-foreground" />
-            </div>
-            <h3 className="text-base font-semibold mb-2">Native Model Context Protocol</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Connect Cursor, Claude Desktop, Antigravity, or custom CLI tools. Autonomous agents draft, update, and publish documents directly to your workspace.
-            </p>
-          </div>
-
-          <div className="landing-feature-card">
-            <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center mb-4">
-              <Shield className="w-4 h-4 text-foreground" />
-            </div>
-            <h3 className="text-base font-semibold mb-2">Zero Telemetry & Sandboxed</h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Rigorous HTML/CSS sanitization, strict Content Security Policy iframes, and end-to-end credential rotation keep your data private.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works with Agents */}
-      <section id="mcp-protocol" className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-10 sm:py-12 text-center box-border">
-        <p className="eyebrow">AUTONOMOUS WORKFLOW</p>
-        <h2 className="text-2xl font-bold tracking-tight mb-8">How It Works with Your AI Agent</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 text-left w-full">
-          <div className="p-4 rounded-lg border border-border bg-card">
-            <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">01. CONNECT</span>
-            <h4 className="text-sm font-semibold mb-1">Add MCP Tool</h4>
-            <p className="text-xs text-muted-foreground">Run <code>npx @docsync/mcp connect</code> in Cursor or Claude to integrate your workspace.</p>
-          </div>
-          <div className="p-4 rounded-lg border border-border bg-card">
-            <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">02. AUTONOMY</span>
-            <h4 className="text-sm font-semibold mb-1">Agent Drafts Slides</h4>
-            <p className="text-xs text-muted-foreground">Your agent analyzes data and creates structured HTML components with live charts.</p>
-          </div>
-          <div className="p-4 rounded-lg border border-border bg-card">
-            <span className="text-xs font-mono font-semibold text-muted-foreground block mb-2">03. PRESENT</span>
-            <h4 className="text-sm font-semibold mb-1">Review & Present</h4>
-            <p className="text-xs text-muted-foreground">Review drafts live in real-time, switch to slides mode, and present or share snapshot links.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Bottom CTA Banner */}
-      <section className="landing-cta-banner">
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">
-          Make room for what matters.
-        </h2>
-        <p className="text-xs text-muted-foreground max-w-md mx-auto mb-5">
-          Join teams and engineers crafting interactive reports and presentations with autonomous agents.
-        </p>
-        <Button
-          size="lg"
-          className="h-10 px-6 text-xs font-medium"
-          onClick={onSignUp}
-        >
-          Create your account →
-        </Button>
-      </section>
-
-      {/* Footer */}
-      <footer className="landing-footer">
-        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-4 text-xs text-muted-foreground px-4 sm:px-0">
-          <div className="flex items-center gap-2">
-            {brand}
-            <span>· Minimalism UI & Model Context Protocol</span>
-          </div>
-          <div>
-            © 2026 DocSync. Open agent protocol.
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
 function LoginPage({
   authMode,
   setAuthMode,
@@ -846,7 +641,7 @@ function LoginPage({
   );
 }
 
-function App() {
+export default function App() {
   const isAuthRoute = () => {
     const p = location.pathname;
     return (
@@ -1001,20 +796,6 @@ function App() {
     return () => window.removeEventListener("popstate", handlePop);
   }, [dirty, doc, preview, session]);
 
-  const goToLogin = () => {
-    setAuthMode("signin");
-    setError("");
-    setAuthPage(true);
-    window.history.pushState(null, "", "/login");
-  };
-
-  const goToSignup = () => {
-    setAuthMode("signup");
-    setError("");
-    setAuthPage(true);
-    window.history.pushState(null, "", "/signup");
-  };
-
   const goToLanding = () => {
     setError("");
     setAuthPage(false);
@@ -1141,6 +922,8 @@ function App() {
     });
   }
 
+  if (loading && location.pathname === "/" && !authPage) return <LandingPage />;
+
   if (loading)
     return (
       <main className="loading">
@@ -1158,10 +941,7 @@ function App() {
   if (!session) {
     if (!authPage) {
       return (
-        <LandingPage
-          onSignIn={goToLogin}
-          onSignUp={goToSignup}
-        />
+        <LandingPage />
       );
     }
     return (
@@ -2253,5 +2033,3 @@ function Edit3Icon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
-createRoot(document.getElementById("root")!).render(location.pathname === "/templates" ? <TemplateGallery /> : <App />);

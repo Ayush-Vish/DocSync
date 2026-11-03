@@ -38,9 +38,8 @@ try {
   assert.match(page.url(), /format=document/);
   await page.click("main > div button:nth-child(3)");
   assert.match(await page.$eval('[aria-label="Selected template"]', node => node.textContent || ""), /Use the Sales Dashboard template/);
-  await page.goto(origin, { waitUntil: "networkidle0" });
-  await page.click('a[href="#agent-skill"]');
-  const galleryFrame = await (await page.$("#template-example iframe"))!.contentFrame();
+  await page.goto(origin + "/templates?template=editorial-document", { waitUntil: "networkidle0" });
+  const galleryFrame = await (await page.$('[aria-label="Selected template"] iframe'))!.contentFrame();
   assert.ok(galleryFrame);
   await galleryFrame.waitForSelector("#live-events");
   const initial = await galleryFrame.$eval("#live-events", node => node.textContent);
@@ -49,17 +48,21 @@ try {
   assert.equal(await galleryFrame.$$eval(".filterable-chart .chart-column:not([hidden])", nodes => nodes.length), 3);
   await galleryFrame.click("nav button");
   assert.match(await galleryFrame.$eval("#live-status", node => node.textContent || ""), /paused/);
-  await page.screenshot({ path: "/tmp/docsync-live-homepage.png", fullPage: true });
-  for (const title of ["Service design", "Sales dashboard", "Product pitch", "Delivery review"]) {
-    await page.click(`button[aria-label="Preview ${title} template"]`);
-    const frame = await (await page.$("#template-example iframe"))!.contentFrame();
+  await page.screenshot({ path: "/tmp/docsync-live-template.png", fullPage: true });
+  for (const title of ["Technical Blueprint", "Sales Dashboard", "Bold Pitch", "Delivery Review"]) {
+    await page.evaluate(title => {
+      const button = [...document.querySelectorAll<HTMLButtonElement>("main > div button")].find(button => button.querySelector("strong")?.textContent === title);
+      if (!button) throw new Error(`Missing template: ${title}`);
+      button.click();
+    }, title);
+    const frame = await (await page.$('[aria-label="Selected template"] iframe'))!.contentFrame();
     assert.ok(frame);
     await frame.waitForSelector(".chart-bar");
-    if (["Product pitch", "Delivery review"].includes(title)) {
+    if (["Bold Pitch", "Delivery Review"].includes(title)) {
       await frame.click("nav button:nth-child(2)");
-      assert.equal(await frame.$eval("[aria-live]", node => node.textContent), "Slide 2 of 3");
+      assert.match(await frame.$eval("[aria-live]", node => node.textContent || ""), /^(?:Slide )?2 of 3$/);
     }
-    if (title === "Sales dashboard") {
+    if (title === "Sales Dashboard") {
       const sales = await frame.$eval("#live-sales", node => node.textContent);
       await frame.waitForFunction(value => document.getElementById("live-sales")?.textContent !== value, { timeout: 8000 }, sales);
       await frame.click(".chart-filters button:nth-child(2)");

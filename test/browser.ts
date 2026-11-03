@@ -34,6 +34,8 @@ f.env.ASSETS = {
           ? "text/javascript"
           : file.endsWith(".css")
             ? "text/css"
+            : file.endsWith(".svg")
+              ? "image/svg+xml"
             : "text/html",
       },
     });
@@ -131,6 +133,41 @@ async function fill(selector: string, text: string) {
   await page.keyboard.type(text);
 }
 try {
+  const homepageRequests: string[] = [];
+  const trackHomepage = (request: { url(): string }) => homepageRequests.push(request.url());
+  page.on("request", trackHomepage);
+  await page.goto(origin, { waitUntil: "networkidle0" });
+  assert.equal(await page.$$eval("h1", nodes => nodes.length), 1);
+  assert.match(await page.$eval("h1", node => node.textContent || ""), /Less busywork/);
+  assert.ok(!homepageRequests.some(url => /\/assets\/main-/.test(url)), "Guest homepage must not load the editor bundle");
+  page.off("request", trackHomepage);
+  await page.screenshot({ path: "/tmp/docsync-home-desktop.png", fullPage: true });
+  await page.keyboard.press("Tab");
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Skip to content");
+  await page.click(".home-faq summary");
+  assert.equal(await page.$eval(".home-faq details", node => (node as HTMLDetailsElement).open), true);
+  for (const width of [390, 320]) {
+    await page.setViewport({ width, height: 844 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  }
+  await page.screenshot({ path: "/tmp/docsync-home-mobile.png", fullPage: true });
+  const staticPage = await browser.newPage();
+  await staticPage.setJavaScriptEnabled(false);
+  await staticPage.goto(origin);
+  assert.match(await staticPage.$eval("main", node => node.textContent || ""), /Reports & updates/);
+  await staticPage.click(".home-faq summary");
+  assert.equal(await staticPage.$eval(".home-faq details", node => (node as HTMLDetailsElement).open), true);
+  await staticPage.close();
+  await page.setViewport({ width: 1440, height: 1000 });
+  await Promise.all([page.waitForNavigation(), page.click('.home-use-cases a[href="/templates?template=sales-dashboard"]')]);
+  await page.waitForFunction(() => document.querySelector('[aria-label="Selected template"] h2')?.textContent === "Sales Dashboard");
+  await page.goto(origin);
+  await Promise.all([page.waitForNavigation(), page.click('.home-actions a[href="/signup"]')]);
+  await page.waitForSelector('input[name="email"]');
+  assert.ok(await page.$('input[name="password"]'));
+  await page.goto(origin + "/login");
+  await page.waitForSelector('input[name="email"]');
+  console.log("Homepage acceptance passed: prerendering without JavaScript, metadata routes, keyboard access, FAQ, mobile layout, deferred editor loading, template links, signup and sign-in.");
   const trial = await mcp();
   const connection = parse(
     await trial.callTool({ name: "get_connection", arguments: {} }),

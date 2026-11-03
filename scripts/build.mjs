@@ -12,6 +12,25 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 await viteBuild();
+// Render the same public React components into HTML for visitors and crawlers.
+await build({
+  entryPoints: ["src/ui/prerender.tsx"],
+  outfile: "dist/prerender.mjs",
+  bundle: true,
+  format: "esm",
+  platform: "node",
+  packages: "external",
+  jsx: "automatic",
+});
+const { pages } = await import("../dist/prerender.mjs");
+const shell = readFileSync("dist/public/index.html", "utf8");
+for (const page of pages) {
+  const html = shell
+    .replace(/<!--seo:start-->[\s\S]*?<!--seo:end-->/, () => `<!--seo:start-->${page.metadata}<!--seo:end-->`)
+    .replace(/<!--app:start-->[\s\S]*?<!--app:end-->/, () => `<!--app:start-->${page.content}<!--app:end-->`);
+  mkdirSync(dirname(join("dist/public", page.file)), { recursive: true });
+  writeFileSync(join("dist/public", page.file), html);
+}
 const results = await Promise.all([
   build({
     entryPoints: ["src/worker.ts"],

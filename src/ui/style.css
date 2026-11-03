@@ -1611,140 +1611,6 @@ blockquote {
    Separate Landing Page & Login Page Styles
    ========================================================================== */
 
-.landing-page {
-  min-height: 100vh;
-  min-height: 100dvh;
-  background: #ffffff;
-  color: var(--foreground);
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
-.landing-nav {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.landing-nav > div {
-  max-width: 1080px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.landing-hero {
-  padding: clamp(3.5rem, 7vw, 5.5rem) 1.5rem clamp(2rem, 5vw, 3.5rem);
-  max-width: 1080px;
-  width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.landing-hero h1 {
-  font-size: clamp(1.875rem, 5.5vw, 4.25rem);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.12;
-  margin: 1.25rem 0 1.25rem;
-}
-
-.landing-hero .subtitle {
-  font-size: clamp(0.9375rem, 2vw, 1.25rem);
-  color: var(--muted-foreground);
-  max-width: 680px;
-  margin: 0 auto 2.25rem;
-  line-height: 1.6;
-}
-
-.landing-preview-box {
-  margin: 2.5rem auto 0;
-  max-width: 980px;
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.07);
-  background: #ffffff;
-  box-sizing: border-box;
-}
-
-#features {
-  max-width: 1080px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.landing-features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.5rem;
-  max-width: 1080px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.landing-feature-card {
-  padding: 2rem;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: #ffffff;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
-}
-
-.landing-feature-card:hover {
-  border-color: #a1a1aa;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-}
-
-#mcp-protocol {
-  max-width: 860px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.landing-cta-banner {
-  max-width: 680px;
-  width: 100%;
-  margin: 3rem auto 5rem;
-  padding: 3.5rem 2rem;
-  background: #f4f4f5;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 4px);
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.landing-footer {
-  border-top: 1px solid var(--border);
-  padding: 2.5rem 1.5rem;
-  background: #fafafa;
-  margin-top: auto;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.landing-footer > div {
-  max-width: 1080px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
 /* Dedicated Centered Login Page */
 .auth-centered-layout {
   min-height: 100vh;
@@ -2007,26 +1873,9 @@ blockquote {
     padding: 1rem 0.75rem;
   }
 
-  .landing-hero {
-    padding: 2.75rem 1rem 2rem;
-  }
 
-  .landing-hero h1 {
-    font-size: clamp(1.75rem, 6.5vw, 2.5rem);
-    line-height: 1.15;
-  }
 
-  .landing-features-grid {
-    grid-template-columns: 1fr;
-    padding: 0;
-    gap: 1rem;
-  }
 
-  .landing-cta-banner {
-    width: auto;
-    margin: 2rem 1rem 3.5rem;
-    padding: 2.75rem 1.5rem;
-  }
 }
 
 @media (max-width: 480px) {
@@ -2043,34 +1892,11 @@ blockquote {
     padding: 1.5rem 1.25rem;
   }
 
-  .landing-hero {
-    padding: 2.25rem 0.875rem 1.5rem;
-  }
 
-  .landing-hero h1 {
-    font-size: clamp(1.5rem, 7vw, 2rem);
-    line-height: 1.15;
-  }
 
-  .landing-preview-box {
-    margin-top: 1.5rem;
-  }
 
-  .landing-features-grid {
-    grid-template-columns: 1fr;
-    padding: 0;
-    gap: 0.875rem;
-  }
 
-  .landing-feature-card {
-    padding: 1.25rem;
-  }
 
-  .landing-cta-banner {
-    width: auto;
-    margin: 1.25rem 0.75rem 2.5rem;
-    padding: 2rem 1rem;
-  }
 
   .slide-thumb {
     width: 96px;

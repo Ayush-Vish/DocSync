@@ -10,7 +10,7 @@ export default defineConfig({
       "@": resolve(import.meta.dirname, "src"),
     },
   },
-  publicDir: false,
+  publicDir: "public",
   build: { outDir: "dist/public", emptyOutDir: true },
   server: { strictPort: true, proxy: { "/api": "http://127.0.0.1:8788" } },
 });

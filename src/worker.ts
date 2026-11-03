@@ -12,11 +12,13 @@ import * as accounts from "./accounts.ts";
 import * as store from "./store.ts";
 import { handleRemoteMcp } from "./remote-mcp.ts";
 import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
+import { webResponse } from "./web.ts";
+import { publicPages } from "./seo.ts";
 
-export const appPolicy =
+const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
-export const oauthPolicy =
+const oauthPolicy =
   "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self' http: https:; frame-ancestors 'none'";
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
@@ -72,7 +74,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   );
   if (remote) return remote;
   if (pathname === "/artifact-frame" && method === "GET") return artifactFrame();
-  if (!pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+  if (!pathname.startsWith("/api/")) return webResponse(request, env);
   if (
     !/^[a-f0-9]{64}$/.test(env.OWNER_KEY_HASH || "") ||
     !env.SESSION_SECRET ||
@@ -410,6 +412,9 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("Referrer-Policy", "no-referrer");
   const { pathname } = new URL(request.url);
+  const publicAsset = pathname.startsWith("/assets/") || ["/favicon.svg", "/social-card.png", "/social-card.svg"].includes(pathname);
+  if ((!Object.hasOwn(publicPages, pathname) && !publicAsset) || secured.status >= 400)
+    secured.headers.set("X-Robots-Tag", "noindex, nofollow");
   const templatePreview = /^\/downloads\/docsync\/assets\/templates\/[a-z-]+\/(?:index\.html)?$/.test(pathname);
   secured.headers.set(
     "Content-Security-Policy",

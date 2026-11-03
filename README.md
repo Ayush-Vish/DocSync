@@ -33,7 +33,15 @@ Live multi-user editing, comments, uploads, offline sync, pagination, password r
 
 ### Downloadable agent skill and templates
 
-The landing page and **Connect agent** page provide `/downloads/docsync-skill.zip`, an installable `docsync/` skill folder for Codex and Claude Code. Source lives in `skills/docsync/`; `npm run build` packages it and publishes browsable template previews. ZIP creation uses the build-only `fflate` dependency.
+The landing page and **Connect agent** page provide `/downloads/docsync-skill.zip`, an installable `docsync/` skill folder for Codex and Claude Code. Browse the interactive examples at `/templates`. Source lives in `skills/docsync/`; `npm run build` packages it and publishes browsable template previews. ZIP creation uses the build-only `fflate` dependency.
+
+### Public pages and search visibility
+
+The build prerenders the homepage and template gallery from their React components, so their content is readable before JavaScript loads. The guest homepage loads the editor only after a successful session check; authentication and document routes load it when needed.
+
+The Worker adds page-specific titles, descriptions, canonical URLs, Open Graph/Twitter cards, and JSON-LD using the request origin. `/robots.txt` points to `/sitemap.xml`, which lists only `/` and `/templates`. Account pages, document routes, share links, and API responses carry `X-Robots-Tag: noindex, nofollow`; this is a search directive, not access control. Published links remain accessible to anyone who has the link. Unknown app URLs return 404.
+
+After deploying to the preferred public domain, submit `https://YOUR_HOST/sitemap.xml` in Google Search Console and Bing Webmaster Tools. Redirect alternative deployment domains to that preferred domain at the hosting layer so they do not compete in search. Indexing and search rankings depend on the engines; local checks do not submit or deploy the site.
 
 Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Claude Code. Connect the DocSync MCP separately. The skill includes editorial documents, technical design documents, pitch decks, and project review slides. Each template has HTML/CSS and shares dependency-free JavaScript preview controls. Its Node.js helper converts marked sections into MCP creation payloads.
 
