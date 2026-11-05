@@ -13,8 +13,8 @@ export const contentSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
     format: z.enum(["document", "presentation"]).optional().describe("Document renders as separate paper pages; presentation renders as slides."),
-    pages: z.array(sectionSchema).min(1).max(40).optional().describe("Ordered document pages. Each item is one complete page with a stable id and self-contained HTML/CSS/JS. Use pages OR sections, never both. Split long reports across pages."),
-    sections: z.array(sectionSchema).max(40).default([]).describe("Legacy document pages or presentation slides. Omit when providing pages."),
+    pages: z.array(sectionSchema).min(1).max(40).optional().describe("Ordered document pages or presentation slides. Each item is one page/slide with a stable id and self-contained HTML/CSS/JS."),
+    sections: z.array(sectionSchema).max(40).default([]).describe("Alias for pages. For backward compatibility. Provide pages or sections, not both."),
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;
@@ -22,4 +22,5 @@ export type Document = Content & {
   id: string;
   revision: number;
   updated_at: string;
+  warnings?: string[];
 };

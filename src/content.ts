@@ -13,7 +13,7 @@ export class HttpError extends Error {
 
 const tags = new Set('article section div span p h1 h2 h3 h4 h5 h6 header footer main aside nav strong em b i u s small mark sub sup blockquote pre code ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col hr br details summary figure figcaption button input label select option output progress meter canvas'.split(' '));
 const attrs = new Set('id class title role aria-label aria-hidden aria-describedby aria-live aria-pressed colspan rowspan scope start reversed open type value min max step checked disabled selected for width height'.split(' '));
-const cssAtRules = new Set(['media', 'supports', 'container', 'layer']);
+const cssAtRules = new Set(['media', 'supports', 'container', 'layer', 'page']);
 
 export function cleanCss(source: string, inline = false): string {
   try {
@@ -52,14 +52,57 @@ export function validateContent(input: unknown): Content {
   const parsed = contentSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(400, 'Invalid document', parsed.error.flatten());
   const value = parsed.data;
-  if (value.pages && value.sections.length) throw new HttpError(400, 'Provide pages or sections, not both');
-  if (value.pages && value.format === 'presentation') throw new HttpError(400, 'Presentations use sections, not pages');
+  if (value.pages && value.sections.length) throw new HttpError(400, 'Provide pages or sections, not both. Pages and sections are interchangeable; use one field per request.');
   const sections = value.pages ?? value.sections;
   if (!sections.length) throw new HttpError(400, 'Document must contain at least one page or section');
   value.sections = sections;
   if (new Set(value.sections.map(s => s.id)).size !== value.sections.length) throw new HttpError(400, 'Section IDs must be unique');
   if (new TextEncoder().encode(JSON.stringify(value)).length > 500_000) throw new HttpError(413, 'Document exceeds 500 KB');
   return { title: value.title, ...(value.format || value.pages ? { format: value.format ?? 'document' } : {}), sections: sections.map(s => ({ ...s, html: cleanHtml(s.html), css: cleanCss(s.css) })) };
+}
+
+/** Return non-blocking design quality warnings for the given content. */
+export function lintContent(content: Content): string[] {
+  const warnings: string[] = [];
+  for (const section of content.sections) {
+    // 1. Slide word count
+    const textContent = section.html.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+    const wordCount = textContent ? textContent.split(/\s+/).length : 0;
+    if (wordCount > 120) {
+      warnings.push(`Section '${section.id}' has ${wordCount} words. Aim for under 60 words per slide for readability.`);
+    }
+
+    // 2. CSS size
+    const cssBytes = new TextEncoder().encode(section.css).length;
+    if (cssBytes > 20_000) {
+      warnings.push(`Section '${section.id}' CSS is ${Math.round(cssBytes / 1024)}KB. Consider using theme-base.css utility classes to reduce custom CSS.`);
+    }
+
+    // 3. Missing semantic headings
+    if (!/< *h[123][\s>]/i.test(section.html)) {
+      warnings.push(`Section '${section.id}' has no heading. Use semantic headings for accessibility.`);
+    }
+
+    // 4. Excessive color usage
+    const hexColors = section.css.match(/#(?:[0-9a-fA-F]{3,8})\b/g) ?? [];
+    const rgbColors = section.css.match(/rgba?\s*\([^)]+\)/gi) ?? [];
+    const uniqueColors = new Set([...hexColors.map(c => c.toLowerCase()), ...rgbColors.map(c => c.toLowerCase().replace(/\s/g, ''))]);
+    if (uniqueColors.size > 8) {
+      warnings.push(`Section '${section.id}' uses ${uniqueColors.size} colors. Stick to 3-4 primary colors plus accents for visual consistency.`);
+    }
+
+    // 5. Small font detection (exclude media queries and chart labels)
+    const cssWithoutMedia = section.css.replace(/@media[^{]*\{(?:[^{}]*\{[^}]*\})*[^}]*\}/g, '');
+    const fontSizes = cssWithoutMedia.match(/font-size\s*:\s*(\d+(?:\.\d+)?)\s*px/gi) ?? [];
+    for (const match of fontSizes) {
+      const px = parseFloat(match.replace(/font-size\s*:\s*/i, ''));
+      if (px < 14) {
+        warnings.push(`Section '${section.id}' uses small fonts (below 14px). Ensure minimum 16px for body text.`);
+        break;
+      }
+    }
+  }
+  return warnings;
 }
 
 export const framePolicy = "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; connect-src 'none'; script-src 'none'; base-uri 'none'; form-action 'none'";

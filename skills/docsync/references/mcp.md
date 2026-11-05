@@ -8,17 +8,22 @@ For a selected template, fetch its `contentUrl` and adapt the content to the use
 facts. Otherwise create a custom design from their request. The gallery is at
 `/templates` and requires no sign-in. These are DocSync templates, not third-party branded templates.
 
-## Paged documents
+## Paged documents and slide decks
 
-Create reports with `format: "document"` and `pages: [{id, kind, html, css, js?}, ...]`.
-Each item is one paper page, in reading order. Split long prose at semantic boundaries;
-do not put an entire report in one HTML string. Keep each page self-contained and
-within the visible paper height (1056 CSS pixels). Verify every page after saving.
-Use `format: "presentation"` with `sections` for slides.
-Send either `pages` or `sections`, never both. The server normalizes pages to the
-existing `sections` field in saved responses; preserve those IDs and `format` when updating.
-Legacy documents remain readable as one paper page per section. Existing long HTML
-is not automatically split, because doing so can break interactive scripts.
+Create reports or slides with `format: "document"` or `format: "presentation"`.
+Use `pages` or `sections` interchangeably (each item has `{id, kind?, html, css, js?}`).
+Each item represents one paper page (for documents) or one 16:9 slide (for presentations).
+Do not provide both `pages` and `sections` in the same call.
+Split long prose at semantic boundaries; keep each page self-contained.
+The server runs automatic design linting on save and returns non-blocking `warnings` (e.g. excessive words, missing headings, tiny fonts, color clashes).
+
+### Design themes and tokens
+
+DocSync includes 6 built-in themes: `midnight` (dark high-contrast), `aurora` (vibrant gradient accents), `clean` (minimal light), `warm` (editorial serif), `corporate` (navy enterprise), and `neon` (electric dark).
+Include `assets/templates/theme-base.css` or set `--ds-*` custom properties:
+- `--ds-bg`, `--ds-surface`, `--ds-text`, `--ds-text-secondary`, `--ds-accent`, `--ds-border`
+- Use typed layouts: `.slide.cover`, `.slide.two-column`, `.slide.big-stat`, `.slide.quote`, `.slide.section-divider`, `.slide.closing`
+- Use built-in visual components: `.metric-tile`, `.card`, `.callout`, `.flow-diagram`, `.timeline`, `.bar-chart`, `.donut-chart`, `.progress-bar`, `.code-block`
 
 Use the DocSync tools exposed by the current client; prefixes vary between Codex and Claude. Skills and MCP connections are installed separately.
 

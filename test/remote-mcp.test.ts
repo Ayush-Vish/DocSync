@@ -20,12 +20,15 @@ test("OAuth sign-in retry gets a fresh CSRF token bound to the same request", as
   const firstHtml = await firstPage!.text();
   const firstCsrf = firstHtml.match(/name="csrf" value="([^"]+)"/)?.[1];
   assert.ok(firstCsrf);
+  const cookie = firstPage.headers.getSetCookie()[0].split(";")[0];
 
   const wrong = new FormData();
   wrong.set("csrf", firstCsrf);
   wrong.set("email", "oauth@example.com");
   wrong.set("password", "incorrect long password");
-  const retry = await handle(new Request(`${origin}/oauth/authorize`, { method: "POST", body: wrong }), f.env);
+  const unbound = await handle(new Request(`${origin}/oauth/authorize`, { method: "POST", body: wrong }), f.env);
+  assert.equal(unbound.status, 403, "A request token alone cannot authorize another browser");
+  const retry = await handle(new Request(`${origin}/oauth/authorize`, { method: "POST", headers: { Cookie: cookie }, body: wrong }), f.env);
   assert.equal(retry?.status, 200);
   const retryHtml = await retry!.text();
   assert.match(retryHtml, /Email or password is incorrect/);
@@ -37,9 +40,11 @@ test("OAuth sign-in retry gets a fresh CSRF token bound to the same request", as
   correct.set("csrf", retryCsrf!);
   correct.set("email", "oauth@example.com");
   correct.set("password", "a long safe password 123!");
-  const approved = await handle(new Request(`${origin}/oauth/authorize`, { method: "POST", body: correct }), f.env);
+  const approved = await handle(new Request(`${origin}/oauth/authorize`, { method: "POST", headers: { Cookie: retry.headers.getSetCookie()[0].split(";")[0] }, body: correct }), f.env);
   assert.equal(approved?.status, 302);
   assert.match(approved!.headers.get("Location") || "", /code=/);
+  assert.match(approved.headers.get("Content-Security-Policy")!, /script-src 'self';/);
+  assert.ok(!(await approved.text()).includes("<script>"));
 });
 
 test("hosted MCP uses the authenticated document API without outbound self-fetch", async (t) => {

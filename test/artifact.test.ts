@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture } from "./helpers.ts";
-import { cleanHtml, validateContent } from "../src/content.ts";
+import { cleanHtml, validateContent, lintContent } from "../src/content.ts";
 import { handle } from "../src/worker.ts";
 
 test("explicit pages preserve order, sanitization and format through publishing", async (t) => {
@@ -19,9 +19,12 @@ test("explicit pages preserve order, sanitization and format through publishing"
   assert.equal(saved.format, "document");
   assert.deepEqual(saved.sections.map(page => page.id), ["cover", "details"]);
   assert.equal(saved.sections[0].html, "<h1>Cover</h1>");
-  for (const invalid of [{ pages, sections: pages }, { pages, format: "presentation" }, { sections: [] }, { pages: [pages[0], pages[0]] }]) {
+  for (const invalid of [{ pages, sections: pages }, { sections: [] }, { pages: [pages[0], pages[0]] }]) {
     assert.throws(() => validateContent({ title: "Invalid", ...invalid }));
   }
+  const pres = validateContent({ title: "Valid presentation with pages", format: "presentation", pages });
+  assert.equal(pres.format, "presentation");
+  assert.equal(pres.sections.length, 2);
 });
 
 test("JavaScript survives create, read, and published snapshots with a size limit", async (t) => {
@@ -57,4 +60,28 @@ test("scripted frame applies response sandbox and inline-only code policy", asyn
   assert.ok(!(await response.text()).includes("__name"));
   const root = await handle(new Request("http://127.0.0.1:8787/"), f.env);
   assert.ok(!(root.headers.get("Content-Security-Policy") || "").includes("script-src 'unsafe-inline'"));
+});
+
+test("lintContent identifies design quality issues", () => {
+  const content = {
+    title: "Lint test",
+    sections: [
+      {
+        id: "bad-slide",
+        html: "<p>" + "word ".repeat(130) + "</p>",
+        css: "body { font-size: 11px; color: #111; background: #222; border-color: #333; outline-color: #444; fill: #555; stroke: #666; --c1: #777; --c2: #888; --c3: #999; }",
+      },
+      {
+        id: "good-slide",
+        html: "<h1>Clean heading</h1><p>Under sixty words here for ideal slide density.</p>",
+        css: ".slide { font-size: 18px; color: #172033; background: #ffffff; }",
+      },
+    ],
+  };
+  const warnings = lintContent(content);
+  assert.ok(warnings.some((w) => w.includes("bad-slide") && w.includes("words")));
+  assert.ok(warnings.some((w) => w.includes("bad-slide") && w.includes("no heading")));
+  assert.ok(warnings.some((w) => w.includes("bad-slide") && w.includes("small fonts")));
+  assert.ok(warnings.some((w) => w.includes("bad-slide") && w.includes("colors")));
+  assert.ok(!warnings.some((w) => w.includes("good-slide")));
 });

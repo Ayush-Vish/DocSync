@@ -23,6 +23,47 @@ Copy the entire `assets/templates/` folder into a working directory, then edit t
 
 Keep typography legible, spacing consistent, and slides focused on one idea. Use semantic HTML, system fonts, CSS diagrams, and real table markup. Check both narrow and desktop widths. Use the browser print dialog for PDF when requested; an HTML slide deck is not a `.pptx` file. If the user requires native PPTX, explain that this skill does not provide that exporter.
 
+## Design system & quality guidelines
+
+DocSync provides a comprehensive design system in `assets/templates/theme-base.css` and 6 built-in themes in `themes/design-tokens.json` (`midnight`, `aurora`, `clean`, `warm`, `corporate`, `neon`).
+
+### 1. Concrete design rules for slides
+- **One idea per slide**: Never crowd multiple unrelated thoughts into a single slide.
+- **Word limit**: Aim for 30–60 words per slide. If a slide exceeds 120 words, split it.
+- **Typography hierarchy**: Use a minimum 18px body font on slides. Headings should be prominent (40px–72px). Use semantic `<h1>` through `<h3>`.
+- **Restrained color palette**: Stick to 1 background, 1 surface, 1 primary text, and 1 accent color per slide (maximum 3–4 colors).
+- **Safe margins**: Maintain generous padding (at least 48px / `var(--ds-slide-pad)`). Content must not touch viewport edges.
+- **High contrast**: Ensure text meets WCAG AA standards against its background.
+
+### 2. Typed slide layouts (use instead of blank-canvas HTML)
+DocSync's design system provides pre-crafted slide layout classes:
+- **Title / Cover**: `<article class="slide cover">` — large centered heading, eyebrow, lede, and optional metric tiles.
+- **Two-Column / Split**: `<article class="slide two-column">` — side-by-side comparison or narrative + visual.
+- **Big Stat**: `<article class="slide big-stat">` — for massive focal metrics (`<div class="big-stat-number">`, `<div class="big-stat-label">`, `<p class="big-stat-subtext">`).
+- **Code**: `<article class="slide">` with `<div class="code-block">` — syntax-styled code presentation.
+- **Quote / Testimonial**: `<article class="slide quote">` — large blockquote with `.quote-author` and `.quote-role`.
+- **Timeline**: `<div class="timeline">` with `<div class="timeline-item">` — chronological progress points.
+- **Comparison Table**: `<table class="comparison-table">` — feature-by-feature matrix with `.check` and `.cross`.
+- **Section Divider**: `<article class="slide section-divider">` — high-impact accent backdrop dividing chapters.
+- **Closing**: `<article class="slide closing">` — final takeaways and call to action.
+
+### 3. Visual components
+- **Metric Tiles**: `<div class="metric-grid"><div class="metric-tile"><span class="metric-label">MRR</span><strong class="metric-value">₹18.4L</strong><small class="metric-change up">+18% MoM</small></div></div>`
+- **Charts**: Use `.bar-chart` with `.chart-column` and `.chart-bar`, `.donut-chart` with `style="--donut-p: 68%"`, or `.progress-bar`.
+- **Flow / Architecture Diagrams**: `<div class="flow-diagram"><div class="flow-step"><strong>Client</strong><small>Browser</small></div><span class="flow-arrow">→</span><div class="flow-step active"><strong>DocSync</strong><small>Worker</small></div></div>`
+- **Callouts**: `<div class="callout callout-success">` for key takeaways.
+
+### 4. Upgraded presentation runtime
+The presentation runtime (`preview.js`) automatically provides:
+- Fixed 16:9 canvas with responsive scaling
+- Deck progress bar at the top
+- Slide overview grid (press `G` or click "Grid")
+- Deep-linked hash navigation (`#1`, `#2`)
+- Touch/swipe gestures on mobile
+- Keyboard navigation (Arrows, Space, PageUp/Down, Home, End, `F` for fullscreen)
+- Speaker notes (`<aside class="speaker-notes">`) visible in presenter controls
+- Print stylesheet for clean 1-slide-per-page PDF export
+
 Generate the MCP payload using the included dependency-free Node.js helper:
 
 ```sh

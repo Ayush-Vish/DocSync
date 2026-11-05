@@ -45,8 +45,9 @@
 .home-document-bottom span { margin-left: auto; color: var(--home-green); }
 .home-compatibility { border-block: 1px solid #dfe4dc; padding-block: 22px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .home-compatibility > span { font-size: 9px; letter-spacing: .11em; color: var(--home-muted); }
-.home-compatibility p { font-size: 13px; font-weight: 500; margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
-.home-compatibility p span { color: #a5ae9d; }
+.home-compatibility ul { list-style: none; padding: 0; font-size: 13px; font-weight: 500; margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 24px; }
+.home-compatibility li { display: inline-flex; align-items: center; gap: 8px; }
+.home-compatibility svg { width: 18px; height: 18px; color: var(--home-green); flex-shrink: 0; }
 .home-section { padding-block: 72px; scroll-margin-top: 24px; }
 .home h2 { font-size: clamp(27px, 3vw, 36px); line-height: 1.2; letter-spacing: -.035em; font-weight: 500; margin: 0; }
 .home-section .home-eyebrow { margin-bottom: 14px; }
@@ -104,7 +105,7 @@
   .home h1 { font-size: clamp(40px, 9vw, 56px); }
   .home-lead { font-size: 16px; }
   .home-example { max-width: 460px; width: 100%; margin-inline: auto; }
-  .home-compatibility p { gap: 10px; font-size: 12px; }
+  .home-compatibility ul { gap: 16px; font-size: 12px; }
   .home-section { padding-block: 48px; }
   .home-steps, .home-collaboration, .home-setup, .home-faq { grid-template-columns: 1fr; gap: 30px; }
   .home-collaboration { padding: 28px 24px; }

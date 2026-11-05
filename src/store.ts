@@ -2,6 +2,7 @@ import type { Database } from "./platform.ts";
 import {
   HttpError,
   validateContent,
+  lintContent,
   type Content,
   type Document,
 } from "./content.ts";
@@ -41,6 +42,7 @@ export async function createDocument(
   accountId = "legacy",
 ): Promise<Document> {
   const content = validateContent(input),
+    warnings = lintContent(content),
     id = crypto.randomUUID(),
     time = new Date().toISOString();
   await db.batch([
@@ -55,7 +57,7 @@ export async function createDocument(
       )
       .bind(id, JSON.stringify(content), time),
   ]);
-  return { ...content, id, revision: 1, updated_at: time };
+  return { ...content, id, revision: 1, updated_at: time, ...(warnings.length ? { warnings } : {}) };
 }
 export async function updateDocument(
   db: Database,
@@ -65,6 +67,7 @@ export async function updateDocument(
   accountId = "legacy",
 ): Promise<Document> {
   const content = validateContent(input),
+    warnings = lintContent(content),
     time = new Date().toISOString();
   const result = await db
     .prepare(
@@ -80,13 +83,13 @@ export async function updateDocument(
       { currentRevision: current.revision },
     );
   }
-  return { ...content, id, revision: expected + 1, updated_at: time };
+  return { ...content, id, revision: expected + 1, updated_at: time, ...(warnings.length ? { warnings } : {}) };
 }
 export async function listDocuments(db: Database, accountId = "legacy") {
   return (
     await db
       .prepare(
-        "SELECT id,title,current_revision AS revision,updated_at FROM documents WHERE account_id=? ORDER BY updated_at DESC LIMIT 200",
+        "SELECT d.id, d.title, d.current_revision AS revision, d.updated_at, CASE WHEN json_extract(r.content, '$.format') IN ('presentation', 'slides') OR json_extract(r.content, '$.sections[0].html') LIKE '%slide%' THEN 'presentation' ELSE COALESCE(json_extract(r.content, '$.format'), 'document') END AS format FROM documents d LEFT JOIN revisions r ON r.document_id = d.id AND r.revision = d.current_revision WHERE d.account_id=? ORDER BY d.updated_at DESC LIMIT 200",
       )
       .bind(accountId)
       .all()

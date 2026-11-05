@@ -27,6 +27,10 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 - One anonymous document per MCP installation, browser claiming, and account tokens with an explicit publishing grant.
 - A self-contained, publishable npm MCP package and a standalone download in **Connect agent**.
 
+Browser requests have a 30-second timeout and clear connection errors. Mutations are never automatically retried, and repeated action clicks produce one request. Save with **Ctrl/Cmd+S**; edits stay open after a conflict or expired session, with sign-in recovery and a draft download. On small screens, the editor keeps the canvas visible and opens outline/properties panels on demand.
+
+Sharing shows the actual published revision. Save before publishing; only returned public links can be copied, and clipboard failures are reported. Publishing again rotates the link. New account tokens default to publishing disabled, and existing token permissions are loaded before changes can be made.
+
 Live multi-user editing, comments, uploads, offline sync, pagination, password reset/email verification, are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
 
 ## Agent onboarding
@@ -151,7 +155,7 @@ agy mcp add --type http docsync https://YOUR_HOST/mcp
 claude mcp add --transport http docsync https://YOUR_HOST/mcp
 ```
 
-The browser authorization page grants document access and lets the user separately allow publishing. OAuth uses authorization code with PKCE, short-lived access tokens, rotating refresh tokens, and account-scoped revocation from **Connect agent**. Hosted MCP requires migrations through `0004_remote_mcp_oauth.sql`. Local stdio with private agent tokens remains available for clients without remote OAuth.
+The browser authorization page grants document access and lets the user separately allow publishing. OAuth uses authorization code with PKCE, short-lived access tokens, rotating refresh tokens, and account-scoped revocation from **Connect agent**. Approval is bound to the initiating browser by a single-use token and HttpOnly cookie. Registration, authorization, and token exchange have per-IP limits; OAuth JSON/forms are capped at 16 KiB, and API/MCP bodies at 550,000 bytes, including streamed bodies. OAuth pages block inline executable scripts, HTTPS responses use HSTS, and sensitive responses are not cached. Hosted MCP requires migrations through `0004_remote_mcp_oauth.sql`. Local stdio with private agent tokens remains available for clients without remote OAuth.
 
 ## Content and sharing
 
@@ -202,6 +206,6 @@ npm run pack:mcp
 
 The API tests cover isolation across accounts and all document operations, CSRF, session revocation, token rotation, trial quota enforcement, claiming/replay, Google state/PKCE and identity linking, snapshots, concurrency, publication, and HTML/CSS security. Stdio tests exercise both development and bundled MCP entry points.
 
-The browser test launches an isolated in-memory API server and installed Chrome (`CHROME_PATH` overrides `/usr/bin/google-chrome`). It does not modify your local database. It exercises the actual packaged MCP executable and private CLI profiles through the entire free-document → browser signup → claim → account token → next document workflow, then editor behavior, sharing, conflicts, revocation, logout, and mobile layout. Screenshots go to `/tmp/docsync-*.png`.
+The browser test launches an isolated in-memory API server and installed Chrome (`CHROME_PATH` overrides `/usr/bin/google-chrome`). It does not modify your local database. It exercises the actual packaged MCP executable and private CLI profiles through the entire free-document → browser signup → claim → account token → next document workflow, then editor behavior, duplicate save protection, session recovery, sharing and clipboard failures, conflicts, revocation, logout, and mobile layout. Screenshots go to `/tmp/docsync-*.png`.
 
 Google's live service, Cloudflare deployment, npm publication, and live model sessions are separate checks; local acceptance does not claim those have happened.

@@ -12,6 +12,7 @@ import * as accounts from "./accounts.ts";
 import * as store from "./store.ts";
 import { handleRemoteMcp } from "./remote-mcp.ts";
 import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
+import { jsonBody as body } from "./request.ts";
 import { webResponse } from "./web.ts";
 import { publicPages } from "./seo.ts";
 
@@ -19,46 +20,12 @@ const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 const oauthPolicy =
-  "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self' http: https:; frame-ancestors 'none'";
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self' http: https:; frame-ancestors 'none'";
 function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json", ...extra },
   });
-}
-async function body(request: Request): Promise<Record<string, unknown>> {
-  if (!request.headers.get("Content-Type")?.startsWith("application/json"))
-    throw new HttpError(415, "JSON body required");
-  if (Number(request.headers.get("Content-Length")) > 550_000)
-    throw new HttpError(413, "Request exceeds 550 KB");
-  const reader = request.body?.getReader();
-  if (!reader) throw new HttpError(400, "Missing request body");
-  let length = 0;
-  const chunks: Uint8Array[] = [];
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    length += value.byteLength;
-    if (length > 550_000) {
-      await reader.cancel();
-      throw new HttpError(413, "Request exceeds 550 KB");
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  try {
-    const value = JSON.parse(new TextDecoder().decode(bytes));
-    if (!value || typeof value !== "object" || Array.isArray(value))
-      throw Error();
-    return value;
-  } catch {
-    throw new HttpError(400, "Invalid JSON object");
-  }
 }
 function revision(value: unknown): number {
   if (!Number.isSafeInteger(value) || Number(value) < 1)
@@ -303,11 +270,8 @@ async function route(request: Request, env: Env): Promise<Response> {
   );
   if (match) {
     const [, id, action] = match;
-    await store.getDocument(env.DB, id, undefined, principal.accountId);
-    if (!action && method === "GET")
-      return json(
-        await store.getDocument(env.DB, id, undefined, principal.accountId),
-      );
+    const current = await store.getDocument(env.DB, id, undefined, principal.accountId);
+    if (!action && method === "GET") return json(current);
     if (!action && method === "PUT") {
       const { expectedRevision, ...content } = await body(request);
       return json(
@@ -408,7 +372,12 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     }
   }
   const secured = new Response(response.body, response);
-  secured.headers.set("Cache-Control", "no-store");
+  const url = new URL(request.url);
+  const immutableAsset = /^\/assets\/[A-Za-z0-9_-]+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/.test(url.pathname)
+    && secured.status === 200 && ["GET", "HEAD"].includes(request.method);
+  secured.headers.set("Cache-Control", immutableAsset ? "public, max-age=31536000, immutable" : "no-store");
+  if (url.protocol === "https:") secured.headers.set("Strict-Transport-Security", "max-age=31536000");
+  secured.headers.set("Cross-Origin-Opener-Policy", "same-origin");
   secured.headers.set("X-Content-Type-Options", "nosniff");
   secured.headers.set("Referrer-Policy", "no-referrer");
   const { pathname } = new URL(request.url);

@@ -40,6 +40,7 @@ test("official MCP client exercises document tools and real Worker API in-proces
     assert.equal(options.linkAccess, "local_only");
     assert.ok(options.templates.length > 0);
     assert.ok(options.templates.every((theme: any) => format === "all" || theme.format === format));
+    assert.ok(Array.isArray(options.themes) && options.themes.includes("midnight"));
     assert.match(options.guidance, /custom design/);
   }
   const connection = parse(

@@ -148,16 +148,13 @@ try {
   assert.ok(await firstMainSlide.evaluate(() => document.documentElement.scrollHeight <= innerHeight));
   assert.equal(await firstMainSlide.evaluate(() => getComputedStyle(document.documentElement).overflowY), "hidden");
   await page.click(".shared-header-actions button");
-  await page.waitForSelector(".shared-slideshow-overlay");
-  const slideshowFrame = await (await page.$(".shared-slideshow-canvas iframe"))!.contentFrame();
+  await page.waitForSelector(".presentation-viewer");
+  const slideshowFrame = await (await page.$(".presentation-canvas iframe"))!.contentFrame();
   assert.ok(slideshowFrame);
   await slideshowFrame.waitForSelector("h1");
   assert.equal(await slideshowFrame.$eval("h1", node => node.textContent), "First slide");
-  await page.evaluate(() => {
-    const exit = [...document.querySelectorAll(".shared-slideshow-controls button")].find(button => button.textContent?.includes("Exit")) as HTMLButtonElement;
-    exit.click();
-  });
-  await page.waitForSelector(".shared-slideshow-overlay", { hidden: true });
+  await page.click('button[aria-label="Exit presentation"]');
+  await page.waitForSelector(".presentation-viewer", { hidden: true });
   await page.click('button[aria-label="Next slide"]');
   await page.waitForFunction(() => document.querySelector(".shared-viewer-toolbar span")?.textContent?.includes("Slide 2 of 2"));
   const secondSlide = await (await page.$(".shared-page iframe"))!.contentFrame();

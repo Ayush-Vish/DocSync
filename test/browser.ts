@@ -15,6 +15,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { fixture, sample } from "./helpers.ts";
 import { handle } from "../src/worker.ts";
+import { hash } from "../src/auth.ts";
 
 const f = await fixture();
 const root = resolve("dist/public");
@@ -107,23 +108,16 @@ await page.setViewport({ width: 1440, height: 1000 });
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("dialog", (d) => void d.accept());
 async function click(text: string) {
-  await page.waitForFunction(
+  const button = await page.waitForFunction(
     (text) =>
-      [...document.querySelectorAll("button")].some(
+      [...document.querySelectorAll("button")].find(
         (b) => b.textContent?.trim() === text && !b.disabled,
       ),
     {},
     text,
   );
-  await page.evaluate(
-    (text) =>
-      (
-        [...document.querySelectorAll("button")].find(
-          (b) => b.textContent?.trim() === text,
-        ) as HTMLButtonElement
-      ).click(),
-    text,
-  );
+  await button.asElement()!.toElement("button").then(element => element.asLocator().click());
+  await button.dispose();
 }
 async function fill(selector: string, text: string) {
   await page.click(selector);
@@ -206,12 +200,14 @@ try {
   await page.type("input[name=password]", "Browser account password 123!");
   await click("Create account →");
   await page.waitForSelector(".workspace");
+  console.log("Account signup passed; claiming the trial document.");
   await click("Claim my document");
   await page.waitForFunction(() =>
     document
       .querySelector("[role=status]")
       ?.textContent?.includes("Document added"),
   );
+  await page.click(".connect-card details > summary");
   await click("Generate token");
   await page.waitForSelector('input[aria-label="New agent token"]');
   const token = await page.$eval(
@@ -256,8 +252,13 @@ try {
     ).isError,
     false,
   );
-  await page.reload();
+  let sessionRequests = 0;
+  const countSession = (request: { url(): string }) => { if (new URL(request.url()).pathname === "/api/session") sessionRequests++; };
+  page.on("request", countSession);
+  await page.goto(origin);
   await page.waitForSelector(".workspace");
+  page.off("request", countSession);
+  assert.equal(sessionRequests, 1, "Authenticated home startup reuses the session check");
   // Navigate using the sidebar and open the claimed document.
   await page.evaluate(() => {
     const button = [...document.querySelectorAll("nav button")].find((b) =>
@@ -269,6 +270,7 @@ try {
   await page.screenshot({ path: "/tmp/docsync-library.png", fullPage: true });
   await page.click(".custom-theme-card summary");
   assert.match(await page.$eval(".custom-theme-card code", node => node.textContent || ""), /custom theme/i);
+  console.log("Agent connection passed; checking templates and editing.");
   await page.click('[data-theme-id="sales-dashboard"]');
   await page.waitForFunction(() => (document.querySelector('input[aria-label="Document title"]') as HTMLInputElement)?.value === "Northstar Sales Dashboard");
   assert.match(new URL(page.url()).pathname, /^\/documents\/[a-f0-9-]{36}\/preview$/);
@@ -277,7 +279,7 @@ try {
   await salesFrame.waitForSelector("#live-sales");
   await page.waitForFunction(() => document.querySelector(".document-paper iframe")!.getBoundingClientRect().height > 1056);
   assert.ok(await salesFrame.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1));
-  assert.equal(await salesFrame.$eval('nav[aria-label="Preview controls"]', node => getComputedStyle(node).display), "none");
+  assert.equal(await salesFrame.$eval('nav[aria-label="Presentation controls"]', node => getComputedStyle(node).display), "none");
   assert.equal(await salesFrame.$eval("html", node => getComputedStyle(node).scrollbarWidth), "none");
   const salesBefore = await salesFrame.$eval("#live-sales", node => node.textContent);
   await salesFrame.waitForFunction(value => document.getElementById("live-sales")?.textContent !== value, { timeout: 8000 }, salesBefore);
@@ -295,7 +297,7 @@ try {
     ) as HTMLButtonElement;
     button.click();
   });
-  await page.waitForSelector(".editor-page");
+  await page.waitForSelector(".doc-studio");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
   await click("Preview");
   await page.waitForSelector(".preview-stack");
@@ -306,10 +308,25 @@ try {
   await click("Edit");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
   await fill('input[aria-label="Document title"]', "Browser edited report");
-  await click("Save");
-  await page.waitForFunction(
-    () => document.querySelector("[role=status]")?.textContent === "Saved.",
-  );
+  await click("Share");
+  await page.waitForSelector("dialog.share-dialog[open]");
+  assert.equal(await page.$eval(".share-dialog footer button:last-child", button => (button as HTMLButtonElement).disabled), true);
+  assert.equal(await page.$$eval(".share-dialog footer button", buttons => (buttons.find(button => button.textContent?.trim() === "Copy link") as HTMLButtonElement).disabled), true);
+  assert.equal(await page.$(".share-dialog select"), null, "Sharing must not advertise unsupported editor or restriction grants");
+  await page.screenshot({ path: "/tmp/docsync-share.png" });
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog.share-dialog", { hidden: true });
+  assert.match(await page.evaluate(() => document.activeElement?.textContent || ""), /Share/);
+  let saves = 0;
+  const countSave = (request: { url(): string; method(): string }) => { if (request.method() === "PUT" && new URL(request.url()).pathname === `/api/documents/${doc.id}`) saves++; };
+  page.on("request", countSave);
+  await page.evaluate(() => {
+    const save = [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Save")!;
+    save.click(); save.click();
+  });
+  await page.waitForFunction(() => document.querySelector("[role=status]")?.textContent === "Saved.");
+  page.off("request", countSave);
+  assert.equal(saves, 1, "Repeated save clicks produce one mutation");
   // Agent-managed implementation source is not exposed in the customer UI.
   assert.equal(await page.$(".component-editor textarea"), null);
   assert.ok(!(await page.$eval("body", node => node.textContent || "")).includes("Edit HTML, CSS & JavaScript"));
@@ -323,30 +340,45 @@ try {
   );
   assert.equal(await frame!.$("#artifact script,img,[onclick]"), null);
   const editorLayout = await page.evaluate(() => {
-    const editor = document.querySelector(".editor-page")!.getBoundingClientRect();
-    const frame = document.querySelector(".document-paper iframe")!.getBoundingClientRect();
-    return { editorWidth: editor.width, frameWidth: frame.width, frameHeight: frame.height };
+    const editor = document.querySelector(".doc-studio")!.getBoundingClientRect();
+    const canvas = document.querySelector(".doc-studio-center")!.getBoundingClientRect();
+    const frame = document.querySelector(".doc-block-content iframe")!.getBoundingClientRect();
+    return { editorWidth: editor.width, canvasWidth: canvas.width, frameWidth: frame.width, frameHeight: frame.height, contained: frame.left >= canvas.left && frame.right <= canvas.right };
   });
   assert.ok(editorLayout.editorWidth >= 1100);
-  assert.ok(editorLayout.frameWidth >= 800 && editorLayout.frameWidth <= 900);
-  assert.ok(editorLayout.frameHeight >= 640);
+  assert.ok(editorLayout.frameWidth > 0 && editorLayout.frameWidth <= editorLayout.canvasWidth);
+  assert.ok(editorLayout.contained, "The rendered block stays within the document canvas");
+  assert.ok(editorLayout.frameHeight >= 260);
   assert.equal(await page.$eval(".sidebar", node => getComputedStyle(node).display), "none");
   assert.equal(await page.$(".section-card"), null);
-  assert.ok(!(await page.$eval(".editor-page", node => node.textContent || "")).includes("Quick-Insert"));
+  assert.ok(!(await page.$eval(".doc-studio", node => node.textContent || "")).includes("Quick-Insert"));
   await page.screenshot({ path: "/tmp/docsync-editor.png" });
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.evaluate(() => {
+    const canvas = document.querySelector(".doc-studio-center")!;
+    canvas.scrollTop = canvas.scrollHeight;
+  });
   const stickyLayout = await page.evaluate(() => ({
-    sidebarTop: document.querySelector(".sidebar")!.getBoundingClientRect().top,
     topbarTop: document.querySelector(".topbar")!.getBoundingClientRect().top,
   }));
-  assert.ok(Math.abs(stickyLayout.sidebarTop) < 1);
   assert.ok(Math.abs(stickyLayout.topbarTop) < 1);
-  await click("Share ↗");
+  await click("Share");
+  await page.waitForSelector("dialog.share-dialog[open]");
+  await click("Publish v2 with new link");
   await page.waitForSelector(".share-link a");
   const sharedUrl = await page.$eval(
     ".share-link a",
     (a) => (a as HTMLAnchorElement).href,
   );
+  assert.equal((await fetch(publication.url.replace("/share/", "/api/shared/"))).status, 404, "Republishing revokes the previous link");
+  await page.evaluate(() => {
+    (window as any).originalClipboard = navigator.clipboard.writeText;
+    navigator.clipboard.writeText = () => Promise.reject(new Error("Permission denied"));
+  });
+  await click("Copy link");
+  await page.waitForFunction(() => document.querySelector(".share-dialog [role=alert]")?.textContent?.includes("copy it manually"));
+  assert.ok(!(await page.$eval(".share-dialog", node => node.textContent || "")).includes("Copied"));
+  await page.evaluate(() => { navigator.clipboard.writeText = (window as any).originalClipboard; });
+  await page.keyboard.press("Escape");
   const reader = await browser.createBrowserContext();
   const publicPage = await reader.newPage();
   await publicPage.setViewport({ width: 1440, height: 1000 });
@@ -365,6 +397,19 @@ try {
   assert.ok(sharedLayout.readerWidth >= 900);
   assert.ok(sharedLayout.frameWidth >= 760);
   assert.ok(sharedLayout.frameHeight >= 640);
+  // Expired sessions can be renewed without replacing an unsaved draft.
+  await fill('input[aria-label="Document title"]', "Draft kept through sign-in");
+  const accountCookie = (await page.cookies()).find(cookie => cookie.name === "docsync_account")!;
+  await f.env.DB.prepare("DELETE FROM account_sessions WHERE token_hash=?").bind(await hash(accountCookie.value)).run();
+  await click("Save");
+  await page.waitForSelector("dialog.session-dialog[open]");
+  assert.equal(await page.$eval('.session-dialog input[name=email]', input => (input as HTMLInputElement).readOnly), true);
+  await page.type('.session-dialog input[name=password]', "Browser account password 123!");
+  await click("Sign in →");
+  await page.waitForSelector("dialog.session-dialog", { hidden: true });
+  assert.equal(await page.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).value), "Draft kept through sign-in");
+  await page.keyboard.down("Control"); await page.keyboard.press("s"); await page.keyboard.up("Control");
+  await page.waitForFunction(() => document.querySelector("[role=status]")?.textContent === "Saved.");
   // A stale save must preserve the user's draft.
   await fill('input[aria-label="Document title"]', "Unsaved browser draft");
   const current = parse(
@@ -392,25 +437,55 @@ try {
     ),
     "Unsaved browser draft",
   );
+  await click("Share");
+  await page.waitForSelector("dialog.share-dialog[open]");
   await click("Revoke link");
   assert.equal(
     (await fetch(sharedUrl.replace("/share/", "/api/shared/"))).status,
     404,
   );
+  await page.waitForFunction(() => !document.querySelector<HTMLButtonElement>('.share-dialog button[aria-label="Close sharing"]')!.disabled);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("dialog.share-dialog", { hidden: true });
   await page.setViewport({ width: 390, height: 844 });
+  await page.waitForSelector(".doc-studio-left.collapsed");
+  await page.waitForSelector(".doc-studio-right.collapsed");
+  await page.waitForFunction(() => document.querySelector(".doc-studio-left")!.getBoundingClientRect().width <= 54 && document.querySelector(".doc-studio-right")!.getBoundingClientRect().width < 1);
+  assert.ok(await page.$eval(".doc-studio-center", node => node.getBoundingClientRect().width >= innerWidth - 60), "The mobile canvas keeps its usable width");
+  assert.ok(await page.$eval(".doc-studio-center", node => node.getBoundingClientRect().height > 300));
+  assert.ok(await page.$$eval(".document-actions button", buttons => buttons.every(button => button.getBoundingClientRect().right <= innerWidth)), "All mobile toolbar actions stay on screen");
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
   await page.screenshot({ path: "/tmp/docsync-mobile.png", fullPage: true });
-  await click("← My documents");
+  await page.locator('button[aria-label="Expand outline"]').click();
+  await page.waitForSelector(".doc-studio-left:not(.collapsed)");
+  await page.locator('button[aria-label="Collapse outline"]').click();
+  await page.locator('button[title="Inspect properties"]').click();
+  await page.waitForSelector(".doc-studio-right:not(.collapsed)");
+  await page.locator('button[aria-label="Close properties"]').click();
+  await page.waitForFunction(() => document.querySelector(".doc-studio-right")!.getBoundingClientRect().width < 1);
+  await click("Slides");
+  await page.waitForSelector(".slide-studio");
+  await page.evaluate(() => { navigator.clipboard.writeText = () => Promise.reject(new Error("Permission denied")); });
+  await click("AI Prompt");
+  await page.waitForFunction(() => document.querySelector("[role=alert]")?.textContent?.includes("Permission denied"));
+  assert.ok(!(await page.$eval("body", node => node.textContent || "")).includes("prompt copied!"));
+  await page.evaluate(() => { navigator.clipboard.writeText = (window as any).originalClipboard; });
+  await page.screenshot({ path: "/tmp/docsync-slides-mobile.png" });
+  await click("My documents");
   await page.click('button[aria-label="Sign out"]');
   await page.waitForSelector("input[name=email]");
   assert.deepEqual(errors, []);
   console.log(
-    "Browser + packaged MCP acceptance passed: signup, free document, quota, claim, account token login, editor, sanitization, sharing, conflict preservation, revocation, logout, mobile.",
+    "Browser + packaged MCP acceptance passed: signup, trial quota and claim, account token login, editor, sanitization, duplicate save protection, sharing and clipboard errors, session recovery, conflict preservation, link rotation and revocation, logout, mobile panels and toolbar.",
   );
+} catch (error) {
+  console.error("Browser acceptance failed at", page.url(), error);
+  await page.screenshot({ path: "/tmp/docsync-browser-failure.png", fullPage: true }).catch(() => {});
+  throw error;
 } finally {
   for (const client of clients) await client.close();
   await browser.close();

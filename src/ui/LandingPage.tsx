@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, Check, FileText, Presentation, Code2, BarChart3, History, Share2 } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, FileText, Presentation, Code2, BarChart3, History, Share2, SquareTerminal, Asterisk, Orbit, Plug } from "lucide-react";
 
 const useCases = [
   { icon: FileText, title: "Reports & updates", description: "Turn scattered notes into a readable report. Spend less time formatting the weekly update.", template: "editorial-document", example: "Explore a report" },
@@ -35,7 +35,7 @@ export function LandingPage() {
           </div>
         </div>
       </section>
-      <div className="home-compatibility home-container"><span>WORKS WITH YOUR EXISTING AGENT</span><p>Codex <span>/</span> Claude Code <span>/</span> Antigravity <span>/</span> MCP-compatible clients</p></div>
+      <div className="home-compatibility home-container"><span>WORKS WITH YOUR EXISTING AGENT</span><ul aria-label="Compatible AI agents"><li><SquareTerminal aria-hidden="true" />Codex</li><li><Asterisk aria-hidden="true" />Claude Code</li><li><Orbit aria-hidden="true" />Antigravity</li><li><Plug aria-hidden="true" />MCP-compatible clients</li></ul></div>
 
       <section className="home-section home-container" id="use-cases" aria-labelledby="use-cases-title">
         <div className="home-section-heading"><div><p className="home-eyebrow">LESS STARTING FROM SCRATCH</p><h2 id="use-cases-title">One workspace. Many ways forward.</h2></div><p>From the first draft to the next handoff,<br />make your work easier to understand.</p></div>
