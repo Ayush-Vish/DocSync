@@ -13,7 +13,7 @@ export class HttpError extends Error {
 
 const tags = new Set('article section div span p h1 h2 h3 h4 h5 h6 header footer main aside nav strong em b i u s small mark sub sup blockquote pre code ul ol li dl dt dd table thead tbody tfoot tr th td caption colgroup col hr br details summary figure figcaption button input label select option output progress meter canvas'.split(' '));
 const attrs = new Set('id class title role aria-label aria-hidden aria-describedby aria-live aria-pressed colspan rowspan scope start reversed open type value min max step checked disabled selected for width height'.split(' '));
-const cssAtRules = new Set(['media', 'supports', 'container', 'layer', 'page']);
+const cssAtRules = new Set(['media', 'supports', 'container', 'layer', 'page', 'keyframes', '-webkit-keyframes']);
 
 export function cleanCss(source: string, inline = false): string {
   try {

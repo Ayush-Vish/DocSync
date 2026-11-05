@@ -23,6 +23,8 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 - HTML/CSS/JavaScript component sections with source editing and isolated previews. Existing component HTML is preserved instead of being converted to rich text.
 - Explicit saves, immutable revision history, restore, conflict preservation, and JSON draft download.
 - Fixed-revision public links, republishing with link rotation, and revocation.
+- Two six-slide presentation templates with entrance animation, animated charts, and self-contained interactive examples. The presentation player supports keyboard and touch navigation, slide overview, animation replay, progress, and native fullscreen.
+- Library cards show the first saved page or slide. Covers load near the viewport and render without document JavaScript.
 - Email/password accounts, server-side sessions, Google OAuth, and account-scoped document access.
 - One anonymous document per MCP installation, browser claiming, and account tokens with an explicit publishing grant.
 - A self-contained, publishable npm MCP package and a standalone download in **Connect agent**.
@@ -52,6 +54,10 @@ Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Cl
 Signed-in users can also create these presets from the document library: Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, and Delivery Review. The Custom card provides a portable prompt for Codex, Claude, Antigravity, or another connected agent. The Sales Dashboard uses fictional Northstar figures and a simulated local update stream; it is not connected to real company data.
 
 Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP blocking network, external scripts, forms, popups, and access to the parent app. Each frame receives only its section content through a source-checked message; edits recreate the frame. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
+
+Each presentation page has an independent `html`, `css`, and `js` payload. Slides use a 1280 × 720 design viewport that scales to the available space, including mobile screens. Only the current slide runs in the player; overview, filmstrip, and library thumbnails never execute scripts. Presentations entered from the editor or a shared link use the same player. The gallery's **Present template** button opens it without creating an account or document.
+
+Use **←/→**, **Page Up/Down**, **Space**, **Home/End**, **G** for overview, **R** to replay, and **Esc** to leave. Keyboard and horizontal swipe navigation also work while a slide frame has focus. Buttons, inputs, canvas interactions, and events handled with `preventDefault()` keep their own behavior. The frame bridge accepts only navigation actions from the currently mounted slide and grants no account access. Fullscreen uses the browser's native control; motion respects `prefers-reduced-motion`.
 
 ### MCP connection
 
@@ -142,7 +148,7 @@ Clients can install the npm package with:
 agy mcp add docsync npx -y @ayush-vish/docsync-mcp --url https://YOUR_HOST
 ```
 
-A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Seven tools are exposed: `get_connection`, `connect_account`, `list_documents`, `get_document`, `create_document`, `update_document`, and `publish_document`.
+A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Eight tools are exposed: `get_connection`, `get_template_options`, `connect_account`, `list_documents`, `get_document`, `create_document`, `update_document`, and `publish_document`.
 
 ### Hosted MCP (OAuth)
 
@@ -159,11 +165,11 @@ The browser authorization page grants document access and lets the user separate
 
 ## Content and sharing
 
-The document model is `{title, sections: [{id, kind?, html, css}]}`. `kind: "text"` is for supported rich text; `kind: "html"` (or omitted for older documents) preserves arbitrary supported components. Agents should use HTML mode for layouts, custom classes, or CSS. Text sections are edited through TipTap's schema and should contain only supported headings, paragraphs, inline formatting, lists, quotes, code blocks, and tables.
+The document model is `{title, format?, sections: [{id, kind?, html, css, js?}]}`. Use `pages` instead of `sections` for the equivalent ordered page input, and set `format` to `document` or `presentation` explicitly. `kind: "text"` is for supported rich text; `kind: "html"` (or omitted for older documents) preserves arbitrary supported components. Agents should use HTML mode for layouts, custom classes, or CSS. Text sections are edited through TipTap's schema and should contain only supported headings, paragraphs, inline formatting, lists, quotes, code blocks, and tables.
 
-`parse5` and `css-tree` validate content on the server. Component previews also validate drafts in the browser and use empty-sandbox iframes with restrictive CSP. Scripts, navigation, external images, SVG, forms, embeds, remote fonts, and CSS resource requests are disabled. HTML components never enter the application DOM.
+`parse5` and `css-tree` validate content on the server. Component previews also validate drafts in the browser. Static content and thumbnails use empty-sandbox iframes; optional per-page `js` uses an opaque `allow-scripts` sandbox with restrictive CSP. HTML script tags and inline event attributes, navigation outside the app, external images, SVG, forms, embeds, remote fonts, and CSS resource requests are disabled. CSS keyframes and self-contained JavaScript animations are supported. HTML components never enter the application DOM.
 
-Limits: 40 sections, 100,000 HTML characters and 30,000 CSS characters per section, 500 KB per document, 550 KB request bodies. History shows the latest 100 revisions; the library lists the latest 200 documents per account.
+Limits: 40 sections; 100,000 HTML, 30,000 CSS, and 50,000 JavaScript characters per section; 500,000 bytes per document JSON; 550,000-byte API/MCP request bodies. History shows the latest 100 revisions; the library lists the latest 200 documents per account.
 
 Save before sharing. A link points to a saved revision, so later private edits do not change it. Republishing rotates the URL and revokes its predecessor. The raw link is shown only when publishing. Revocation stops future reads but cannot erase copies already downloaded. Share responses use `no-store`, prioritizing revocation over CDN caching. Localhost links are previews accessible only on the host machine.
 

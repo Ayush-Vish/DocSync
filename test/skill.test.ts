@@ -72,3 +72,20 @@ test("selectable theme payloads match the downloadable template catalog", () => 
     assert.deepEqual(generated, expected);
   }
 });
+
+test("presentation templates have independent slide payloads and scoped script/style overrides", () => {
+  const deck = JSON.parse(execFileSync(process.execPath, ['skills/docsync/scripts/to-document.mjs', 'skills/docsync/assets/templates/pitch-deck', 'Animated pitch'], { encoding: 'utf8' }));
+  assert.equal(deck.format, 'presentation');
+  assert.equal(deck.sections.length, 6);
+  const traction = deck.sections.find((section: { id: string }) => section.id === 'pitch-traction');
+  const solution = deck.sections.find((section: { id: string }) => section.id === 'pitch-solution');
+  assert.match(traction.css, /#traction-count/);
+  assert.match(traction.js, /const count =/);
+  assert.ok(!solution.css.includes('#traction-count'));
+  assert.ok(!solution.js.includes('const count ='));
+  assert.match(solution.js, /workflow-next/);
+  for (const slide of deck.sections) {
+    assert.match(slide.js, /prefers-reduced-motion/);
+    assert.ok(!slide.js.includes('ds-grid-overlay'), 'Hosted slides use the host player, without a second navigation toolbar');
+  }
+});

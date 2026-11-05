@@ -229,6 +229,7 @@
         slide.hidden = false;
         if (i !== prev || (opts && opts.force)) {
           animateSlide(slide, dir);
+          slide.dispatchEvent(new Event("docsync:slide-enter"));
         }
       } else {
         slide.hidden = true;
@@ -525,7 +526,11 @@
 
   // ── 14. Auto-fit slides in fullscreen ─────────────────────────────────
   function scaleSlidesIfFullscreen() {
-    if (!isFullscreen()) return;
+    if (!isFullscreen()) {
+      slides.filter(slide => slide.classList.contains("slide")).forEach(slide => { slide.style.zoom = String(Math.min(1, window.innerWidth / 1280)); });
+      return;
+    }
+    slides.forEach(slide => { slide.style.zoom = "1"; });
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     slides.forEach((slide, i) => {

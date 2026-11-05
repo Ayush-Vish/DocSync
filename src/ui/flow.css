@@ -29,6 +29,13 @@
 .document-workspace > .banner { flex-shrink: 0; max-height: 22dvh; overflow-y: auto; }
 .document-workspace > .request-progress { flex-shrink: 0; }
 .doc-properties-trigger { position: sticky; top: 12px; align-self: flex-end; flex-shrink: 0; margin: 12px 16px -44px 0; z-index: 5; }
+.document-thumbnail { height: auto; aspect-ratio: 16/9; overflow: hidden; background: #eeeff1; }
+.document-cover { display: block; width: 100%; height: 100%; position: absolute; inset: 0; pointer-events: none; }
+.document-cover-placeholder { display: grid; height: 100%; align-content: center; justify-items: center; gap: 10px; color: #98a0ab; }
+.document-cover-placeholder small { font-size: 10px; }
+.document-format-badge { z-index: 1; background: #fffffff0; color: #344034; border: 1px solid #e0e5e1; }
+.shared-slide-layout { grid-template-columns: 176px minmax(0, 1fr); }
+@media (max-width: 768px) { .shared-slide-layout { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 1200px) {
   .document-workspace > .topbar { padding: 10px 16px; }
   .document-toolbar { flex-wrap: wrap; gap: 10px; }

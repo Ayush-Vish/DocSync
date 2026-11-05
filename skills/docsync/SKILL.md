@@ -72,6 +72,16 @@ node scripts/to-document.mjs /path/to/template "Document title" > document.json
 
 The helper reads `index.html`, `styles.css`, and the shared `../charts.css` and `../preview.js`; it produces a self-contained `html`, `css`, and `js` payload for each marked section. When run outside the skill folder, use the helper's absolute path. Treat the JSON as input to the connected MCP tools, not as a command to execute.
 
+For presentations, the helper uses `../presentation-base.css` and the lightweight `../slides.js` animation runtime instead of embedding standalone navigation in every slide. Optional `slides/SECTION_ID.css` and `slides/SECTION_ID.js` files are appended only to that slide's payload. Link those files in `index.html` too when they are needed by the standalone preview. Each slide keeps independent HTML, CSS, and JavaScript; no script can read another slide's DOM or variables. The helper sets an explicit `format` for the result.
+
+## Presentation design and motion
+
+The pitch and review templates each contain six complete 16:9 slides. Author against **1280 × 720 px**; the app scales that canvas instead of reflowing it into a mobile document. Keep one main idea per slide, a clear heading, comfortable margins, and a useful ending. Use supplied facts; all bundled Northstar figures are fictional examples.
+
+Add `.reveal` to elements for a subtle staggered entrance. The shared slide runtime animates these elements and `.chart-bar` marks with the Web Animations API. For custom sequences, use `element.animate()` or `requestAnimationFrame()` in that slide's `js`; CSS `@keyframes` are also supported. Respect `matchMedia('(prefers-reduced-motion: reduce)')`, keep animations short, and make the final state readable. Keep meaningful content in the initial HTML so script-free covers, overview tiles, and printing remain useful. Avoid flashing, hidden essential content, and endless motion.
+
+The host owns next/previous navigation, overview, replay, fullscreen, and progress. Do not inject another presentation toolbar into a hosted slide. Native buttons, form controls, and canvas clicks remain interactive. If a custom non-button click handler should consume a click instead of advancing, call `event.preventDefault()`. The player supports navigation even when its sandboxed frame has focus, and replay restarts the current slide in a fresh frame. Hidden slides and thumbnail previews do not run JavaScript.
+
 ## Save, edit, and share
 
 Read [references/mcp.md](references/mcp.md) for the tool contract and renderer limits. Use the user's connected DocSync server. The public instance is `https://docsync.ayushvish6555.workers.dev/mcp`.

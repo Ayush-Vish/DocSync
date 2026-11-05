@@ -60,7 +60,7 @@ try {
     await frame.waitForSelector(".chart-bar");
     if (["Bold Pitch", "Delivery Review"].includes(title)) {
       await frame.click("nav button:nth-child(2)");
-      assert.match(await frame.$eval("[aria-live]", node => node.textContent || ""), /^(?:Slide )?2 of 3$/);
+      assert.match(await frame.$eval("[aria-live]", node => node.textContent || ""), /^(?:Slide )?2 of 6$/);
     }
     if (title === "Sales Dashboard") {
       const sales = await frame.$eval("#live-sales", node => node.textContent);
@@ -73,6 +73,95 @@ try {
   await page.setViewport({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await page.setViewport({ width: 1280, height: 1000 });
+
+  // The same player is used by template previews, the editor, and published decks.
+  await page.click('button.home-button');
+  await page.waitForSelector('dialog.presentation-viewer[open]');
+  async function currentFrame() {
+    const frame = await (await page.$('.presentation-canvas iframe'))!.contentFrame();
+    assert.ok(frame);
+    await frame.waitForSelector('.slide');
+    await frame.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await frame.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {}))));
+    return frame;
+  }
+  for (let index = 0; index < 6; index++) {
+    await page.waitForFunction(index => document.querySelector('.presentation-counter')?.textContent === `Slide ${index + 1} of 6`, {}, index);
+    const frame = await currentFrame();
+    const geometry = await frame.evaluate(() => {
+      const slide = document.querySelector<HTMLElement>('.slide')!;
+      return { width: innerWidth, height: innerHeight, contentWidth: slide.scrollWidth, contentHeight: slide.scrollHeight };
+    });
+    assert.equal(geometry.width, 1280);
+    assert.equal(geometry.height, 720);
+    assert.ok(geometry.contentWidth <= 1280 && geometry.contentHeight <= 720, `Review slide ${index + 1} fits: ${JSON.stringify(geometry)}`);
+    if (index === 0) await page.screenshot({ path: '/tmp/docsync-review-presentation.png' });
+    if (index < 5) await page.locator('.presentation-controls button[aria-label="Next slide"]').click();
+  }
+  await page.keyboard.press('Home');
+  await page.setViewport({ width: 390, height: 844 });
+  const mobileFrame = await currentFrame();
+  assert.equal(await mobileFrame.evaluate(() => innerWidth), 1280, 'Mobile slides keep their design viewport');
+  const ratio = await page.$eval('.presentation-canvas iframe', node => { const r = node.getBoundingClientRect(); return r.width / r.height; });
+  assert.ok(Math.abs(ratio - 16 / 9) < .01);
+  await page.screenshot({ path: '/tmp/docsync-presentation-mobile.png' });
+  await page.locator('button[aria-label="Exit presentation"]').click();
+  await page.setViewport({ width: 1280, height: 1000 });
+  await page.goto(origin + '/templates?format=presentation&template=pitch-deck', { waitUntil: 'networkidle0' });
+  await page.click('button.home-button');
+  await page.waitForSelector('dialog.presentation-viewer[open]');
+  for (let index = 0; index < 6; index++) {
+    const frame = await currentFrame();
+    const geometry = await frame.evaluate(() => { const slide = document.querySelector<HTMLElement>('.slide')!; return { width: slide.scrollWidth, height: slide.scrollHeight }; });
+    assert.ok(geometry.width <= 1280 && geometry.height <= 720, `Pitch slide ${index + 1} fits: ${JSON.stringify(geometry)}`);
+    if (index === 0) await page.screenshot({ path: '/tmp/docsync-pitch-cover.png' });
+    if (index < 5) {
+      await page.locator('.presentation-controls button[aria-label="Next slide"]').click();
+      await page.waitForFunction(index => document.querySelector('.presentation-counter')?.textContent === `Slide ${index + 2} of 6`, {}, index);
+    }
+  }
+  await page.locator('button[aria-label="Slide overview"]').click();
+  assert.equal(await page.$$eval('.presentation-overview button', nodes => nodes.length), 6);
+  await page.locator('.presentation-overview button[data-slide="2"]').click();
+  let workflow = await currentFrame();
+  await workflow.click('#workflow-next');
+  assert.match(await workflow.$eval('#workflow-status', node => node.textContent || ''), /Step 2 of 3/);
+  assert.equal(await page.$eval('.presentation-counter', node => node.textContent), 'Slide 3 of 6', 'Interactive slide controls do not advance the deck');
+  await page.locator('button[aria-label="Replay slide animations"]').click();
+  workflow = await currentFrame();
+  assert.match(await workflow.$eval('#workflow-status', node => node.textContent || ''), /Step 1 of 3/, 'Replay resets only the current slide');
+  await workflow.evaluate(() => { document.body.tabIndex = -1; document.body.focus(); });
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.presentation-counter')?.textContent === 'Slide 4 of 6');
+  const traction = await currentFrame();
+  await traction.waitForFunction(() => document.getElementById('traction-count')?.textContent === '1,280');
+  assert.equal(await traction.$('#workflow-next'), null, 'Each slide has an independent DOM and script');
+  assert.match(await traction.$eval('#traction-count', node => getComputedStyle(node).fontSize), /80px/);
+  await page.screenshot({ path: '/tmp/docsync-pitch-presentation.png' });
+  await page.locator('button[aria-label="Replay slide animations"]').click();
+  await currentFrame();
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await page.locator('button[aria-label="Replay slide animations"]').click();
+  const still = await currentFrame();
+  assert.equal(await still.$eval('#traction-count', node => node.textContent), '1,280');
+  assert.equal(await still.evaluate(() => document.getAnimations().length), 0);
+  await page.locator('button[aria-label="Enter fullscreen"]').click();
+  await page.waitForFunction(() => document.fullscreenElement?.classList.contains('presentation-shell'));
+  await page.locator('button[aria-label="Leave fullscreen"]').click();
+  await page.waitForFunction(() => !document.fullscreenElement);
+  await page.evaluate(() => window.postMessage({ type: 'docsync:presentation-v1', action: 'last' }, '*'));
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+  assert.equal(await page.$eval('.presentation-counter', node => node.textContent), 'Slide 4 of 6', 'Messages from outside the active frame cannot control the player');
+  await still.evaluate(() => {
+    const target = document.body;
+    const start = new Touch({ identifier: 1, target, clientX: 900, clientY: 300 });
+    const end = new Touch({ identifier: 1, target, clientX: 300, clientY: 305 });
+    target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [start] }));
+    target.dispatchEvent(new TouchEvent('touchend', { bubbles: true, changedTouches: [end] }));
+  });
+  await page.waitForFunction(() => document.querySelector('.presentation-counter')?.textContent === 'Slide 5 of 6');
+  await page.emulateMediaFeatures([]);
+  await page.locator('button[aria-label="Exit presentation"]').click();
 
   const js = `
     const count=document.getElementById('count');
@@ -121,7 +210,7 @@ try {
   const deckResponse = await f.call("/documents", "POST", {
     title: "Two slide deck",
     sections: [
-      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9}" },
+      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9;--long:\"" + 'x'.repeat(29400) + "\"}", js: 'window.currentSlide="first";' },
       { id: "second-slide", kind: "html", html: '<article class="slide"><h1>Second slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9}" },
     ],
   });
@@ -164,7 +253,11 @@ try {
   assert.ok(await secondSlide.evaluate(() => document.documentElement.scrollHeight <= innerHeight));
   await page.setViewport({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  console.log("Passed: live demo metrics, chart filters, slide navigation, one-page shared viewers, mobile width; published artifact JS works; parent DOM, cookies, storage, external code, fetch, images, top navigation, and HTML breakout are blocked.");
+  console.log("Passed: all 12 template slide layouts, independent slide scripts/styles, interactive controls, replay, overview, keyboard and touch navigation, native fullscreen, reduced motion, mobile sizing, shared viewers and artifact sandbox isolation.");
+} catch (error) {
+  const active = (await browser.pages()).at(-1);
+  await active?.screenshot({ path: '/tmp/docsync-artifact-failure.png', fullPage: true }).catch(() => {});
+  throw error;
 } finally {
   await browser.close();
   server.close();

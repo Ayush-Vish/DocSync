@@ -5,6 +5,7 @@ import { ShareDialog } from "./ShareDialog";
 import { AgentSkill } from "./AgentSkill";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
+import { DocumentCover } from "./DocumentCover";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Table } from "@tiptap/extension-table";
@@ -203,9 +204,8 @@ function SharedViewer({
 
   useEffect(() => {
     const navigate = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && slideshow) {
-        onSlideshowChange(false);
-      } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+      if (slideshow || (event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) return;
+      if (event.key === "ArrowLeft" || event.key === "PageUp") {
         setPage((value) => Math.max(0, value - 1));
       } else if (
         event.key === "ArrowRight" ||
@@ -243,20 +243,7 @@ function SharedViewer({
       >
         <ChevronRight className="w-4 h-4" />
       </Button>
-      {isPresentation && (
-        <>
-          <i className="shared-toolbar-divider" aria-hidden="true" />
-          <span className="shared-tool-button"><Search className="w-3.5 h-3.5" /> Fit</span>
-          <i className="shared-toolbar-divider" aria-hidden="true" />
-          <span className="shared-icon-tool" aria-label="Undo unavailable in read-only view"><Undo2 className="w-4 h-4" /></span>
-          <span className="shared-icon-tool" aria-label="Redo unavailable in read-only view"><Redo2 className="w-4 h-4" /></span>
-          <i className="shared-toolbar-divider" aria-hidden="true" />
-          <span className="shared-tool-label">Background</span>
-          <span className="shared-tool-label">Layout</span>
-          <span className="shared-tool-label">Theme</span>
-          <span className="shared-tool-label">Transition</span>
-        </>
-      )}
+      {isPresentation && <Button variant="outline" size="sm" onClick={() => onSlideshowChange(true)}><Play size={14} /> Present</Button>}
     </div>
   );
 
@@ -284,21 +271,16 @@ function SharedViewer({
         <div className="shared-slide-workarea">
           <div className="shared-page-stage">
             <div className="shared-page">
-              <ArtifactFrame
+              {slideshow ? <ArtifactThumbnail section={current} title={`Slide ${page + 1}`} /> : <ArtifactFrame
                 key={current.id}
                 title={`Slide ${page + 1}: ${content.title}`}
                 section={current}
                 fitSlide
-              />
+              />}
             </div>
           </div>
           <div className="shared-speaker-notes">Shared presentation · Read only</div>
         </div>
-        <aside className="shared-tools-rail" aria-label="Presentation tools">
-          <span><LayoutGrid className="w-4 h-4" />Theme</span>
-          <span><Columns className="w-4 h-4" />Layout</span>
-          <span><Presentation className="w-4 h-4" />Present</span>
-        </aside>
       </div>
       {slideshow && (
         <PresentationViewer
@@ -576,6 +558,7 @@ function SlideStudio({
   setActiveSlide,
   change,
   busy,
+  presenting,
   setFullscreen,
   slidesSidebarOpen,
   setSlidesSidebarOpen,
@@ -593,6 +576,7 @@ function SlideStudio({
   setActiveSlide: React.Dispatch<React.SetStateAction<number>>;
   change: (next: Document) => void;
   busy: boolean;
+  presenting: boolean;
   setFullscreen: (open: boolean) => void;
   slidesSidebarOpen: boolean;
   setSlidesSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -844,7 +828,7 @@ function SlideStudio({
         <div className="slide-studio-canvas-container">
           <div className="slide-studio-canvas">
             {doc.sections[safeActiveSlide] && (
-              <ArtifactFrame
+              presenting ? <ArtifactThumbnail section={doc.sections[safeActiveSlide]} title={`Slide ${safeActiveSlide + 1}`} /> : <ArtifactFrame
                 key={doc.sections[safeActiveSlide].id + "-" + doc.sections[safeActiveSlide].css.length + "-" + doc.sections[safeActiveSlide].html.length}
                 title={`Slide ${safeActiveSlide + 1}`}
                 section={doc.sections[safeActiveSlide]}
@@ -3373,6 +3357,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               setActiveSlide={setActiveSlide}
               change={change}
               busy={busy}
+              presenting={fullscreen}
               setFullscreen={setFullscreen}
               slidesSidebarOpen={slidesSidebarOpen}
               setSlidesSidebarOpen={setSlidesSidebarOpen}
@@ -3503,21 +3488,12 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                     onClick={() => void open(item.id)}
                   >
                     <div className={cn("document-thumbnail relative", item.format === "presentation" && "presentation-thumbnail")}>
-                      <span className="paper-icon">
-                        {item.format === "presentation" ? (
-                          <Presentation className="w-8 h-8 text-primary/70" />
-                        ) : (
-                          <FileText className="w-8 h-8 text-muted-foreground/40" />
-                        )}
-                      </span>
+                      <DocumentCover id={item.id} revision={item.revision} title={item.title} presentation={item.format === "presentation"} />
                       {item.format === "presentation" && (
-                        <span className="absolute top-2 right-2 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase text-primary">
+                        <span className="document-format-badge absolute top-2 right-2 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wider uppercase">
                           Slides
                         </span>
                       )}
-                      <div />
-                      <div />
-                      <div />
                     </div>
                     <h3>{item.title}</h3>
                     <p>

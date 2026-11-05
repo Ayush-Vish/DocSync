@@ -6,7 +6,7 @@ export const sectionSchema = z
     id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
     html: z.string().max(100_000),
     css: z.string().max(30_000),
-    js: z.string().max(50_000).optional(),
+    js: z.string().max(50_000).optional().describe("Independent page/slide JavaScript for animations and interactions. Use DOM APIs or the Web Animations API, respect reduced motion, and keep meaningful content in HTML. Runs in an isolated sandbox without network or account access."),
   })
   .strict();
 export const contentSchema = z

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture } from "./helpers.ts";
-import { cleanHtml, validateContent, lintContent } from "../src/content.ts";
+import { cleanCss, cleanHtml, validateContent, lintContent } from "../src/content.ts";
 import { handle } from "../src/worker.ts";
 
 test("explicit pages preserve order, sanitization and format through publishing", async (t) => {
@@ -44,6 +44,31 @@ test("JavaScript survives create, read, and published snapshots with a size limi
 
 test("controls survive sanitization without executable HTML attributes or uploads", () => {
   assert.equal(cleanHtml('<button type="button" onclick="bad()">Go</button><input type="file" onchange="bad()"><canvas width="300" height="200"></canvas>'), '<button type="button">Go</button><input type="text"><canvas width="300" height="200"></canvas>');
+});
+
+test("slide keyframes survive sanitization while resource loading stays blocked", () => {
+  const css = cleanCss('@keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}.reveal{animation:enter .5s ease}');
+  assert.match(css, /@keyframes enter/);
+  assert.match(css, /animation:enter/);
+  for (const unsafe of ['@keyframes leak{to{background:url(https://example.invalid/leak)}}', '@import "https://example.invalid/style.css";']) assert.throws(() => cleanCss(unsafe));
+});
+
+test("library covers return only the first page without JavaScript and enforce account ownership", async t => {
+  const f = await fixture(); t.after(f.close);
+  const response = await f.call('/documents', 'POST', { title: 'Private deck', format: 'presentation', sections: [
+    { id: 'cover', html: '<h1>Cover</h1>', css: 'h1{color:red}', js: 'window.secret=true' },
+    { id: 'private-details', html: '<h1>Other page</h1>', css: '', js: '' },
+  ] });
+  assert.equal(response.status, 201);
+  const doc = await response.json() as { id: string };
+  const cover = await f.call(`/documents/${doc.id}/thumbnail`);
+  assert.equal(cover.status, 200);
+  assert.equal(cover.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(await cover.json(), { revision: 1, section: { id: 'cover', html: '<h1>Cover</h1>', css: 'h1{color:red}' } });
+  assert.equal((await f.call(`/documents/${doc.id}/thumbnail`, 'GET', undefined, 'anonymous')).status, 401);
+  await f.env.DB.prepare("INSERT INTO accounts(id,kind,created_at) VALUES('other','user',?)").bind(new Date().toISOString()).run();
+  await f.env.DB.prepare("UPDATE documents SET account_id='other' WHERE id=?").bind(doc.id).run();
+  assert.equal((await f.call(`/documents/${doc.id}/thumbnail`)).status, 404);
 });
 
 test("scripted frame applies response sandbox and inline-only code policy", async (t) => {

@@ -36,6 +36,14 @@ export async function getDocument(
   if (!row) throw new HttpError(404, "Document or revision not found");
   return document(row);
 }
+export async function documentThumbnail(db: Database, id: string, accountId: string) {
+  const row = await db.prepare(
+    "SELECT d.current_revision AS revision, json_remove(json_extract(r.content, '$.sections[0]'), '$.js') AS section FROM documents d JOIN revisions r ON r.document_id=d.id AND r.revision=d.current_revision WHERE d.id=? AND d.account_id=?",
+  ).bind(id, accountId).first<{ revision: number; section: string }>();
+  if (!row?.section) throw new HttpError(404, "Document not found");
+  return { revision: row.revision, section: JSON.parse(row.section) as Content["sections"][number] };
+}
+
 export async function createDocument(
   db: Database,
   input: unknown,

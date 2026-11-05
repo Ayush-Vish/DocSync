@@ -266,10 +266,11 @@ async function route(request: Request, env: Env): Promise<Response> {
     }
   }
   const match = pathname.match(
-    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish))?$/,
+    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail))?$/,
   );
   if (match) {
     const [, id, action] = match;
+    if (action === "thumbnail" && method === "GET") return json(await store.documentThumbnail(env.DB, id, principal.accountId));
     const current = await store.getDocument(env.DB, id, undefined, principal.accountId);
     if (!action && method === "GET") return json(current);
     if (!action && method === "PUT") {
