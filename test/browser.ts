@@ -358,7 +358,7 @@ try {
     const save = [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Save")!;
     save.click(); save.click();
   });
-  await page.waitForFunction(() => document.querySelector("[role=status]")?.textContent === "Saved.");
+  await page.waitForFunction(() => document.querySelector(".notice[role=status]")?.textContent === "Saved.");
   page.off("request", countSave);
   assert.equal(saves, 1, "Repeated save clicks produce one mutation");
   // Agent-managed implementation source is not exposed in the customer UI.
@@ -468,7 +468,7 @@ try {
   await publicPage.keyboard.down('Control'); await publicPage.keyboard.press('A'); await publicPage.keyboard.up('Control');
   await publicPage.keyboard.type('Collaborator saved revision');
   await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Save')!.click());
-  await publicPage.waitForFunction(() => document.querySelector('[role=status]')?.textContent === 'Saved.');
+  await publicPage.waitForFunction(() => document.querySelector('.notice[role=status]')?.textContent === 'Saved.');
   await publicPage.click('input[aria-label="Document title"]');
   await publicPage.keyboard.down('Control'); await publicPage.keyboard.press('A'); await publicPage.keyboard.up('Control');
   await publicPage.keyboard.type('Collaborator unsaved draft');
@@ -501,7 +501,7 @@ try {
   await page.waitForSelector("dialog.session-dialog", { hidden: true });
   assert.equal(await page.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).value), "Draft kept through sign-in");
   await page.keyboard.down("Control"); await page.keyboard.press("s"); await page.keyboard.up("Control");
-  await page.waitForFunction(() => document.querySelector("[role=status]")?.textContent === "Saved.");
+  await page.waitForFunction(() => document.querySelector(".notice[role=status]")?.textContent === "Saved.");
   // Leases block a second agent, and a fresh lease still cannot overwrite a
   // newer revision with a preserved browser draft.
   await fill('input[aria-label="Document title"]', "Unsaved browser draft");

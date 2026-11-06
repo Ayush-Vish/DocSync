@@ -72,6 +72,7 @@ import {
   Code2,
   SlidersHorizontal,
   Lock,
+  LoaderCircle,
   Globe,
   Users,
   CheckCircle2,
@@ -2679,14 +2680,20 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             </>
           )}
         </header>
-        {doc && <div className="edit-lock-status" data-editing={lock.canWrite ? "true" : "false"} aria-live="polite">
-          <span>{lock.canWrite ? "Editing · Your session holds the document lock" : lock.pending ? "Acquiring edit lock…" : doc.access === "viewer" ? "Viewer access · Read only" : lock.lock ? `Read only · ${lock.lock.holder} is editing with ${lock.lock.agent}` : "Read only · Start editing to make changes"}</span>
-          {canEdit && !preview && <Button variant="outline" size="sm" disabled={busy || lock.pending} onClick={() => {
+        {doc && <div className="edit-lock-status" data-editing={lock.canWrite ? "true" : "false"}>
+          <div className="edit-lock-summary" role="status" aria-live="polite" aria-atomic="true">
+            <Badge variant="outline" className="edit-lock-badge">
+              {lock.pending ? <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : lock.canWrite ? <Lock className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
+              {lock.canWrite ? "Editing" : lock.pending ? "Connecting" : doc.access === "viewer" ? "Viewer access" : "Read only"}
+            </Badge>
+            <span className="edit-lock-description">{lock.canWrite ? "Only you can edit right now." : lock.pending ? "Requesting edit access…" : doc.access === "viewer" ? "Ask the owner for edit access." : lock.lock ? `${lock.lock.holder} is editing with ${lock.lock.agent}.` : "Start editing when you’re ready to make changes."}</span>
+          </div>
+          {canEdit && !preview && <Button variant={lock.canWrite ? "secondary" : "default"} size="sm" className="edit-lock-action" disabled={busy || lock.pending} onClick={() => {
             if (lock.canWrite) setEditingRequested(false);
             else if (!editingRequested) setEditingRequested(true);
             else void lock.start().catch(fail);
-          }}>{lock.canWrite ? "Stop editing" : "Start editing"}</Button>}
-          {lock.error && !lock.canWrite && <small>{lock.error}</small>}
+          }}>{lock.canWrite ? <Eye aria-hidden="true" /> : <Lock aria-hidden="true" />}{lock.canWrite ? "Stop editing" : "Start editing"}</Button>}
+          {lock.error && !lock.canWrite && <Alert variant="destructive" className="edit-lock-error"><AlertDescription>{lock.error}</AlertDescription></Alert>}
         </div>}
         {busy && <div className="request-progress" role="status" aria-label="Request in progress"><span /></div>}
         {error && (
