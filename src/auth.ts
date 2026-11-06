@@ -90,6 +90,8 @@ export type Principal = {
   canPublish: boolean;
   accountId: string;
   kind: "legacy" | "user" | "trial";
+  actorId: string;
+  actorLabel: string;
 };
 export async function authenticate(
   request: Request,
@@ -114,13 +116,15 @@ export async function authenticate(
         canPublish: credential.can_publish === 1,
         accountId: credential.account_id,
         kind: credential.kind,
+        actorId: `credential:${await hash(bearer.slice(7))}`,
+        actorLabel: "Account agent",
       };
     const oauth = await env.DB.prepare(
-      "SELECT t.account_id,t.can_publish,a.kind FROM oauth_access_tokens t JOIN accounts a ON a.id=t.account_id WHERE t.token_hash=? AND t.expires_at>?",
+      "SELECT t.account_id,t.can_publish,a.kind,t.client_id,c.client_name FROM oauth_access_tokens t JOIN accounts a ON a.id=t.account_id JOIN oauth_clients c ON c.client_id=t.client_id WHERE t.token_hash=? AND t.expires_at>?",
     )
       .bind(await hash(bearer.slice(7)), Math.floor(Date.now() / 1000))
-      .first<{ account_id: string; can_publish: number; kind: Principal["kind"] }>();
-    if (oauth) return { role: "agent", canPublish: oauth.can_publish === 1, accountId: oauth.account_id, kind: oauth.kind };
+      .first<{ account_id: string; can_publish: number; kind: Principal["kind"]; client_id: string; client_name: string }>();
+    if (oauth) return { role: "agent", canPublish: oauth.can_publish === 1, accountId: oauth.account_id, kind: oauth.kind, actorId: `oauth:${oauth.client_id}`, actorLabel: oauth.client_name };
     const stored = await env.DB.prepare(
       "SELECT token_hash,can_publish FROM agent_credentials WHERE slot=1",
     ).first<{ token_hash: string; can_publish: number }>();
@@ -131,6 +135,8 @@ export async function authenticate(
       canPublish: stored.can_publish === 1,
       accountId: "legacy",
       kind: "legacy",
+      actorId: `credential:${await hash(bearer.slice(7))}`,
+      actorLabel: "Workspace agent",
     };
   }
   const accountToken = readCookie(request, "docsync_account");
@@ -147,6 +153,8 @@ export async function authenticate(
       canPublish: true,
       accountId: session.account_id,
       kind: session.kind,
+      actorId: `session:${await hash(accountToken)}`,
+      actorLabel: "Browser",
     };
   }
   const token = request.headers
@@ -169,5 +177,7 @@ export async function authenticate(
     canPublish: true,
     accountId: "legacy",
     kind: "legacy",
+    actorId: `session:${await hash(token)}`,
+    actorLabel: "Browser",
   };
 }

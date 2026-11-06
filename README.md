@@ -22,7 +22,8 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 - Text sections with headings, bold, italic, underline, lists, quotes, tables, and undo/redo through TipTap.
 - HTML/CSS/JavaScript component sections with source editing and isolated previews. Existing component HTML is preserved instead of being converted to rich text.
 - A separate document workspace with a page outline, portrait reading, keyboard navigation, and animation replay. Only the selected page runs its JavaScript.
-- Explicit saves, immutable revision history, restore, conflict preservation, and JSON draft download.
+- Private collaboration through one-time invitations with editor/viewer roles. Connected agents inherit their account’s document access.
+- Exclusive five-minute edit leases, automatic browser renewal, immutable attributed revision history, version comparison, restore, conflict preservation, and JSON draft download.
 - Fixed-revision public links, republishing with link rotation, and revocation.
 - Two six-slide presentation templates with entrance animation, animated charts, and self-contained interactive examples. The presentation player supports keyboard and touch navigation, slide overview, animation replay, progress, and native fullscreen.
 - Library cards show the first saved page or slide. Covers load near the viewport and render without document JavaScript.
@@ -34,7 +35,17 @@ Browser requests have a 30-second timeout and clear connection errors. Mutations
 
 Sharing shows the actual published revision. Save before publishing; only returned public links can be copied, and clipboard failures are reported. Publishing again rotates the link. New account tokens default to publishing disabled, and existing token permissions are loaded before changes can be made.
 
-Live multi-user editing, comments, uploads, offline sync, automatic text pagination, and password reset/email verification are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
+Simultaneous character-level editing, branching/automatic merging, comments, uploads, offline sync, automatic text pagination, and password reset/email verification are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified. Invitations grant access through an explicit, single-use bearer link accepted by a signed-in account; email addresses are display labels, not identity verification.
+
+## Shared editing and version history
+
+In **Share → People with access**, the document owner creates an editor or viewer invitation. The first signed-in account to accept receives access; the link expires after 24 hours, works once, and can be revoked before acceptance. Share invitation links privately. Members appear in the same panel; changing a role or removing a member immediately invalidates their edit lease. Invited accounts see the document in their library, and their connected agents inherit that account’s role. Only the document owner can manage collaborators or publish/revoke public viewing links; agent publishing additionally requires its existing publishing grant.
+
+One editing session holds a document lease at a time, including sessions using the same account or agent credential. The browser acquires a lease when editing starts, renews it every minute, and releases it when editing ends or the page closes. A lost connection may prevent release; the lease expires after five minutes without renewal. Other sessions can read the document and see who is editing. **Stop editing** hands off the lock. Unsaved drafts stay in the browser when a lease is lost; acquiring another lease refreshes clean content, while a changed saved revision requires reconciling a preserved dirty draft.
+
+MCP edits follow `acquire_document_lock` → `get_document` → `update_document` → `release_document_lock`. During long work call `renew_document_lock` at least once a minute. Every update or restore requires the lease’s secret `lockToken` and the current `expectedRevision`; the database checks role, lease ownership/expiry, and revision in the write itself. `423` means the lease is missing, expired, or held by another session; `409` means the saved revision changed. Preserve generated work, read current state, and reconcile rather than retrying a mutation blindly. Lock status never returns the lease secret.
+
+**History** shows saved revisions, author and agent labels, timestamps, change summaries, and restore ancestry. Compare versions by stable page ID, order, and HTML/CSS/JS content. A restore creates a new version; it does not erase subsequent history or change a published snapshot. Existing revisions remain intact and show unknown author metadata where it was never recorded. Members with viewer access can read saved history as well as the current draft.
 
 ## Agent onboarding
 
@@ -137,7 +148,7 @@ Google credentials are not included. Automated tests mock Google's endpoints; a 
 npm run pack:mcp
 ```
 
-Produces `dist/ayush-vish-docsync-mcp-0.3.0.tgz`. The package source is `packages/mcp/`; the archive includes a Node executable, package metadata, README, MIT license, and dependency notices. The executable is bundled and requires no runtime dependency installation. The `prepack` hook rebuilds when packing/publishing directly from the package directory.
+Produces `dist/ayush-vish-docsync-mcp-0.4.0.tgz`. The package source is `packages/mcp/`; the archive includes a Node executable, package metadata, README, MIT license, and dependency notices. The executable is bundled and requires no runtime dependency installation. The `prepack` hook rebuilds when packing/publishing directly from the package directory.
 
 The npm package is **`@ayush-vish/docsync-mcp`**. Packaging does not publish to npm. Maintainers can publish a new version after updating the manifest and authenticating to the authorized npm account:
 
@@ -151,7 +162,7 @@ Clients can install the npm package with:
 agy mcp add docsync npx -y @ayush-vish/docsync-mcp --url https://YOUR_HOST
 ```
 
-A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Eight tools are exposed: `get_connection`, `get_template_options`, `connect_account`, `list_documents`, `get_document`, `create_document`, `update_document`, and `publish_document`.
+A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Fifteen tools are exposed: connection/template discovery and claiming; document list/read/create/update/publish; lock status/acquire/renew/release; history, version comparison, and restore. See [the MCP README](packages/mcp/README.md) for their contracts.
 
 ### Hosted MCP (OAuth)
 
@@ -178,6 +189,8 @@ Save before sharing. A link points to a saved revision, so later private edits d
 
 ## Deploy to Cloudflare
 
+For the collaboration upgrade, apply **`0006_collaboration.sql` before deploying this Worker**. It adds membership, invitation and lease tables and nullable revision metadata without rewriting saved content. Use the 0.4.0 MCP bridge or reconnect remote MCP to load the new lock tools; older clients cannot update documents without a lease. Rebuild/publish the npm bridge separately when releasing it; changing this repository does not update the npm registry.
+
 1. Run `npm run build` and authenticate with `npx wrangler@4 login`.
 2. Create a database using `npx wrangler@4 d1 create docsync` and replace the database ID placeholder in `wrangler.jsonc`.
 3. Apply all migrations with `npx wrangler@4 d1 migrations apply docsync --remote`.
@@ -201,6 +214,8 @@ Before production migrations, export D1:
 ```sh
 npx wrangler@4 d1 export docsync --remote --output=/private/path/docsync-backup.sql
 ```
+
+**Do not roll back to a pre-collaboration Worker after enabling shared editing:** older writes bypass edit leases and cannot honor the new collaboration contract.
 
 **Do not roll back to the pre-account Worker after admitting multiple users.** The old API lacks tenant filtering and is incompatible with multi-user data. Prefer a forward fix, or restore a matching pre-upgrade database and code together while preserving the current database separately.
 

@@ -10,6 +10,7 @@ import {
 } from "./auth.ts";
 import * as accounts from "./accounts.ts";
 import * as store from "./store.ts";
+import * as collaboration from "./collaboration.ts";
 import { handleRemoteMcp } from "./remote-mcp.ts";
 import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
 import { jsonBody as body } from "./request.ts";
@@ -88,6 +89,15 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (principal.role !== "owner")
       throw new HttpError(403, "Owner access required");
   };
+  const invitationMatch = pathname.match(/^\/api\/invitations\/([a-f0-9]{64})$/);
+  if (invitationMatch) {
+    owner();
+    if (method === "GET") return json(await collaboration.invitation(env.DB, invitationMatch[1]));
+    if (method === "POST") {
+      await body(request);
+      return json(await collaboration.acceptInvitation(env.DB, invitationMatch[1], principal.accountId));
+    }
+  }
   if (pathname === "/api/mcp-clients" && method === "GET") {
     owner();
     const clients = await env.DB.prepare(
@@ -100,6 +110,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     const clientId=(await body(request)).clientId;
     if(typeof clientId!=="string" || !/^[a-f0-9]{64}$/.test(clientId)) throw new HttpError(400,"Invalid MCP client");
     await env.DB.batch([
+      env.DB.prepare("DELETE FROM edit_locks WHERE account_id=? AND actor_id=?").bind(principal.accountId, `oauth:${clientId}`),
       env.DB.prepare("DELETE FROM oauth_codes WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
       env.DB.prepare("DELETE FROM oauth_access_tokens WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
       env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
@@ -137,10 +148,10 @@ async function route(request: Request, env: Env): Promise<Response> {
     owner();
     checkOrigin(request);
     const cookie = accounts.readCookie(request, "docsync_account");
-    if (cookie)
-      await env.DB.prepare("DELETE FROM account_sessions WHERE token_hash=?")
-        .bind(await hash(cookie))
-        .run();
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM edit_locks WHERE account_id=? AND actor_id=?").bind(principal.accountId, principal.actorId),
+      env.DB.prepare("DELETE FROM account_sessions WHERE token_hash=?").bind(cookie ? await hash(cookie) : ""),
+    ]);
     const headers = new Headers({ "Content-Type": "application/json" });
     headers.append("Set-Cookie", logoutCookie(request));
     headers.append("Set-Cookie", accounts.sessionCookie(request, "", 0));
@@ -187,23 +198,19 @@ async function route(request: Request, env: Env): Promise<Response> {
         if (typeof input.allowPublishing !== "boolean")
           throw new HttpError(400, "Choose whether this token can publish.");
         const token = randomToken();
-        await env.DB.prepare(
-          "INSERT INTO account_credentials VALUES(?,?,?) ON CONFLICT(account_id) DO UPDATE SET token_hash=excluded.token_hash,can_publish=excluded.can_publish",
-        )
-          .bind(
-            principal.accountId,
-            await hash(token),
-            Number(input.allowPublishing),
-          )
-          .run();
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM edit_locks WHERE account_id=? AND actor_id IN(SELECT 'credential:' || token_hash FROM account_credentials WHERE account_id=?)").bind(principal.accountId, principal.accountId),
+          env.DB.prepare(
+            "INSERT INTO account_credentials VALUES(?,?,?) ON CONFLICT(account_id) DO UPDATE SET token_hash=excluded.token_hash,can_publish=excluded.can_publish",
+          ).bind(principal.accountId, await hash(token), Number(input.allowPublishing)),
+        ]);
         return json({ token, allowPublishing: input.allowPublishing });
       }
       if (method === "DELETE") {
-        await env.DB.prepare(
-          "DELETE FROM account_credentials WHERE account_id=?",
-        )
-          .bind(principal.accountId)
-          .run();
+        await env.DB.batch([
+          env.DB.prepare("DELETE FROM edit_locks WHERE account_id=? AND actor_id IN(SELECT 'credential:' || token_hash FROM account_credentials WHERE account_id=?)").bind(principal.accountId, principal.accountId),
+          env.DB.prepare("DELETE FROM account_credentials WHERE account_id=?").bind(principal.accountId),
+        ]);
         return json({ ok: true });
       }
     }
@@ -226,15 +233,19 @@ async function route(request: Request, env: Env): Promise<Response> {
         throw new HttpError(400, "allowPublishing must be a boolean");
       const canPublish = input.allowPublishing === true;
       const token = randomToken();
-      await env.DB.prepare(
-        "INSERT INTO agent_credentials(slot,token_hash,created_at,can_publish) VALUES(1,?,?,?) ON CONFLICT(slot) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,can_publish=excluded.can_publish",
-      )
-        .bind(await hash(token), new Date().toISOString(), Number(canPublish))
-        .run();
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM edit_locks WHERE account_id='legacy' AND actor_id IN(SELECT 'credential:' || token_hash FROM agent_credentials WHERE slot=1)"),
+        env.DB.prepare(
+          "INSERT INTO agent_credentials(slot,token_hash,created_at,can_publish) VALUES(1,?,?,?) ON CONFLICT(slot) DO UPDATE SET token_hash=excluded.token_hash,created_at=excluded.created_at,can_publish=excluded.can_publish",
+        ).bind(await hash(token), new Date().toISOString(), Number(canPublish)),
+      ]);
       return json({ token, allowPublishing: canPublish });
     }
     if (method === "DELETE") {
-      await env.DB.prepare("DELETE FROM agent_credentials WHERE slot=1").run();
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM edit_locks WHERE account_id='legacy' AND actor_id IN(SELECT 'credential:' || token_hash FROM agent_credentials WHERE slot=1)"),
+        env.DB.prepare("DELETE FROM agent_credentials WHERE slot=1"),
+      ]);
       return json({ ok: true });
     }
   }
@@ -245,7 +256,7 @@ async function route(request: Request, env: Env): Promise<Response> {
       const input = await body(request);
       try {
         return json(
-          await store.createDocument(env.DB, input, principal.accountId),
+          await store.createDocument(env.DB, input, principal.accountId, principal),
           201,
         );
       } catch (error) {
@@ -265,32 +276,61 @@ async function route(request: Request, env: Env): Promise<Response> {
       }
     }
   }
+  const revokeInvite = pathname.match(/^\/api\/documents\/([a-f0-9-]{36})\/invitations\/([a-f0-9-]{36})$/);
+  if (revokeInvite && method === "DELETE") {
+    owner();
+    await collaboration.access(env.DB, revokeInvite[1], principal.accountId, "owner");
+    await env.DB.prepare("DELETE FROM document_invitations WHERE document_id=? AND id=? AND EXISTS(SELECT 1 FROM documents WHERE id=? AND account_id=?)").bind(revokeInvite[1], revokeInvite[2], revokeInvite[1], principal.accountId).run();
+    return json({ ok: true });
+  }
   const match = pathname.match(
-    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail))?$/,
+    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail|lock|access|compare))?$/,
   );
   if (match) {
     const [, id, action] = match;
     if (action === "thumbnail" && method === "GET") return json(await store.documentThumbnail(env.DB, id, principal.accountId));
     const current = await store.getDocument(env.DB, id, undefined, principal.accountId);
-    if (!action && method === "GET") return json(current);
+    if (!action && method === "GET") {
+      const requested = new URL(request.url).searchParams.get("revision");
+      return json(requested ? await store.getDocument(env.DB, id, revision(Number(requested)), principal.accountId) : current);
+    }
+    if (action === "lock") {
+      if (method === "GET") return json(await collaboration.lockStatus(env.DB, id, principal.accountId));
+      const input = await body(request);
+      if (method === "POST") return json(await collaboration.acquireLock(env.DB, id, principal));
+      if (method === "PATCH") return json(await collaboration.renewLock(env.DB, id, principal, collaboration.lockToken(input.lockToken)));
+      if (method === "DELETE") return json(await collaboration.releaseLock(env.DB, id, principal, collaboration.lockToken(input.lockToken)));
+    }
+    if (action === "access") {
+      owner();
+      if (method === "GET") return json(await collaboration.sharing(env.DB, id, principal.accountId));
+      const input = await body(request);
+      if (method === "POST") return json(await collaboration.invite(env.DB, id, principal.accountId, input.role, new URL(request.url).origin), 201);
+      if (method === "PATCH" && input.role === undefined) throw new HttpError(400, "Choose editor or viewer access");
+      if (method === "PATCH" || method === "DELETE") return json(await collaboration.changeMember(env.DB, id, principal.accountId, input.accountId, method === "PATCH" ? input.role : undefined));
+    }
+    if (action === "compare" && method === "GET") {
+      const query = new URL(request.url).searchParams;
+      return json(await store.compareVersions(env.DB, id, revision(Number(query.get("from"))), revision(Number(query.get("to"))), principal.accountId));
+    }
     if (!action && method === "PUT") {
-      const { expectedRevision, ...content } = await body(request);
+      const { expectedRevision, lockToken, changeSummary, ...content } = await body(request);
       return json(
         await store.updateDocument(
           env.DB,
           id,
           revision(expectedRevision),
           content,
-          principal.accountId,
+          principal,
+          collaboration.lockToken(lockToken),
+          collaboration.summary(changeSummary),
         ),
       );
     }
     if (action === "history" && method === "GET") {
-      owner();
       return json(await store.history(env.DB, id, principal.accountId));
     }
     if (action === "restore" && method === "POST") {
-      owner();
       const input = await body(request);
       const snapshot = await store.getDocument(
         env.DB,
@@ -304,13 +344,15 @@ async function route(request: Request, env: Env): Promise<Response> {
           id,
           revision(input.expectedRevision),
           { title: snapshot.title, format: snapshot.format, sections: snapshot.sections },
-          principal.accountId,
+          principal,
+          collaboration.lockToken(input.lockToken),
+          collaboration.summary(input.changeSummary) || `Restored version ${input.revision}`,
+          revision(input.revision),
         ),
       );
     }
     if (action === "publish") {
       if (method === "GET") {
-        owner();
         return json(
           await env.DB.prepare(
             "SELECT revision FROM publications WHERE document_id=?",
@@ -342,6 +384,7 @@ async function route(request: Request, env: Env): Promise<Response> {
       }
       if (method === "DELETE") {
         owner();
+        await collaboration.access(env.DB, id, principal.accountId, "owner");
         await env.DB.prepare("DELETE FROM publications WHERE document_id=?")
           .bind(id)
           .run();

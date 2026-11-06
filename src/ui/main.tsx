@@ -2,6 +2,9 @@ import React, { useEffect, useId, useRef, useState, type FormEvent } from "react
 import { api, ApiError, requestJson, type Session } from "./api";
 import { LandingPage } from "./LandingPage";
 import { ShareDialog } from "./ShareDialog";
+import { AcceptInvitation } from "./Collaborators";
+import { VersionHistory } from "./VersionHistory";
+import { useDocumentLock } from "./useDocumentLock";
 import { AgentSkill } from "./AgentSkill";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
@@ -87,7 +90,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import type { Content, Document } from "../document";
+import type { Content, Document, Revision } from "../document";
 import themeCatalog from "../../skills/docsync/themes.json";
 
 type Summary = {
@@ -468,61 +471,6 @@ const SLIDE_ARCHETYPES: SlideArchetype[] = [
     css: `.slide { padding: clamp(20px, 4vw, 40px); font-family: system-ui, -apple-system, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #EC4899; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(20px, 3.5vw, 28px); margin: 0 0 20px; color: #F8FAFC; letter-spacing: -0.5px; }\n.timeline-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }\n.step-card { background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 8px; padding: 14px; box-sizing: border-box; }\n.step-card.active { border-color: #EC4899; background: rgba(236, 72, 153, 0.1); }\n.step-num { font-size: 11px; font-weight: 700; color: #94A3B8; font-family: monospace; display: block; margin-bottom: 6px; }\nh4 { font-size: 13px; margin: 0 0 4px; color: #F8FAFC; }\np { font-size: 11px; color: #94A3B8; margin: 0; line-height: 1.4; }`,
   },
 ];
-
-function HistoryModal({
-  history,
-  currentRevision,
-  busy,
-  dirty,
-  onRestore,
-  onClose,
-}: {
-  history: { revision: number; created_at: string }[];
-  currentRevision: number;
-  busy: boolean;
-  dirty: boolean;
-  onRestore: (revision: number) => Promise<void>;
-  onClose: () => void;
-}) {
-  return (
-    <div className="history-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="history-modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-indigo-600" />
-            <h3 className="text-sm font-semibold text-slate-900 m-0">Version history</h3>
-          </div>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-        <div className="max-h-80 overflow-y-auto py-2 divide-y divide-slate-100">
-          {history.map((row) => (
-            <div key={row.revision} className="flex items-center justify-between py-2.5 px-1 text-xs">
-              <div>
-                <div className="font-semibold text-slate-900">
-                  Version {row.revision} {row.revision === currentRevision && <span className="text-indigo-600 font-normal ml-1.5">(Current)</span>}
-                </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
-                  {new Date(row.created_at).toLocaleString()}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs px-2.5 border-slate-200 hover:bg-slate-50"
-                disabled={busy || dirty || row.revision === currentRevision}
-                onClick={() => void onRestore(row.revision)}
-              >
-                Restore
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function SlideStudio({
   doc,
@@ -995,7 +943,7 @@ function SlideStudio({
           </button>
         </div>
 
-        <div className="slide-studio-right-body">
+        <div className="slide-studio-right-body" inert={busy}>
           {/* Tab 1: Layout Archetypes */}
           {propertiesTab === "layout" && (
             <>
@@ -1228,6 +1176,7 @@ function SlideStudio({
 
               <textarea
                 className="code-editor-area"
+                disabled={busy}
                 spellCheck={false}
                 value={doc.sections[safeActiveSlide]?.[codeTab] || ""}
                 placeholder={`Enter slide ${codeTab.toUpperCase()}...`}
@@ -1789,7 +1738,7 @@ function DocStudio({
           </button>
         </div>
 
-        <div className="doc-studio-right-body">
+        <div className="doc-studio-right-body" inert={busy}>
           {/* Tab 1: Block Archetypes */}
           {propertiesTab === "layout" && (
             <>
@@ -1984,6 +1933,7 @@ function DocStudio({
 
               <textarea
                 className="code-editor-area"
+                disabled={busy}
                 spellCheck={false}
                 value={doc.sections[safeActiveSection]?.[codeTab] || ""}
                 placeholder={`Enter page ${codeTab.toUpperCase()}...`}
@@ -2065,7 +2015,7 @@ function LoginPage({
           <ArrowLeft className="w-3.5 h-3.5" />
           {recovering ? "Keep draft open" : "Back to DocSync"}
         </Button>
-        <span className="text-xs text-muted-foreground font-mono">v0.3.0</span>
+        <span className="text-xs text-muted-foreground font-mono">v0.4.0</span>
       </div>
 
       <div className="auth-centered-card">
@@ -2221,8 +2171,10 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       p === "/login" ||
       p === "/signup" ||
       p === "/connect" ||
+      p === "/invite" ||
+      Boolean(sessionStorage.getItem("docsync_invite")) ||
       Boolean(sessionStorage.getItem("docsync_claim")) ||
-      location.hash.includes("claim=")
+      location.hash.includes("claim=") || location.hash.includes("invite=")
     );
   };
   const [authPage, setAuthPage] = useState(isAuthRoute);
@@ -2247,9 +2199,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     [activeSectionIndex, setActiveSectionIndex] = useState(0),
     [outlineOpen, setOutlineOpen] = useState(() => !matchMedia("(max-width: 800px)").matches),
     [fullscreen, setFullscreen] = useState(false),
-    [history, setHistory] = useState<
-      { revision: number; created_at: string }[] | null
-    >(null),
+    [history, setHistory] = useState<Revision[] | null>(null),
     [share, setShare] = useState(""),
     [published, setPublished] = useState<number | null>(null),
     [token, setToken] = useState(""),
@@ -2273,6 +2223,15 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     }
     return sessionStorage.getItem("docsync_claim") || "";
   });
+  const [invitation, setInvitation] = useState(() => {
+    const token = new URLSearchParams(location.hash.slice(1)).get("invite");
+    if (token && /^[a-f0-9]{64}$/.test(token)) {
+      sessionStorage.setItem("docsync_invite", token);
+      window.history.replaceState(null, "", location.pathname);
+    }
+    return sessionStorage.getItem("docsync_invite") || "";
+  });
+  const [editingRequested, setEditingRequested] = useState(true);
   const [shared, setShared] = useState<Content | null>(null);
   const [mcpClients, setMcpClients] = useState<{client_id:string;client_name:string;access_expires:number}[]>([]);
   const sharePath = location.pathname.startsWith("/share/");
@@ -2280,6 +2239,25 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   const latestDoc = useRef(doc);
   latestDoc.current = doc;
   const draftVersion = useRef(0);
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const canEdit = doc?.access !== "viewer";
+  const lock = useDocumentLock(doc?.id ?? null, Boolean(doc && canEdit && !preview && editingRequested), async (revision) => {
+    const current = latestDoc.current;
+    if (!current || current.revision === revision) return;
+    if (dirtyRef.current) { setError("A newer version was saved. Your draft is preserved. Compare version history before reconciling your changes."); return; }
+    const version = draftVersion.current;
+    const fresh = await api<Document>(`/documents/${current.id}`);
+    if (latestDoc.current?.id === current.id && draftVersion.current === version && !dirtyRef.current) {
+      latestDoc.current = fresh;
+      setDoc(fresh);
+    }
+  });
+  useEffect(() => {
+    if (lock.documentId === doc?.id && lock.access && lock.access !== doc.access) {
+      setDoc(current => current?.id === lock.documentId ? { ...current, access: lock.access } : current);
+    }
+  }, [lock.documentId, lock.access, doc?.id, doc?.access]);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [authenticationNeeded, setAuthenticationNeeded] = useState(false);
   const recoveryDialog = useRef<HTMLDialogElement>(null);
@@ -2461,6 +2439,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   };
 
   function change(next: Document) {
+    if (!lock.canWrite) { setNotice("Start editing with an active lock to change this document. Your draft is still here."); return; }
     draftVersion.current += 1;
     latestDoc.current = next;
     setDoc(next);
@@ -2474,7 +2453,8 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     ]);
     if (signal?.aborted) return;
     setDoc(next);
-    setPreview(openPreview);
+    setEditingRequested(true);
+    setPreview(openPreview || next.access === "viewer");
     setActiveSlide(0);
     setActiveSectionIndex(0);
     setDirty(false);
@@ -2497,6 +2477,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       const content = await requestJson<Content>(`/downloads/docsync/themes/${theme.id}.json`);
       const next = await api<Document>("/documents", "POST", content);
       setDoc(next);
+      setEditingRequested(true);
       setPreview(theme.format === "document");
       setActiveSlide(0);
       setActiveSectionIndex(0);
@@ -2515,10 +2496,13 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   }
 
   async function save() {
-    if (!doc) return;
+    if (!doc || !lock.canWrite) return;
     const version = draftVersion.current;
     await run(async () => {
+      const lease = await lock.renew();
       const updated = await api<Document>("/documents/" + doc.id, "PUT", {
+        lockToken: lease.lockToken,
+        changeSummary: "Edited in browser",
         title: doc.title,
         format: doc.format,
         sections: doc.sections,
@@ -2570,6 +2554,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       setSession(signedIn);
       setSessionExpired(false);
       setAuthenticationNeeded(false);
+      if (doc && canEdit && !preview && editingRequested) await lock.start();
       if (!doc) {
         const route = documentRoute();
         await Promise.all([refresh(), route ? loadDocument(route.id, false, route.preview) : Promise.resolve()]);
@@ -2588,7 +2573,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     };
     window.addEventListener("keydown", saveShortcut);
     return () => window.removeEventListener("keydown", saveShortcut);
-  }, [doc, dirty, sessionExpired]);
+  }, [doc, dirty, sessionExpired, lock.canWrite]);
 
   if (loading && location.pathname === "/" && !authPage) return <LandingPage />;
 
@@ -2643,6 +2628,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             void run(async () => {
               const next = await api<Document>("/documents", "POST", blank());
               setDoc(next);
+              setEditingRequested(true);
               setActiveSectionIndex(0);
               setPreview(false);
               setView("library");
@@ -2782,7 +2768,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                   className="document-title-input"
                   aria-label="Document title"
                   maxLength={200}
-                  disabled={busy}
+                  disabled={busy || !lock.canWrite}
                   value={doc.title}
                   placeholder="Untitled document"
                   onChange={(e) => change({ ...doc, title: e.target.value })}
@@ -2809,7 +2795,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                   variant={dirty ? "default" : "outline"}
                   size="sm"
                   className={cn("h-8 text-xs px-2.5 font-medium", dirty && "bg-indigo-600 hover:bg-indigo-700 text-white")}
-                  disabled={!dirty || busy}
+                  disabled={!dirty || busy || !lock.canWrite}
                   onClick={() => void save()}
                 >
                   <Save className="w-3.5 h-3.5 mr-1" />
@@ -2857,6 +2843,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                     disabled={busy}
                     onClick={() => {
                       const nextPreview = !preview;
+                      setEditingRequested(true);
                       setPreview(nextPreview);
                       window.history.pushState(
                         null,
@@ -2866,14 +2853,14 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                     }}
                   >
                     {preview ? <Edit3Icon className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
-                    {preview ? "Edit" : "Preview"}
+                    {preview ? (canEdit ? "Edit" : "View") : "Preview"}
                   </Button>
                 )}
                 <Button
                   variant="default"
                   size="sm"
                   className="h-8 text-xs px-3 font-medium bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs"
-                  disabled={busy}
+                  disabled={busy || doc.access !== "owner"}
                   onClick={() => { setError(""); setCopiedLink(""); setShareModalOpen(true); }}
                 >
                   <Share2 className="w-3.5 h-3.5 mr-1.5" />
@@ -2896,6 +2883,15 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             </>
           )}
         </header>
+        {doc && <div className="edit-lock-status" data-editing={lock.canWrite ? "true" : "false"} aria-live="polite">
+          <span>{lock.canWrite ? "Editing · Your session holds the document lock" : lock.pending ? "Acquiring edit lock…" : doc.access === "viewer" ? "Viewer access · Read only" : lock.lock ? `Read only · ${lock.lock.holder} is editing with ${lock.lock.agent}` : "Read only · Start editing to make changes"}</span>
+          {canEdit && !preview && <Button variant="outline" size="sm" disabled={busy || lock.pending} onClick={() => {
+            if (lock.canWrite) setEditingRequested(false);
+            else if (!editingRequested) setEditingRequested(true);
+            else void lock.start().catch(fail);
+          }}>{lock.canWrite ? "Stop editing" : "Start editing"}</Button>}
+          {lock.error && !lock.canWrite && <small>{lock.error}</small>}
+        </div>}
         {busy && <div className="request-progress" role="status" aria-label="Request in progress"><span /></div>}
         {error && (
           <div role="alert" className="error banner flex items-center justify-between gap-4">
@@ -2924,7 +2920,11 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             {notice}
           </div>
         )}
-        {view === "connect" ? (
+        {invitation ? <AcceptInvitation token={invitation} onDismiss={() => { sessionStorage.removeItem("docsync_invite"); setInvitation(""); window.history.replaceState(null, "", "/"); }} onAccepted={async id => {
+          await loadDocument(id, true, false);
+          sessionStorage.removeItem("docsync_invite"); setInvitation("");
+          await refresh();
+        }} /> : view === "connect" ? (
           <section className="connect-page" aria-busy={connectionLoading}>
             {connectionLoading && <p role="status">Checking your agent connection…</p>}
             <p className="eyebrow">YOUR AGENT, YOUR WORKSPACE</p>
@@ -3133,7 +3133,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               safeActiveSlide={safeActiveSlide}
               setActiveSlide={setActiveSlide}
               change={change}
-              busy={busy}
+              busy={busy || !lock.canWrite}
               presenting={fullscreen}
               setFullscreen={setFullscreen}
               slidesSidebarOpen={slidesSidebarOpen}
@@ -3153,7 +3153,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               activeSectionIndex={activeSectionIndex}
               setActiveSectionIndex={setActiveSectionIndex}
               change={change}
-              busy={busy}
+              busy={busy || !lock.canWrite}
               preview={preview}
               outlineOpen={outlineOpen}
               setOutlineOpen={setOutlineOpen}
@@ -3319,7 +3319,9 @@ export default function App({ initialSession }: { initialSession?: Session }) {
         />
       )}
       {history && doc && (
-        <HistoryModal
+        <VersionHistory
+          documentId={doc.id}
+          canRestore={lock.canWrite}
           history={history}
           currentRevision={doc.revision}
           busy={busy}
@@ -3329,7 +3331,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               const restored = await api<Document>(
                 `/documents/${doc.id}/restore`,
                 "POST",
-                { revision: rev, expectedRevision: doc.revision },
+                { revision: rev, expectedRevision: doc.revision, lockToken: (await lock.renew()).lockToken },
               );
               setDoc(restored);
               setHistory(null);
@@ -3346,6 +3348,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
 
       {shareModalOpen && doc && session && (
         <ShareDialog
+          documentId={doc.id}
           title={doc.title}
           revision={doc.revision}
           published={published}

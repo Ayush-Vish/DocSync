@@ -217,6 +217,7 @@ export async function claimInstallation(
       "Connection link expired or already used. Request a new link from your agent.",
     );
   const result = await env.DB.batch([
+    env.DB.prepare("DELETE FROM edit_locks WHERE document_id IN (SELECT id FROM documents WHERE account_id=?) AND EXISTS(SELECT 1 FROM installation_claims WHERE token_hash=? AND expires_at>?)").bind(claim.account_id, digest, now()),
     env.DB.prepare(
       "UPDATE documents SET account_id=? WHERE account_id=? AND EXISTS(SELECT 1 FROM installation_claims WHERE token_hash=? AND expires_at>?)",
     ).bind(accountId, claim.account_id, digest, now()),
@@ -227,7 +228,7 @@ export async function claimInstallation(
       claim.account_id,
     ),
   ]);
-  if (!result[1].meta.changes)
+  if (!result[2].meta.changes)
     throw new HttpError(410, "Connection link already used.");
 }
 const googleCookie = (request: Request, value: string, age: number) =>

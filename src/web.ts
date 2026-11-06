@@ -17,7 +17,7 @@ export async function webResponse(request: Request, env: Env) {
     return Response.redirect(url.origin + (path === "/index.html" ? "/" : "/templates") + url.search, 301);
   }
   const isPublic = Object.hasOwn(publicPages, path);
-  const isApp = ["/login", "/signup", "/connect"].includes(path) || /^\/share\/[a-f0-9]{64}$/.test(path) || /^\/documents\/[a-f0-9-]{36}(\/preview)?$/.test(path);
+  const isApp = ["/login", "/signup", "/connect", "/invite"].includes(path) || /^\/share\/[a-f0-9]{64}$/.test(path) || /^\/documents\/[a-f0-9-]{36}(\/preview)?$/.test(path);
   if (!isPublic && !isApp) {
     // Preserve directory links to downloadable examples while owning app routing here.
     const assetRequest = path.startsWith("/downloads/") && path.endsWith("/")

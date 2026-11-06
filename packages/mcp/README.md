@@ -71,22 +71,35 @@ Author presentations against a **1280 × 720** canvas. The player scales the des
 
 Animate with the Web Animations API, `requestAnimationFrame()`, or CSS `@keyframes`, and respect `prefers-reduced-motion`. Keep meaningful content in the initial HTML: cover, filmstrip, and overview previews never run scripts. Only the active page or slide runs in its viewer. JavaScript starts after that page’s HTML/CSS has been laid out. Initialize immediately or register `DOMContentLoaded`/`load` listeners; the host delivers these ready events once per visit or replay. Call `event.preventDefault()` when a custom widget consumes a navigation key. Text fields, range inputs, canvas, and ARIA keyboard widgets retain their keys; ordinary buttons allow arrow navigation while keeping native Space/Enter activation. Put executable code in `js` and attach handlers with `addEventListener`; HTML script tags and inline event attributes are removed. Each script is sandboxed without access to another slide, the parent app, cookies, storage, network requests, external code, or navigation outside the app. Include required styles, data, and code in each page. These are HTML presentations; browser printing supports PDF, while native `.pptx` export is not included.
 
-The downloadable agent skill at `/downloads/docsync-skill.zip` includes templates and a conversion helper. It converts marked HTML sections to independent page payloads and supports optional `slides/SECTION_ID.css` and `slides/SECTION_ID.js` overrides. Install the skill separately from the MCP connection. Use a current backend and bridge; reconnect your client after upgrading if its tool schema does not include `js`.
+The downloadable agent skill at `/downloads/docsync-skill.zip` includes templates and a conversion helper. It converts marked HTML sections to independent page payloads and supports optional `slides/SECTION_ID.css` and `slides/SECTION_ID.js` overrides. Install the skill separately from the MCP connection. Use a 0.4.0 backend and bridge for collaboration; reconnect your client after upgrading if its tool schema does not include `js`.
 
-Eight tools are available:
+Fifteen tools are available (bridge 0.4.0 and a backend migrated through `0006_collaboration.sql`):
 
 | Tool | Purpose |
 | --- | --- |
 | `get_connection` | Check connectivity, trial status, publishing permission, and link access. |
 | `get_template_options` | Discover templates, themes, gallery links, and self-contained content URLs. |
-| `list_documents` | Find documents in the connected account. |
-| `get_document` | Read saved content, stable page IDs, and the current revision. |
+| `list_documents` | Find owned documents and private documents shared with the account. |
+| `get_document` | Read content, page IDs, revision, and document role. Optional `revision` reads a historical snapshot. |
 | `create_document` | Create a private document or presentation from `pages` or `sections`. |
-| `update_document` | Save a complete snapshot with `id` and `expectedRevision`. |
-| `publish_document` | Publish a verified saved revision and return its read-only URL. |
+| `update_document` | Save a complete snapshot with `id`, `expectedRevision`, and `lockToken`; optional `changeSummary` is at most 300 characters. |
+| `publish_document` | Publish a verified saved revision as the document owner, with a publishing grant. |
 | `connect_account` | Request a browser link to claim a stdio installation's trial document. |
+| `get_document_lock` | Read the current holder and lease expiry; never returns the lease secret. |
+| `acquire_document_lock` | Acquire an exclusive five-minute lease with `id`; returns `lockToken`, `leaseId`, expiry, and current revision. |
+| `renew_document_lock` | Extend an unexpired lease using `id` and `lockToken`. |
+| `release_document_lock` | Release the lease using `id` and `lockToken`. |
+| `get_document_history` | Read authors, agent labels, summaries, timestamps, and restore ancestry. |
+| `compare_document_versions` | Compare `fromRevision` and `toRevision` for an `id`, including page order and HTML/CSS/JS changes. |
+| `restore_document` | Create a new revision from a historical `revision`, with `id`, `expectedRevision`, `lockToken`, and optional `changeSummary`. |
 
-Create and update responses may include non-blocking design warnings. Read the saved result back before publishing. Preserve page IDs and include the current `expectedRevision` when updating. A revision conflict requires reading and reconciling the latest document; after an uncertain write, inspect the saved state before retrying. Publishing requires `canPublish: true`; later draft edits do not change the published snapshot. Anyone with a hosted share link can read it, and republishing rotates the URL and revokes the old link. Owners can revoke links in the web app.
+For an existing document, acquire a lease **before starting the edit**, then read the current content. Renew at least once a minute during long work. Save with the returned `lockToken`, a fresh `expectedRevision`, and a short `changeSummary`; read back to verify and release the lease when finished or abandoning the edit. Keep lease secrets inside the agent session. Two sessions using the same account still require separate leases and cannot write simultaneously.
+
+A `423` response means the lease is missing, expired, or belongs to another session. A `409` means the revision changed. Preserve generated content; acquire a new lease if needed, read current state, and reconcile. Never replace `expectedRevision` without reconciling the actual content. Release an owned lease after errors when possible; a disconnected client’s lease expires automatically after five minutes. An uncertain acquisition may have created a lease even if its response was lost; check status and wait for expiry rather than repeatedly acquiring.
+
+The document owner invites signed-in editors/viewers through **Share → People with access**. Invitation links grant access to the first account accepting them, expire after 24 hours, and work once. Share them privately. Connected agents inherit their account’s document role. Viewers can read the draft and version history; editors can edit/restore while holding a lease. Only owners manage access or publish public snapshots. Membership changes immediately end the affected account’s lease. Public viewing links never grant editing rights.
+
+Create and update responses may include non-blocking design warnings. Read the saved result back before publishing. Preserve page IDs and include the current `expectedRevision` and active `lockToken` when updating. A revision conflict requires reading and reconciling the latest document; after an uncertain write, inspect the saved state before retrying. Publishing requires `canPublish: true`; later draft edits do not change the published snapshot. Anyone with a hosted share link can read it, and republishing rotates the URL and revokes the old link. Owners can revoke links in the web app.
 
 Limits: 1–40 pages; title 1–200 characters; unique page IDs of 1–80 letters, digits, underscores, or hyphens; at most 100,000 HTML, 30,000 CSS, and 50,000 JavaScript characters per page; document JSON at most 500,000 bytes. Payload HTML is a fragment, without document wrappers, scripts, or stylesheet links. External images, SVG markup, embeds, fonts, and CSS resource requests are blocked.
 

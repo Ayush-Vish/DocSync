@@ -332,12 +332,13 @@ try {
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}/preview`);
   await click("Edit");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
+  await page.waitForSelector('.edit-lock-status[data-editing="true"]');
   await fill('input[aria-label="Document title"]', "Browser edited report");
   await click("Share");
   await page.waitForSelector("dialog.share-dialog[open]");
   assert.equal(await page.$eval(".share-dialog footer button:last-child", button => (button as HTMLButtonElement).disabled), true);
   assert.equal(await page.$$eval(".share-dialog footer button", buttons => (buttons.find(button => button.textContent?.trim() === "Copy link") as HTMLButtonElement).disabled), true);
-  assert.equal(await page.$(".share-dialog select"), null, "Sharing must not advertise unsupported editor or restriction grants");
+  assert.ok(await page.$('.share-dialog select[aria-label="Invitation access"]'), "Private draft collaboration has an explicit role selector");
   await page.screenshot({ path: "/tmp/docsync-share.png" });
   await page.keyboard.press("Escape");
   await page.waitForSelector("dialog.share-dialog", { hidden: true });
@@ -426,6 +427,54 @@ try {
   assert.ok(sharedLayout.readerWidth >= 900);
   assert.ok(sharedLayout.frameWidth >= 760);
   assert.ok(sharedLayout.frameHeight >= 640);
+  // A second signed-in account accepts a one-time editor invitation. Its
+  // browser waits for the owner's lease, then saves an attributed version.
+  await click("Share");
+  await click("Create invitation");
+  await page.waitForSelector('input[aria-label="Invitation link"]');
+  const invitationUrl = await page.$eval('input[aria-label="Invitation link"]', input => (input as HTMLInputElement).value);
+  await page.screenshot({ path: '/tmp/docsync-collaborator-sharing.png', fullPage: true });
+  await page.keyboard.press("Escape");
+  await publicPage.goto(invitationUrl);
+  await publicPage.waitForSelector('input[name=email]');
+  await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Create an account')!.click());
+  await publicPage.type('input[name=email]', 'collaborator@example.com');
+  await publicPage.type('input[name=password]', 'Collaboration browser password 123!');
+  await publicPage.click('button[type=submit]');
+  await publicPage.waitForSelector('.invitation-card');
+  await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Accept invitation')!.click());
+  await publicPage.waitForSelector('.doc-studio');
+  await publicPage.waitForFunction(() => document.querySelector('.edit-lock-status')?.textContent?.includes('Browser'));
+  assert.equal(await publicPage.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).disabled), true);
+  await click("Stop editing");
+  await page.waitForFunction(async id => !(await (await fetch(`/api/documents/${id}/lock`)).json()).lock, {}, doc.id);
+  await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Start editing')!.click());
+  await publicPage.waitForSelector('.edit-lock-status[data-editing="true"]');
+  await publicPage.click('input[aria-label="Document title"]');
+  await publicPage.keyboard.down('Control'); await publicPage.keyboard.press('A'); await publicPage.keyboard.up('Control');
+  await publicPage.keyboard.type('Collaborator saved revision');
+  await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Save')!.click());
+  await publicPage.waitForFunction(() => document.querySelector('[role=status]')?.textContent === 'Saved.');
+  await publicPage.click('input[aria-label="Document title"]');
+  await publicPage.keyboard.down('Control'); await publicPage.keyboard.press('A'); await publicPage.keyboard.up('Control');
+  await publicPage.keyboard.type('Collaborator unsaved draft');
+  await click("Share");
+  await page.waitForSelector('select[aria-label="Access for collaborator@example.com"]');
+  await page.select('select[aria-label="Access for collaborator@example.com"]', 'viewer');
+  await publicPage.waitForFunction(() => document.querySelector('.edit-lock-status')?.textContent?.includes('Viewer access'));
+  assert.equal(await publicPage.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).value), 'Collaborator unsaved draft', 'A revoked edit lease preserves the browser draft');
+  assert.equal(await publicPage.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).disabled), true);
+  await page.keyboard.press('Escape');
+  await click("Start editing");
+  await page.waitForSelector('.edit-lock-status[data-editing="true"]');
+  assert.equal(await page.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).value), 'Collaborator saved revision', 'Acquiring a lock refreshes an unchanged browser from the saved revision');
+  await click("History");
+  await page.waitForSelector('dialog.version-history[open]');
+  assert.match(await page.$eval('.version-history', element => element.textContent || ''), /collaborator@example.com/);
+  await page.click('.revision-row:nth-of-type(2) button');
+  await page.waitForSelector('[aria-label="Version comparison"]');
+  await page.screenshot({ path: '/tmp/docsync-version-history.png' });
+  await click("Close history");
   // Expired sessions can be renewed without replacing an unsaved draft.
   await fill('input[aria-label="Document title"]', "Draft kept through sign-in");
   const accountCookie = (await page.cookies()).find(cookie => cookie.name === "docsync_account")!;
@@ -439,20 +488,20 @@ try {
   assert.equal(await page.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).value), "Draft kept through sign-in");
   await page.keyboard.down("Control"); await page.keyboard.press("s"); await page.keyboard.up("Control");
   await page.waitForFunction(() => document.querySelector("[role=status]")?.textContent === "Saved.");
-  // A stale save must preserve the user's draft.
+  // Leases block a second agent, and a fresh lease still cannot overwrite a
+  // newer revision with a preserved browser draft.
   await fill('input[aria-label="Document title"]', "Unsaved browser draft");
-  const current = parse(
-    await account.callTool({ name: "get_document", arguments: { id: doc.id } }),
-  );
-  await account.callTool({
-    name: "update_document",
-    arguments: {
-      id: doc.id,
-      expectedRevision: current.revision,
-      title: "Agent update",
-      sections: current.sections,
-    },
-  });
+  const blockedLease = await account.callTool({ name: "acquire_document_lock", arguments: { id: doc.id } });
+  assert.equal(blockedLease.isError, true);
+  await click("Stop editing");
+  await page.waitForFunction(async id => !(await (await fetch(`/api/documents/${id}/lock`)).json()).lock, {}, doc.id);
+  const agentLease = parse(await account.callTool({ name: "acquire_document_lock", arguments: { id: doc.id } }));
+  const current = parse(await account.callTool({ name: "get_document", arguments: { id: doc.id } }));
+  const agentUpdate = await account.callTool({ name: "update_document", arguments: { id: doc.id, lockToken: agentLease.lockToken, expectedRevision: current.revision, title: "Agent update", sections: current.sections } });
+  assert.equal(agentUpdate.isError, false);
+  await account.callTool({ name: "release_document_lock", arguments: { id: doc.id, lockToken: agentLease.lockToken } });
+  await click("Start editing");
+  await page.waitForSelector('.edit-lock-status[data-editing="true"]');
   await click("Save");
   await page.waitForFunction(() =>
     document

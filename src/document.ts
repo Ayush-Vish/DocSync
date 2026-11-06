@@ -18,9 +18,14 @@ export const contentSchema = z
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;
+export type DocumentAccess = "owner" | "editor" | "viewer";
+export type EditLock = { leaseId: string; holder: string; agent: string; expiresAt: number };
+export type EditLease = EditLock & { lockToken: string; revision: number };
+export type Revision = { revision: number; created_at: string; author: string | null; agent: string | null; parent_revision: number | null; summary: string; restored_from: number | null };
 export type Document = Content & {
   id: string;
   revision: number;
   updated_at: string;
   warnings?: string[];
+  access?: DocumentAccess;
 };

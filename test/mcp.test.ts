@@ -24,13 +24,20 @@ test("official MCP client exercises document tools and real Worker API in-proces
   assert.ok(client.getInstructions()?.includes("publish_document"));
   const tools = await client.listTools();
   assert.deepEqual(tools.tools.map((t) => t.name).sort(), [
+    "acquire_document_lock",
+    "compare_document_versions",
     "connect_account",
     "create_document",
     "get_connection",
     "get_document",
+    "get_document_history",
+    "get_document_lock",
     "get_template_options",
     "list_documents",
     "publish_document",
+    "release_document_lock",
+    "renew_document_lock",
+    "restore_document",
     "update_document",
   ]);
   const parse = (r: any) => JSON.parse(r.content[0].text);
@@ -59,14 +66,16 @@ test("official MCP client exercises document tools and real Worker API in-proces
     await client.callTool({ name: "get_document", arguments: { id: doc.id } }),
   );
   assert.equal(read.title, "From MCP");
+  const { lockToken } = parse(await client.callTool({ name: "acquire_document_lock", arguments: { id: doc.id } }));
+  assert.equal(typeof lockToken, "string");
   const updated = await client.callTool({
     name: "update_document",
-    arguments: { id: doc.id, expectedRevision: 1, ...sample("MCP updated") },
+    arguments: { id: doc.id, expectedRevision: 1, lockToken, ...sample("MCP updated") },
   });
   assert.equal(parse(updated).revision, 2);
   const conflict = await client.callTool({
     name: "update_document",
-    arguments: { id: doc.id, expectedRevision: 1, ...sample("Stale") },
+    arguments: { id: doc.id, expectedRevision: 1, lockToken, ...sample("Stale") },
   });
   assert.equal(conflict.isError, true);
   assert.equal(parse(conflict).details.currentRevision, 2);
@@ -99,4 +108,15 @@ test("official MCP client exercises document tools and real Worker API in-proces
     arguments: { id: doc.id, expectedRevision: 1 },
   });
   assert.equal(stalePublication.isError, true);
+  assert.equal((await client.callTool({ name: "renew_document_lock", arguments: { id: doc.id, lockToken } })).isError, false);
+  const versions = parse(await client.callTool({ name: "get_document_history", arguments: { id: doc.id } }));
+  assert.deepEqual(versions.map((row: any) => row.revision), [2, 1]);
+  const comparison = parse(await client.callTool({ name: "compare_document_versions", arguments: { id: doc.id, fromRevision: 1, toRevision: 2 } }));
+  assert.equal(comparison.title.after, "MCP updated");
+  const oldVersion = parse(await client.callTool({ name: "get_document", arguments: { id: doc.id, revision: 1 } }));
+  assert.equal(oldVersion.title, "From MCP");
+  const restored = parse(await client.callTool({ name: "restore_document", arguments: { id: doc.id, revision: 1, expectedRevision: 2, lockToken, changeSummary: "Reverted after review" } }));
+  assert.equal(restored.revision, 3);
+  assert.equal((await client.callTool({ name: "release_document_lock", arguments: { id: doc.id, lockToken } })).isError, false);
+  assert.equal(parse(await client.callTool({ name: "get_document_lock", arguments: { id: doc.id } })).lock, null);
 });

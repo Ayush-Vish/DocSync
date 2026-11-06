@@ -165,12 +165,13 @@ test("trial first document is atomic, claim transfers ownership and revokes the 
     (await call("/documents", "POST", sample("Second"), trial)).status,
     403,
   );
+  const { lockToken } = await (await call(`/documents/${doc.id}/lock`, "POST", {}, trial)).json() as any;
   assert.equal(
     (
       await call(
         "/documents/" + doc.id,
         "PUT",
-        { ...sample("Edited free"), expectedRevision: 1 },
+        { ...sample("Edited free"), expectedRevision: 1, lockToken },
         trial,
       )
     ).status,

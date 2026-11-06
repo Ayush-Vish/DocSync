@@ -4,12 +4,12 @@ import { fixture, sample } from './helpers.ts';
 import { cleanCss, cleanHtml, frameSource, validateContent } from '../src/content.ts';
 import { hash } from '../src/auth.ts';
 
-test('private API requires authentication; draft-only agents cannot publish, restore, or manage credentials', async t => {
+test('private API requires authentication; draft-only agents cannot publish or manage credentials; restore requires a lease', async t => {
   const f = await fixture(); t.after(f.close);
   assert.equal((await f.call('/documents', 'GET', undefined, 'anonymous')).status, 401);
   const created = await (await f.call('/documents', 'POST', sample(), 'agent')).json() as any;
   assert.equal((await f.call(`/documents/${created.id}`, 'GET', undefined, 'agent')).status, 200);
-  for (const [path, method] of [[`/documents/${created.id}/publish`, 'POST'], [`/documents/${created.id}/restore`, 'POST'], ['/agent-token', 'POST']] as const)
+  for (const [path, method] of [[`/documents/${created.id}/publish`, 'POST'], ['/agent-token', 'POST']] as const)
     assert.equal((await f.call(path, method, { expectedRevision: 1, revision: 1 }, 'agent')).status, 403);
   assert.equal((await f.call('/documents', 'POST', sample(), 'owner', { Origin: 'https://attacker.test' })).status, 403);
   assert.equal((await f.call('/documents', 'POST', sample(), 'owner', { Cookie: 'docsync_session=0.' + 'a'.repeat(64) + '.' + 'a'.repeat(64) })).status, 401);
@@ -18,13 +18,14 @@ test('private API requires authentication; draft-only agents cannot publish, res
 test('concurrent stale writes have one winner, preserve immutable history, and restore adds a revision', async t => {
   const f = await fixture(); t.after(f.close);
   const created = await (await f.call('/documents', 'POST', sample())).json() as any;
-  const results = await Promise.all(['Winner A', 'Winner B'].map(title => f.call(`/documents/${created.id}`, 'PUT', { ...sample(title), expectedRevision: 1 })));
+  const { lockToken } = await (await f.call(`/documents/${created.id}/lock`, 'POST', {})).json() as any;
+  const results = await Promise.all(['Winner A', 'Winner B'].map(title => f.call(`/documents/${created.id}`, 'PUT', { ...sample(title), expectedRevision: 1, lockToken })));
   assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
   const current = await (await f.call(`/documents/${created.id}`)).json() as any;
   assert.equal(current.revision, 2);
   const history = await (await f.call(`/documents/${created.id}/history`)).json() as any[];
   assert.deepEqual(history.map(r => r.revision), [2, 1]);
-  const restored = await (await f.call(`/documents/${created.id}/restore`, 'POST', { revision: 1, expectedRevision: 2 })).json() as any;
+  const restored = await (await f.call(`/documents/${created.id}/restore`, 'POST', { revision: 1, expectedRevision: 2, lockToken })).json() as any;
   assert.equal(restored.revision, 3); assert.equal(restored.title, sample().title);
   const stored = await f.env.DB.prepare('SELECT content FROM revisions WHERE document_id=? AND revision=2').bind(created.id).first<{ content: string }>();
   assert.equal(JSON.parse(stored!.content).title, current.title);
@@ -35,7 +36,8 @@ test('publication is a reviewed snapshot; republish rotates URL; revocation and 
   const doc = await (await f.call('/documents', 'POST', sample())).json() as any;
   const published = await (await f.call(`/documents/${doc.id}/publish`, 'POST', { expectedRevision: 1 })).json() as any;
   const shared = '/shared/' + published.url.split('/').at(-1);
-  await f.call(`/documents/${doc.id}`, 'PUT', { ...sample('Private draft'), expectedRevision: 1 });
+  const { lockToken } = await (await f.call(`/documents/${doc.id}/lock`, 'POST', {})).json() as any;
+  await f.call(`/documents/${doc.id}`, 'PUT', { ...sample('Private draft'), expectedRevision: 1, lockToken });
   const response = await f.call(shared, 'GET', undefined, 'anonymous');
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal((await response.json() as any).title, sample().title);
