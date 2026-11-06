@@ -399,82 +399,6 @@ function RichText({
   return <EditorContent editor={editor} />;
 }
 
-type SlideArchetype = {
-  id: string;
-  name: string;
-  desc: string;
-  icon: React.ComponentType<{ className?: string }>;
-  badge: string;
-  html: string;
-  css: string;
-};
-
-const SLIDE_ARCHETYPES: SlideArchetype[] = [
-  {
-    id: "title",
-    name: "Cover / Title",
-    desc: "Hero heading, subtitle, and presenter info",
-    icon: Type,
-    badge: "TITLE SLIDE",
-    html: `<article class="slide slide-cover">\n  <span class="badge">DEFENSE PRESENTATION</span>\n  <h2>DbSync: Shared-Nothing Key-Value Engine</h2>\n  <p class="subtitle">An ultra-high-throughput, sharded in-memory database built in C++20 using Linux io_uring.</p>\n  <div class="meta-row">\n    <span class="author">Ayush Vishwakarma</span>\n    <span class="dot">•</span>\n    <span class="dept">Systems & High Performance Computing</span>\n  </div>\n</article>`,
-    css: `.slide { padding: clamp(24px, 5vw, 48px); font-family: system-ui, -apple-system, sans-serif; background: #0B0F17; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #6366F1; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(24px, 4vw, 36px); font-weight: 700; margin: 0 0 12px; line-height: 1.2; color: #F8FAFC; letter-spacing: -0.5px; }\n.subtitle { font-size: clamp(14px, 2vw, 17px); color: #94A3B8; margin: 0 0 24px; max-width: 620px; line-height: 1.5; }\n.meta-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748B; }\n.meta-row .dot { color: #475569; }`,
-  },
-  {
-    id: "kpi",
-    name: "KPI Metrics",
-    desc: "3-column key performance stats & cards",
-    icon: LayoutGrid,
-    badge: "BENCHMARK METRICS",
-    html: `<article class="slide">\n  <span class="badge">PERFORMANCE BENCHMARK</span>\n  <h2>Engine Throughput & Latency</h2>\n  <div class="metrics-grid">\n    <div class="card">\n      <span class="num">2.14M</span>\n      <span class="label">Ops/sec Throughput</span>\n    </div>\n    <div class="card highlight">\n      <span class="num">14.2 µs</span>\n      <span class="label">p99 Tail Latency</span>\n    </div>\n    <div class="card">\n      <span class="num">0 Lock</span>\n      <span class="label">Contention Overhead</span>\n    </div>\n  </div>\n</article>`,
-    css: `.slide { padding: clamp(20px, 4vw, 40px); font-family: system-ui, -apple-system, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #38BDF8; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(20px, 3.5vw, 28px); margin: 0 0 20px; color: #F8FAFC; letter-spacing: -0.5px; }\n.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }\n.card { background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 10px; padding: 18px; box-sizing: border-box; }\n.card.highlight { border-color: #6366F1; background: rgba(99, 102, 241, 0.12); }\n.num { display: block; font-size: clamp(20px, 3.5vw, 32px); font-weight: 700; color: #F8FAFC; margin-bottom: 4px; }\n.label { font-size: 12px; color: #94A3B8; font-weight: 500; }`,
-  },
-  {
-    id: "chart",
-    name: "Bar Chart",
-    desc: "Vertical animated comparative bar chart",
-    icon: BarChart3,
-    badge: "SCALING COMPARISON",
-    html: `<article class="slide">\n  <span class="badge">CORE SCALING</span>\n  <h2>Throughput Across Hardware Cores</h2>\n  <div class="chart">\n    <div class="col"><div class="bar" style="height: 25%"><span class="val">540K</span></div><span class="sub">4 Cores</span></div>\n    <div class="col"><div class="bar" style="height: 48%"><span class="val">1.05M</span></div><span class="sub">8 Cores</span></div>\n    <div class="col"><div class="bar" style="height: 72%"><span class="val">1.60M</span></div><span class="sub">16 Cores</span></div>\n    <div class="col"><div class="bar highlight" style="height: 100%"><span class="val">2.14M</span></div><span class="sub">32 Cores</span></div>\n  </div>\n</article>`,
-    css: `.slide { padding: clamp(20px, 4vw, 40px); font-family: system-ui, -apple-system, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #34D399; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(20px, 3.5vw, 28px); margin: 0 0 20px; color: #F8FAFC; letter-spacing: -0.5px; }\n.chart { display: flex; align-items: flex-end; gap: clamp(8px, 2vw, 20px); height: clamp(100px, 18vw, 170px); padding-bottom: 12px; border-bottom: 1px solid #334155; }\n.col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }\n.bar { width: 100%; background: #334155; border-radius: 6px; display: flex; align-items: flex-start; justify-content: center; padding-top: 6px; }\n.bar.highlight { background: #6366F1; box-shadow: 0 0 16px rgba(99, 102, 241, 0.4); }\n.bar .val { font-size: 11px; font-weight: 700; color: #F8FAFC; }\n.col .sub { font-size: 11px; color: #94A3B8; font-weight: 500; }`,
-  },
-  {
-    id: "columns",
-    name: "Two Columns",
-    desc: "Side-by-side feature or trade-off split",
-    icon: Columns,
-    badge: "ARCHITECTURE COMPARISON",
-    html: `<article class="slide">\n  <span class="badge">PARADIGM COMPARISON</span>\n  <h2>Global Mutex vs Shared-Nothing</h2>\n  <div class="split-grid">\n    <div class="card">\n      <h3>Traditional Mutex Engine</h3>\n      <ul>\n        <li>Thread contention on hot keys</li>\n        <li>CPU cache line bounce across NUMA</li>\n        <li>Throughput plateaus at 8 cores</li>\n      </ul>\n    </div>\n    <div class="card highlight">\n      <h3>DbSync Shared-Nothing</h3>\n      <ul>\n        <li>Isolated memory partition per core</li>\n        <li>Zero lock overhead on hot paths</li>\n        <li>Linear scaling to 64+ cores</li>\n      </ul>\n    </div>\n  </div>\n</article>`,
-    css: `.slide { padding: clamp(20px, 4vw, 40px); font-family: system-ui, -apple-system, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #F59E0B; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(20px, 3.5vw, 28px); margin: 0 0 20px; color: #F8FAFC; letter-spacing: -0.5px; }\n.split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }\n.card { background: rgba(30, 41, 59, 0.7); border: 1px solid #334155; border-radius: 10px; padding: 18px; box-sizing: border-box; }\n.card.highlight { border-color: #6366F1; background: rgba(99, 102, 241, 0.1); }\nh3 { font-size: 15px; margin: 0 0 10px; color: #F8FAFC; }\nul { margin: 0; padding-left: 20px; font-size: 13px; color: #94A3B8; line-height: 1.6; }`,
-  },
-  {
-    id: "code",
-    name: "Code Block",
-    desc: "Syntax-styled technical code snippet",
-    icon: FileCode,
-    badge: "SYSTEM IMPLEMENTATION",
-    html: `<article class="slide">\n  <span class="badge">KERNEL IO</span>\n  <h2>Linux io_uring Submission Loop</h2>\n  <pre class="code-box"><code>// Batched SQE submission bypasses syscall overhead\nstruct io_uring_sqe *sqe = io_uring_get_sqe(&ring);\nio_uring_prep_readv(sqe, client_fd, iov, 1, 0);\nio_uring_sqe_set_data(sqe, ctx);\nio_uring_submit(&ring);</code></pre>\n  <p class="caption">Zero context-switch kernel ring buffer achieves sub-microsecond IO latency.</p>\n</article>`,
-    css: `.slide { padding: clamp(20px, 4vw, 40px); font-family: system-ui, -apple-system, sans-serif; background: #0A0E17; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #A855F7; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(20px, 3.5vw, 28px); margin: 0 0 16px; color: #F8FAFC; letter-spacing: -0.5px; }\n.code-box { background: #010409; border: 1px solid #21262D; border-radius: 8px; padding: 16px; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; color: #E6EDF3; overflow-x: auto; margin: 0 0 12px; line-height: 1.5; }\n.caption { font-size: 12px; color: #8B949E; margin: 0; }`,
-  },
-  {
-    id: "quote",
-    name: "Editorial Quote",
-    desc: "High-impact memorable quote slide",
-    icon: Quote,
-    badge: "KEY TAKEAWAY",
-    html: `<article class="slide quote-slide">\n  <blockquote>“Concurrency without communication is faster than fast communication with locks.”</blockquote>\n  <p class="author">— Shared-Nothing Architecture Principle</p>\n</article>`,
-    css: `.slide { padding: clamp(24px, 5vw, 48px); font-family: system-ui, -apple-system, sans-serif; background: #09090B; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; text-align: center; }\nblockquote { font-size: clamp(16px, 3vw, 26px); font-style: italic; line-height: 1.45; margin: 0 0 16px; color: #F8FAFC; border: 0; padding: 0; }\n.author { font-size: 13px; color: #A1A1AA; font-weight: 500; margin: 0; }`,
-  },
-  {
-    id: "timeline",
-    name: "Roadmap / Flow",
-    desc: "Horizontal 4-step milestone progression",
-    icon: Layers,
-    badge: "ROADMAP MILESTONES",
-    html: `<article class="slide">\n  <span class="badge">EXECUTION TIMELINE</span>\n  <h2>Project Roadmap & Deliverables</h2>\n  <div class="timeline-grid">\n    <div class="step-card"><span class="step-num">01</span><h4>Engine</h4><p>SPSC ring queues</p></div>\n    <div class="step-card"><span class="step-num">02</span><h4>io_uring</h4><p>Kernel submission</p></div>\n    <div class="step-card active"><span class="step-num">03</span><h4>Replication</h4><p>Non-blocking WAL</p></div>\n    <div class="step-card"><span class="step-num">04</span><h4>Benchmark</h4><p>memtier validation</p></div>\n  </div>\n</article>`,
-    css: `.slide { padding: clamp(20px, 4vw, 40px); font-family: system-ui, -apple-system, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\n.badge { font-size: 11px; letter-spacing: 1.5px; font-weight: 700; color: #EC4899; text-transform: uppercase; margin-bottom: 8px; display: inline-block; }\nh2 { font-size: clamp(20px, 3.5vw, 28px); margin: 0 0 20px; color: #F8FAFC; letter-spacing: -0.5px; }\n.timeline-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }\n.step-card { background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 8px; padding: 14px; box-sizing: border-box; }\n.step-card.active { border-color: #EC4899; background: rgba(236, 72, 153, 0.1); }\n.step-num { font-size: 11px; font-weight: 700; color: #94A3B8; font-family: monospace; display: block; margin-bottom: 6px; }\nh4 { font-size: 13px; margin: 0 0 4px; color: #F8FAFC; }\np { font-size: 11px; color: #94A3B8; margin: 0; line-height: 1.4; }`,
-  },
-];
-
 function SlideStudio({
   doc,
   safeActiveSlide,
@@ -512,13 +436,13 @@ function SlideStudio({
   run: (action: () => Promise<void>) => Promise<void>;
   setNotice: (n: string) => void;
 }) {
-  const addSlide = (arch?: SlideArchetype) => {
+  const addSlide = () => {
     if (doc.sections.length >= 40) return;
     const newSection = {
       id: crypto.randomUUID(),
       kind: "html" as const,
-      html: arch?.html || `<article class="slide">\n  <h2>New Slide</h2>\n  <p>Add presentation content here.</p>\n</article>`,
-      css: arch?.css || `.slide { padding: 40px; font-family: system-ui, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\nh2 { font-size: 26px; margin: 0 0 12px; color: #F8FAFC; }\np { font-size: 15px; color: #94A3B8; }`,
+      html: `<article class="slide">\n  <h2>New Slide</h2>\n  <p>Add presentation content here.</p>\n</article>`,
+      css: `.slide { padding: 40px; font-family: system-ui, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\nh2 { font-size: 26px; margin: 0 0 12px; color: #F8FAFC; }\np { font-size: 15px; color: #94A3B8; }`,
     };
     change({ ...doc, sections: [...doc.sections, newSection] });
     setActiveSlide(doc.sections.length);
@@ -550,16 +474,6 @@ function SlideStudio({
     [updated[idx], updated[targetIdx]] = [updated[targetIdx], updated[idx]];
     change({ ...doc, sections: updated });
     setActiveSlide(targetIdx);
-  };
-
-  const applyArchetype = (arch: SlideArchetype) => {
-    change({
-      ...doc,
-      sections: doc.sections.map((s, idx) =>
-        idx === safeActiveSlide ? { ...s, html: arch.html, css: arch.css } : s,
-      ),
-    });
-    setNotice(`Applied ${arch.name} layout to slide ${safeActiveSlide + 1}.`);
   };
 
   const applyTheme = (theme: ThemeCatalogItem) => {
@@ -761,87 +675,8 @@ function SlideStudio({
           </div>
         </div>
 
-        {/* Notion + Canva Floating Dock */}
+        {/* Slide controls */}
         <div className="slide-studio-bottom-bar" role="toolbar" aria-label="Slide quick actions">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add heading / title slide"
-            onClick={() => addSlide(SLIDE_ARCHETYPES[0])}
-          >
-            <Type className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Heading
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add text slide"
-            onClick={() => {
-              const textSection = {
-                id: crypto.randomUUID(),
-                kind: "html" as const,
-                html: `<article class="slide">\n  <h2>Key Insights</h2>\n  <p>Summarize key research findings, architectural decisions, and operational conclusions here.</p>\n</article>`,
-                css: `.slide { padding: 40px; font-family: system-ui, sans-serif; background: #0F172A; color: #FFFFFF; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }\nh2 { font-size: 26px; margin: 0 0 14px; color: #F8FAFC; }\np { font-size: 16px; color: #94A3B8; line-height: 1.6; max-width: 650px; }`,
-              };
-              change({ ...doc, sections: [...doc.sections, textSection] });
-              setActiveSlide(doc.sections.length);
-            }}
-          >
-            <FileText className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Text
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add KPI metrics"
-            onClick={() => addSlide(SLIDE_ARCHETYPES[1])}
-          >
-            <LayoutGrid className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Metric
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add bar chart"
-            onClick={() => addSlide(SLIDE_ARCHETYPES[2])}
-          >
-            <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Chart
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add comparison"
-            onClick={() => addSlide(SLIDE_ARCHETYPES[3])}
-          >
-            <Columns className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Compare
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add code snippet"
-            onClick={() => addSlide(SLIDE_ARCHETYPES[4])}
-          >
-            <FileCode className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Code
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs px-2 text-slate-700 hover:text-indigo-600 font-medium"
-            title="Add quote slide"
-            onClick={() => addSlide(SLIDE_ARCHETYPES[5])}
-          >
-            <Quote className="w-3.5 h-3.5 mr-1 text-slate-500" />
-            Quote
-          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -952,7 +787,7 @@ function SlideStudio({
               change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSlide ? { ...section, kind: "html", html: insertPageMedia(section.html, html) } : section) });
               setNotice("Media inserted. Save to keep this change.");
             }} />
-          {/* Tab 1: Layout Archetypes */}
+          {/* Tab 1: Slide layout */}
           {propertiesTab === "layout" && (
             <>
               <div>
@@ -983,7 +818,7 @@ function SlideStudio({
                 </div>
               </div>
 
-              {doc.sections[safeActiveSlide]?.kind === "text" ? (
+              {doc.sections[safeActiveSlide]?.kind === "text" && (
                 <div>
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                     Text Content
@@ -1004,61 +839,7 @@ function SlideStudio({
                     />
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                    Apply Layout Archetype
-                  </div>
-                  <div className="archetype-grid">
-                    {SLIDE_ARCHETYPES.map((arch) => {
-                      const Icon = arch.icon;
-                      return (
-                        <button
-                          key={arch.id}
-                          type="button"
-                          className="archetype-card"
-                          onClick={() => applyArchetype(arch)}
-                        >
-                          <div className="flex items-center gap-1.5 text-slate-700">
-                            <Icon className="w-3.5 h-3.5 text-indigo-600" />
-                            <span className="name">{arch.name}</span>
-                          </div>
-                          <span className="desc">{arch.desc}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               )}
-
-              <Separator />
-
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Slide Actions
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs h-8"
-                    onClick={() => duplicateSlide(safeActiveSlide)}
-                  >
-                    <Copy className="w-3.5 h-3.5 mr-1.5" />
-                    Duplicate
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs h-8 text-destructive hover:bg-destructive/10 hover:text-destructive border-slate-200"
-                    disabled={doc.sections.length <= 1}
-                    onClick={() => deleteSlide(safeActiveSlide)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                    Delete
-                  </Button>
-                </div>
-              </div>
             </>
           )}
 
