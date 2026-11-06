@@ -5,6 +5,9 @@ import { ShareDialog } from "./ShareDialog";
 import { AcceptInvitation } from "./Collaborators";
 import { VersionHistory } from "./VersionHistory";
 import { useDocumentLock } from "./useDocumentLock";
+import { MediaContext } from "./MediaContext";
+import { MediaUpload, insertPageMedia } from "./MediaUpload";
+import { CollaboratorPresence } from "./CollaboratorPresence";
 import { AgentSkill } from "./AgentSkill";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
@@ -90,7 +93,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import type { Content, Document, Revision } from "../document";
+import type { Content, Document, Revision, RenderedContent } from "../document";
 import themeCatalog from "../../skills/docsync/themes.json";
 
 type Summary = {
@@ -185,7 +188,7 @@ function SharedViewer({
   slideshow,
   onSlideshowChange,
 }: {
-  content: Content;
+  content: RenderedContent;
   slideshow: boolean;
   onSlideshowChange: (open: boolean) => void;
 }) {
@@ -293,7 +296,7 @@ function SharedViewer({
   </div>;
 }
 
-function SharedWorkspace({ content, error }: { content: Content | null; error: string }) {
+function SharedWorkspace({ content, error }: { content: RenderedContent | null; error: string }) {
   const isPresentation = content ? isPresentationContent(content) : false;
   const [slideshow, setSlideshow] = useState(() =>
     typeof window !== "undefined" && (location.hash === "#present" || new URLSearchParams(location.search).get("mode") === "present")
@@ -302,7 +305,7 @@ function SharedWorkspace({ content, error }: { content: Content | null; error: s
   const changeSlideshow = setSlideshow;
 
   return (
-    <div className="app-shell shared-app-shell document-shell">
+    <MediaContext.Provider value={content?.mediaToken}><div className="app-shell shared-app-shell document-shell">
       <aside className="sidebar shared-sidebar">
         {brand}
         <div className="shared-sidebar-item">
@@ -359,7 +362,7 @@ function SharedWorkspace({ content, error }: { content: Content | null; error: s
           </main>
         </section>
       </main>
-    </div>
+    </div></MediaContext.Provider>
   );
 }
 
@@ -944,6 +947,11 @@ function SlideStudio({
         </div>
 
         <div className="slide-studio-right-body" inert={busy}>
+          <MediaUpload key={doc.sections[safeActiveSlide].id} documentId={doc.id} textPage={doc.sections[safeActiveSlide].kind === "text"} disabled={busy}
+            onInsert={html => {
+              change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSlide ? { ...section, kind: "html", html: insertPageMedia(section.html, html) } : section) });
+              setNotice("Media inserted. Save to keep this change.");
+            }} />
           {/* Tab 1: Layout Archetypes */}
           {propertiesTab === "layout" && (
             <>
@@ -1739,6 +1747,11 @@ function DocStudio({
         </div>
 
         <div className="doc-studio-right-body" inert={busy}>
+          <MediaUpload key={doc.sections[safeActiveSection].id} documentId={doc.id} textPage={doc.sections[safeActiveSection].kind === "text"} disabled={busy}
+            onInsert={html => {
+              change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSection ? { ...section, kind: "html", html: insertPageMedia(section.html, html) } : section) });
+              setNotice("Media inserted. Save to keep this change.");
+            }} />
           {/* Tab 1: Block Archetypes */}
           {propertiesTab === "layout" && (
             <>
@@ -2015,7 +2028,7 @@ function LoginPage({
           <ArrowLeft className="w-3.5 h-3.5" />
           {recovering ? "Keep draft open" : "Back to DocSync"}
         </Button>
-        <span className="text-xs text-muted-foreground font-mono">v0.4.0</span>
+        <span className="text-xs text-muted-foreground font-mono">v0.5.0</span>
       </div>
 
       <div className="auth-centered-card">
@@ -2232,7 +2245,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     return sessionStorage.getItem("docsync_invite") || "";
   });
   const [editingRequested, setEditingRequested] = useState(true);
-  const [shared, setShared] = useState<Content | null>(null);
+  const [shared, setShared] = useState<RenderedContent | null>(null);
   const [mcpClients, setMcpClients] = useState<{client_id:string;client_name:string;access_expires:number}[]>([]);
   const sharePath = location.pathname.startsWith("/share/");
   const running = useRef(false);
@@ -2520,8 +2533,9 @@ export default function App({ initialSession }: { initialSession?: Session }) {
 
   function exportDraft() {
     if (!doc) return;
+    const { mediaToken, ...draft } = doc;
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
+      new Blob([JSON.stringify(draft, null, 2)], { type: "application/json" }),
     );
     const a = document.createElement("a");
     a.href = url;
@@ -2617,7 +2631,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   );
 
   return (
-    <div className={cn("app-shell", doc && "document-shell")}>
+    <MediaContext.Provider value={doc?.mediaToken}><div className={cn("app-shell", doc && "document-shell")}>
       <aside className="sidebar">
         {brand}
         <Button
@@ -2781,6 +2795,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
 
               {/* Right Status & Actions */}
               <div className="document-actions flex items-center gap-2 shrink-0">
+                <CollaboratorPresence key={doc.id} documentId={doc.id} />
                 {dirty ? (
                   <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700 text-xs font-normal">
                     Unsaved changes
@@ -3386,7 +3401,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           busy={busy}
         />
       )}
-    </div>
+    </div></MediaContext.Provider>
   );
 }
 

@@ -16,9 +16,14 @@ import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
 import { jsonBody as body } from "./request.ts";
 import { webResponse } from "./web.ts";
 import { publicPages } from "./seo.ts";
+import { mediaGrant, serveMedia, uploadMedia } from "./media.ts";
+import { maxMediaBytes } from "./media-config.ts";
+import { readBody } from "./request.ts";
+import type { Document } from "./document.ts";
+import { agentActivity, collaborators } from "./agents.ts";
 
 const appPolicy =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 const oauthPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self' http: https:; frame-ancestors 'none'";
@@ -41,6 +46,8 @@ async function route(request: Request, env: Env): Promise<Response> {
     handle(new Request(input, init), env),
   );
   if (remote) return remote;
+  const mediaMatch = pathname.match(/^\/media\/([a-f0-9-]{36})$/);
+  if (mediaMatch) return serveMedia(request, env, mediaMatch[1]);
   if (pathname === "/artifact-frame" && method === "GET") return artifactFrame();
   if (!pathname.startsWith("/api/")) return webResponse(request, env);
   if (
@@ -82,9 +89,17 @@ async function route(request: Request, env: Env): Promise<Response> {
     const token = pathname.slice("/api/shared/".length);
     if (!/^[a-f0-9]{64}$/.test(token))
       throw new HttpError(404, "Share link not found or revoked");
-    return json(await store.sharedDocument(env.DB, await hash(token)));
+    const publication = await hash(token), shared = await store.sharedDocument(env.DB, publication);
+    const published = await env.DB.prepare("SELECT document_id FROM publications WHERE token_hash=?").bind(publication).first<{ document_id: string }>();
+    if (!published) throw new HttpError(404, "Share link not found or revoked");
+    return json({ ...shared, mediaToken: await mediaGrant(env, published.document_id, { publication, revision: shared.revision }) });
   }
   const principal = await authenticate(request, env);
+  await agentActivity(env.DB, principal);
+  const documentResponse = async (value: Document | Promise<Document>, status = 200) => {
+    const doc = await value;
+    return json({ ...doc, mediaToken: await mediaGrant(env, doc.id, { accountId: principal.accountId }) }, status);
+  };
   const owner = () => {
     if (principal.role !== "owner")
       throw new HttpError(403, "Owner access required");
@@ -255,8 +270,8 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (method === "POST") {
       const input = await body(request);
       try {
-        return json(
-          await store.createDocument(env.DB, input, principal.accountId, principal),
+        return await documentResponse(
+          store.createDocument(env.DB, input, principal.accountId, principal),
           201,
         );
       } catch (error) {
@@ -278,21 +293,32 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   const revokeInvite = pathname.match(/^\/api\/documents\/([a-f0-9-]{36})\/invitations\/([a-f0-9-]{36})$/);
   if (revokeInvite && method === "DELETE") {
-    owner();
     await collaboration.access(env.DB, revokeInvite[1], principal.accountId, "owner");
     await env.DB.prepare("DELETE FROM document_invitations WHERE document_id=? AND id=? AND EXISTS(SELECT 1 FROM documents WHERE id=? AND account_id=?)").bind(revokeInvite[1], revokeInvite[2], revokeInvite[1], principal.accountId).run();
     return json({ ok: true });
   }
   const match = pathname.match(
-    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail|lock|access|compare))?$/,
+    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail|lock|access|compare|media|collaborators))?$/,
   );
   if (match) {
     const [, id, action] = match;
-    if (action === "thumbnail" && method === "GET") return json(await store.documentThumbnail(env.DB, id, principal.accountId));
+    if (action === "thumbnail" && method === "GET") return json({ ...await store.documentThumbnail(env.DB, id, principal.accountId), mediaToken: await mediaGrant(env, id, { accountId: principal.accountId }) });
     const current = await store.getDocument(env.DB, id, undefined, principal.accountId);
+    if (action === "collaborators" && method === "GET") return json(await collaborators(env.DB, id, principal.accountId));
     if (!action && method === "GET") {
       const requested = new URL(request.url).searchParams.get("revision");
-      return json(requested ? await store.getDocument(env.DB, id, revision(Number(requested)), principal.accountId) : current);
+      return documentResponse(requested ? store.getDocument(env.DB, id, revision(Number(requested)), principal.accountId) : current);
+    }
+    if (action === "media" && method === "POST") {
+      await collaboration.access(env.DB, id, principal.accountId, "editor");
+      let filename: string;
+      try {
+        const encoded = request.headers.get("X-File-Name") || "";
+        if (encoded.length > 2048) throw new Error("Filename too long");
+        filename = decodeURIComponent(encoded);
+      }
+      catch { throw new HttpError(400, "Invalid media filename"); }
+      return json(await uploadMedia(env, principal, id, filename, request.headers.get("Content-Type")?.split(";", 1)[0].toLowerCase() || "", await readBody(request, maxMediaBytes), new URL(request.url).origin), 201);
     }
     if (action === "lock") {
       if (method === "GET") return json(await collaboration.lockStatus(env.DB, id, principal.accountId));
@@ -302,8 +328,8 @@ async function route(request: Request, env: Env): Promise<Response> {
       if (method === "DELETE") return json(await collaboration.releaseLock(env.DB, id, principal, collaboration.lockToken(input.lockToken)));
     }
     if (action === "access") {
-      owner();
-      if (method === "GET") return json(await collaboration.sharing(env.DB, id, principal.accountId));
+      if (method === "GET") return json({ ...await collaboration.sharing(env.DB, id, principal.accountId), members: await collaborators(env.DB, id, principal.accountId) });
+      await collaboration.access(env.DB, id, principal.accountId, "owner");
       const input = await body(request);
       if (method === "POST") return json(await collaboration.invite(env.DB, id, principal.accountId, input.role, new URL(request.url).origin), 201);
       if (method === "PATCH" && input.role === undefined) throw new HttpError(400, "Choose editor or viewer access");
@@ -315,8 +341,8 @@ async function route(request: Request, env: Env): Promise<Response> {
     }
     if (!action && method === "PUT") {
       const { expectedRevision, lockToken, changeSummary, ...content } = await body(request);
-      return json(
-        await store.updateDocument(
+      return documentResponse(
+        store.updateDocument(
           env.DB,
           id,
           revision(expectedRevision),
@@ -338,8 +364,8 @@ async function route(request: Request, env: Env): Promise<Response> {
         revision(input.revision),
         principal.accountId,
       );
-      return json(
-        await store.updateDocument(
+      return documentResponse(
+        store.updateDocument(
           env.DB,
           id,
           revision(input.expectedRevision),
@@ -431,7 +457,7 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   const templatePreview = /^\/downloads\/docsync\/assets\/templates\/[a-z-]+\/(?:index\.html)?$/.test(pathname);
   secured.headers.set(
     "Content-Security-Policy",
-    pathname === "/artifact-frame" ? artifactPolicy : pathname.startsWith("/oauth/") ? oauthPolicy : templatePreview
+    pathname === "/artifact-frame" ? artifactPolicy(url.origin) : pathname.startsWith("/oauth/") ? oauthPolicy : templatePreview
       ? appPolicy.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
       : appPolicy,
   );

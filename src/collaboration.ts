@@ -80,11 +80,18 @@ function memberRole(value: unknown): "editor" | "viewer" {
   if (value !== "editor" && value !== "viewer") throw new HttpError(400, "Choose editor or viewer access");
   return value;
 }
+export async function members(db: Database, id: string, accountId: string) {
+  await access(db, id, accountId);
+  return (await db.prepare(`WITH allowed AS(SELECT d.id,d.account_id FROM documents d WHERE d.id=? AND ${readableDocument})
+    SELECT a.id AS accountId,COALESCE(a.email,'Workspace owner') AS name,'owner' AS role FROM allowed d JOIN accounts a ON a.id=d.account_id
+    UNION ALL SELECT a.id,COALESCE(a.email,'Workspace member'),m.role FROM document_members m JOIN allowed d ON d.id=m.document_id JOIN accounts a ON a.id=m.account_id`)
+    .bind(id, accountId, accountId).all<{ accountId: string; name: string; role: "owner" | "editor" | "viewer" }>()).results;
+}
 export async function sharing(db: Database, id: string, accountId: string) {
   await access(db, id, accountId, "owner");
-  const members = await db.prepare("SELECT a.id AS accountId, COALESCE(a.email,'Workspace owner') AS name, 'owner' AS role FROM documents d JOIN accounts a ON a.id=d.account_id WHERE d.id=? UNION ALL SELECT a.id,COALESCE(a.email,'Workspace member'),m.role FROM document_members m JOIN accounts a ON a.id=m.account_id WHERE m.document_id=?").bind(id, id).all();
+  const people = await members(db, id, accountId);
   const invitations = await db.prepare("SELECT id,role,expires_at AS expiresAt FROM document_invitations WHERE document_id=? AND accepted_by IS NULL AND expires_at>unixepoch() ORDER BY expires_at DESC LIMIT 50").bind(id).all();
-  return { members: members.results, invitations: invitations.results };
+  return { members: people, invitations: invitations.results };
 }
 export async function invite(db: Database, id: string, accountId: string, role: unknown, origin: string) {
   await access(db, id, accountId, "owner");

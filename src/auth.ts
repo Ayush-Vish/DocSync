@@ -1,6 +1,7 @@
 import type { Env } from "./platform.ts";
 import { HttpError } from "./content.ts";
 import { readCookie } from "./accounts.ts";
+import { clientName } from "./agent-client.ts";
 
 export const randomToken = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
@@ -20,7 +21,7 @@ function same(a: string, b: string): boolean {
     diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
   return diff === 0;
 }
-async function signature(secret: string, payload: string): Promise<string> {
+export async function signature(secret: string, payload: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -34,6 +35,9 @@ async function signature(secret: string, payload: string): Promise<string> {
     ),
     (b) => b.toString(16).padStart(2, "0"),
   ).join("");
+}
+export async function verifySignature(secret: string, payload: string, signed: string) {
+  return same(await signature(secret, payload), signed);
 }
 export function checkOrigin(request: Request) {
   if (request.headers.get("Origin") !== new URL(request.url).origin)
@@ -117,7 +121,7 @@ export async function authenticate(
         accountId: credential.account_id,
         kind: credential.kind,
         actorId: `credential:${await hash(bearer.slice(7))}`,
-        actorLabel: "Account agent",
+        actorLabel: clientName(request, "Account agent"),
       };
     const oauth = await env.DB.prepare(
       "SELECT t.account_id,t.can_publish,a.kind,t.client_id,c.client_name FROM oauth_access_tokens t JOIN accounts a ON a.id=t.account_id JOIN oauth_clients c ON c.client_id=t.client_id WHERE t.token_hash=? AND t.expires_at>?",
@@ -136,7 +140,7 @@ export async function authenticate(
       accountId: "legacy",
       kind: "legacy",
       actorId: `credential:${await hash(bearer.slice(7))}`,
-      actorLabel: "Workspace agent",
+      actorLabel: clientName(request, "Workspace agent"),
     };
   }
   const accountToken = readCookie(request, "docsync_account");

@@ -1,12 +1,26 @@
 import { sqliteDatabase } from '../scripts/sqlite.ts';
 import { hash, randomToken } from '../src/auth.ts';
 import { handle } from '../src/worker.ts';
-import type { Env } from '../src/platform.ts';
+import type { Env, MediaBucket } from '../src/platform.ts';
+
+export function memoryMediaBucket(): MediaBucket {
+  const files = new Map<string, Uint8Array>();
+  return {
+    async put(key, bytes) { files.set(key, bytes.slice()); },
+    async get(key, options) {
+      let bytes = files.get(key); if (!bytes) return null;
+      const size = bytes.byteLength;
+      if (options?.range) bytes = bytes.subarray(options.range.offset, options.range.offset + options.range.length);
+      return { size, body: new Response(bytes.slice()).body! };
+    },
+    async delete(key) { files.delete(key); },
+  };
+}
 
 export async function fixture(canPublish = false) {
   const database = sqliteDatabase(':memory:'); database.migrate();
   const ownerKey = randomToken(), agentToken = randomToken();
-  const env: Env = { DB: database.db, OWNER_KEY_HASH: await hash(ownerKey), SESSION_SECRET: randomToken(), ASSETS: { fetch: async () => new Response('app') } };
+  const env: Env = { DB: database.db, MEDIA: memoryMediaBucket(), OWNER_KEY_HASH: await hash(ownerKey), SESSION_SECRET: randomToken(), ASSETS: { fetch: async () => new Response('app') } };
   await env.DB.prepare('INSERT INTO agent_credentials(slot,token_hash,created_at,can_publish) VALUES(1,?,?,?)').bind(await hash(agentToken), new Date().toISOString(), Number(canPublish)).run();
   let cookie = '';
   async function call(path: string, method = 'GET', data?: unknown, mode: 'owner' | 'agent' | 'anonymous' = 'owner', extra: Record<string, string> = {}) {

@@ -65,6 +65,27 @@
 .edit-lock-status > span { flex: 1; min-width: 180px; }
 .edit-lock-status > small { width: 100%; font-size: 11px; }
 .collaborators { border-block: 1px solid var(--border); padding: 16px 0; margin: 16px 0; }
+.collaborator-presence { position: relative; font-size: 12px; }
+.collaborator-presence > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; list-style: none; }
+.collaborator-presence > summary::-webkit-details-marker { display: none; }
+.collaborator-presence > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.collaborator-presence-list { position: absolute; right: 0; top: calc(100% + 8px); z-index: 50; width: min(340px, calc(100vw - 32px)); max-height: min(440px, 65dvh); overflow: auto; padding: 16px; background: white; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px #101a2420; }
+.collaborator-presence-list > div + div { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 12px; }
+.collaborator-presence-list strong { display: block; overflow-wrap: anywhere; }
+.collaborator-presence-list strong small { margin-left: 8px; color: #64748b; font-weight: 400; }
+.collaborator-presence-list > p { font-size: 11px; line-height: 1.5; color: #64748b; margin: 14px 0 0; }
+.collaborator-agents { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.agent-identity { display: inline-flex; align-items: center; gap: 7px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; background: #f8fafc; }
+.agent-identity > svg { flex-shrink: 0; }
+.agent-identity small { display: block; font-size: 10px; color: #64748b; }
+.agent-identity i { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+.agent-identity[data-active=true] i { background: #16a34a; }
+.media-upload { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; margin-bottom: 16px; }
+.media-upload h3 { font-size: 12px; font-weight: 600; margin: 0; }
+.media-upload p { font-size: 11px; line-height: 1.5; color: #64748b; margin: 0; }
+.media-upload p[role=alert] { color: #b42318; }
+.media-upload input[type=file] { display: none; }
+.media-upload input[readonly] { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 5px; background: white; font: 11px ui-monospace, monospace; }
 .collaborators h3, .share-dialog h3 { margin: 0; font-size: 14px; font-weight: 600; }
 .collaborator-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 7px; }
 .collaborator-row > span, .collaborator-row > small { flex: 1; min-width: 120px; overflow-wrap: anywhere; font-size: 12px; }

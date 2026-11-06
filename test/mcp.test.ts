@@ -30,15 +30,20 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "create_document",
     "get_connection",
     "get_document",
+    "get_document_access",
     "get_document_history",
     "get_document_lock",
     "get_template_options",
+    "invite_document_collaborator",
     "list_documents",
     "publish_document",
     "release_document_lock",
     "renew_document_lock",
     "restore_document",
+    "revoke_document_invitation",
     "update_document",
+    "update_document_collaborator_access",
+    "upload_media",
   ]);
   const parse = (r: any) => JSON.parse(r.content[0].text);
   for (const format of ["document", "presentation", "all"]) {
@@ -62,6 +67,15 @@ test("official MCP client exercises document tools and real Worker API in-proces
   assert.equal(created.isError, false);
   const doc = parse(created);
   assert.equal(doc.revision, 1);
+  const media = parse(await client.callTool({ name: "upload_media", arguments: { id: doc.id, filename: "image.png", mimeType: "image/png", dataBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSAAAAABJRU5ErkJggg==" } }));
+  assert.equal(media.size, 67);
+  assert.match(media.src, /^\/media\//);
+  assert.equal(media.url, "http://127.0.0.1:8787" + media.src);
+  for (const arguments_ of [
+    { filePath: "/server/secret.png" },
+    { dataBase64: "not base64!", filename: "bad.png" },
+    { dataBase64: "aGVsbG8=", filePath: "/local/image.png", filename: "both.png" },
+  ]) assert.equal((await client.callTool({ name: "upload_media", arguments: { id: doc.id, mimeType: "image/png", ...arguments_ } })).isError, true);
   const read = parse(
     await client.callTool({ name: "get_document", arguments: { id: doc.id } }),
   );
@@ -119,4 +133,21 @@ test("official MCP client exercises document tools and real Worker API in-proces
   assert.equal(restored.revision, 3);
   assert.equal((await client.callTool({ name: "release_document_lock", arguments: { id: doc.id, lockToken } })).isError, false);
   assert.equal(parse(await client.callTool({ name: "get_document_lock", arguments: { id: doc.id } })).lock, null);
+});
+
+test("stdio media capability uploads exactly the chosen local file bytes", async t => {
+  const f = await fixture(); t.after(f.close);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const image = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+  const server = createMcpServer("http://127.0.0.1:8787", f.agentToken, async (input, init) => handle(new Request(input, init), f.env), async path => {
+    assert.equal(path, "/local/motion.gif"); return { bytes: image, filename: "motion.gif" };
+  });
+  const client = new Client({ name: "Codex", version: "1" });
+  await server.connect(b); await client.connect(a); t.after(() => client.close()); t.after(() => server.close());
+  const parse = (result: any) => JSON.parse(result.content[0].text);
+  const doc = parse(await client.callTool({ name: "create_document", arguments: sample() }));
+  const result = await client.callTool({ name: "upload_media", arguments: { id: doc.id, mimeType: "image/gif", filePath: "/local/motion.gif" } });
+  assert.equal(result.isError, false); assert.equal(parse(result).size, image.byteLength);
+  const people = await (await f.call(`/documents/${doc.id}/collaborators`)).json() as any[];
+  assert.equal(people[0].agents[0].name, "Codex");
 });

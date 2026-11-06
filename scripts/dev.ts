@@ -3,6 +3,8 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { handle } from "../src/worker.ts";
 import { sqliteDatabase } from "./sqlite.ts";
+import { fileMediaBucket } from "./media-store.ts";
+import { maxMediaBytes, maxMediaJsonBytes } from "../src/media-config.ts";
 
 if (!existsSync(".local/config.json"))
   throw new Error("Run npm run setup first.");
@@ -60,9 +62,11 @@ const server = createServer(async (incoming, outgoing) => {
     }
     const chunks: Buffer[] = [];
     let size = 0;
+    const requestPath = new URL(incoming.url || "/", "http://local").pathname;
+    const limit = requestPath === "/mcp" ? maxMediaJsonBytes : /^\/api\/documents\/[a-f0-9-]{36}\/media$/.test(requestPath) ? maxMediaBytes : 550_000;
     for await (const chunk of incoming) {
       size += chunk.length;
-      if (size > 550_000) {
+      if (size > limit) {
         outgoing.writeHead(413);
         outgoing.end("Request too large");
         return;
@@ -90,6 +94,7 @@ const server = createServer(async (incoming, outgoing) => {
       GOOGLE_CLIENT_SECRET:
         process.env.GOOGLE_CLIENT_SECRET || config.GOOGLE_CLIENT_SECRET,
       DB: database.db,
+      MEDIA: fileMediaBucket(".local/media"),
       ASSETS: assets,
     });
     const responseHeaders = Object.fromEntries(

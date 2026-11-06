@@ -2,6 +2,7 @@ import type { Database } from "./platform.ts";
 import type { Principal } from "./auth.ts";
 import { hash } from "./auth.ts";
 import { access, readableDocument, editableDocument, lostLock } from "./collaboration.ts";
+import { validateMedia } from "./media.ts";
 import {
   HttpError,
   validateContent,
@@ -59,6 +60,7 @@ export async function createDocument(
     warnings = lintContent(content),
     id = crypto.randomUUID(),
     time = new Date().toISOString();
+  await validateMedia(db, null, content);
   await db.batch([
     db
       .prepare(
@@ -88,6 +90,7 @@ export async function updateDocument(
   const content = validateContent(input),
     warnings = lintContent(content),
     time = new Date().toISOString();
+  await validateMedia(db, id, content);
   const result = await db
     .prepare(
       `INSERT INTO revisions(document_id,revision,content,created_at,author_account_id,actor_id,actor_label,parent_revision,summary,restored_from)

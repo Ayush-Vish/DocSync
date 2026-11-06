@@ -77,4 +77,10 @@ test("hosted MCP uses the authenticated document API without outbound self-fetch
   assert.equal(saved.sections[0].html, "<p>hello</p>");
   const published = await callTool("publish_document", { id: saved.id, expectedRevision: saved.revision });
   assert.match(published.url, /\/share\/[a-f0-9]{64}$/);
+  // Only media calls receive the larger JSON transport budget.
+  const image = new Uint8Array(600_000); image.set([137, 80, 78, 71, 13, 10, 26, 10]);
+  const media = await callTool("upload_media", { id: saved.id, filename: "large.png", mimeType: "image/png", dataBase64: Buffer.from(image).toString("base64") });
+  assert.equal(media.size, 600_000); assert.match(media.src, /^\/media\//);
+  const oversized = await handle(new Request(`${origin}/mcp`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "create_document", arguments: { title: "x".repeat(550_001) } } }) }), f.env);
+  assert.equal(oversized.status, 413);
 });

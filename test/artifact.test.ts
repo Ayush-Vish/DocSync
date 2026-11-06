@@ -81,7 +81,9 @@ test("library covers return only the first page without JavaScript and enforce a
   const cover = await f.call(`/documents/${doc.id}/thumbnail`);
   assert.equal(cover.status, 200);
   assert.equal(cover.headers.get('Cache-Control'), 'no-store');
-  assert.deepEqual(await cover.json(), { revision: 1, section: { id: 'cover', html: '<h1>Cover</h1>', css: 'h1{color:red}' } });
+  const { mediaToken, ...thumbnail } = await cover.json() as any;
+  assert.equal(typeof mediaToken, 'string');
+  assert.deepEqual(thumbnail, { revision: 1, section: { id: 'cover', html: '<h1>Cover</h1>', css: 'h1{color:red}' } });
   assert.equal((await f.call(`/documents/${doc.id}/thumbnail`, 'GET', undefined, 'anonymous')).status, 401);
   await f.env.DB.prepare("INSERT INTO accounts(id,kind,created_at) VALUES('other','user',?)").bind(new Date().toISOString()).run();
   await f.env.DB.prepare("UPDATE documents SET account_id='other' WHERE id=?").bind(doc.id).run();

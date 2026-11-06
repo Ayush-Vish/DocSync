@@ -1,10 +1,11 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { authenticate, hash, randomToken } from "./auth.ts";
 import { readCookie, rateLimit } from "./accounts.ts";
-import { jsonBody, formBody, boundedRequest } from "./request.ts";
+import { jsonBody, formBody, readBody } from "./request.ts";
 import { HttpError } from "./content.ts";
 import { createMcpServer } from "./mcp-server.ts";
 import type { Env } from "./platform.ts";
+import { maxMediaJsonBytes } from "./media-config.ts";
 
 const json = (value: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...headers } });
@@ -130,7 +131,16 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
   if(path==="/mcp") {
     const auth=request.headers.get("Authorization")||"", match=auth.match(/^Bearer ([a-f0-9]{64})$/); if(!match)return json({error:"unauthorized"},401,{"WWW-Authenticate":`Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp", scope="docsync"`});
     const valid=await env.DB.prepare("SELECT 1 AS ok FROM oauth_access_tokens WHERE token_hash=? AND expires_at>?").bind(await hash(match[1]),now()).first(); if(!valid)return json({error:"invalid_token"},401,{"WWW-Authenticate":`Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"`});
-    const incoming = method === "POST" ? await boundedRequest(request) : request;
+    let incoming = request;
+    if (method === "POST") {
+      const bytes = await readBody(request, maxMediaJsonBytes);
+      if (bytes.byteLength > 550_000) {
+        let payload;
+        try { payload = JSON.parse(new TextDecoder().decode(bytes)); } catch { throw new HttpError(400, "Invalid JSON request"); }
+        if (payload?.method !== "tools/call" || payload?.params?.name !== "upload_media") throw new HttpError(413, "Request body is too large.");
+      }
+      incoming = new Request(request, { body: bytes });
+    }
     const server=createMcpServer(origin,match[1],fetchApi),transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true}); await server.connect(transport); return transport.handleRequest(incoming);
   }
   return null;

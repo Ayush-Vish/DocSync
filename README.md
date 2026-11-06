@@ -26,6 +26,7 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 - Exclusive five-minute edit leases, automatic browser renewal, immutable attributed revision history, version comparison, restore, conflict preservation, and JSON draft download.
 - Fixed-revision public links, republishing with link rotation, and revocation.
 - Two six-slide presentation templates with entrance animation, animated charts, and self-contained interactive examples. The presentation player supports keyboard and touch navigation, slide overview, animation replay, progress, and native fullscreen.
+- Upload images, animated GIFs, and video to docs and presentations, through the editor or the `upload_media` MCP tool. Collaborator panels show reported agent names, companies, icons, and recent activity.
 - Library cards show the first saved page or slide. Covers load near the viewport and render without document JavaScript.
 - Email/password accounts, server-side sessions, Google OAuth, and account-scoped document access.
 - One anonymous document per MCP installation, browser claiming, and account tokens with an explicit publishing grant.
@@ -35,17 +36,27 @@ Browser requests have a 30-second timeout and clear connection errors. Mutations
 
 Sharing shows the actual published revision. Save before publishing; only returned public links can be copied, and clipboard failures are reported. Publishing again rotates the link. New account tokens default to publishing disabled, and existing token permissions are loaded before changes can be made.
 
-Simultaneous character-level editing, branching/automatic merging, comments, uploads, offline sync, automatic text pagination, and password reset/email verification are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified. Invitations grant access through an explicit, single-use bearer link accepted by a signed-in account; email addresses are display labels, not identity verification.
+Simultaneous character-level editing, branching/automatic merging, comments, offline sync, automatic text pagination, and password reset/email verification are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified. Invitations grant access through an explicit, single-use bearer link accepted by a signed-in account; email addresses are display labels, not identity verification.
 
 ## Shared editing and version history
 
-In **Share → People with access**, the document owner creates an editor or viewer invitation. The first signed-in account to accept receives access; the link expires after 24 hours, works once, and can be revoked before acceptance. Share invitation links privately. Members appear in the same panel; changing a role or removing a member immediately invalidates their edit lease. Invited accounts see the document in their library, and their connected agents inherit that account’s role. Only the document owner can manage collaborators or publish/revoke public viewing links; agent publishing additionally requires its existing publishing grant.
+In **Share → People with access**, the document owner creates an editor or viewer invitation. The first signed-in account to accept receives access; the link expires after 24 hours, works once, and can be revoked before acceptance. Share invitation links privately. Members appear in the same panel; changing a role or removing a member immediately invalidates their edit lease. Invited accounts see the document in their library, and their connected agents inherit that account’s role. Only the document owner can manage collaborators or publish/revoke public viewing links; their connected agents can manage collaborators from terminal MCP tools; agent publishing additionally requires its existing publishing grant.
 
 One editing session holds a document lease at a time, including sessions using the same account or agent credential. The browser acquires a lease when editing starts, renews it every minute, and releases it when editing ends or the page closes. A lost connection may prevent release; the lease expires after five minutes without renewal. Other sessions can read the document and see who is editing. **Stop editing** hands off the lock. Unsaved drafts stay in the browser when a lease is lost; acquiring another lease refreshes clean content, while a changed saved revision requires reconciling a preserved dirty draft.
 
 MCP edits follow `acquire_document_lock` → `get_document` → `update_document` → `release_document_lock`. During long work call `renew_document_lock` at least once a minute. Every update or restore requires the lease’s secret `lockToken` and the current `expectedRevision`; the database checks role, lease ownership/expiry, and revision in the write itself. `423` means the lease is missing, expired, or held by another session; `409` means the saved revision changed. Preserve generated work, read current state, and reconcile rather than retrying a mutation blindly. Lock status never returns the lease secret.
 
 **History** shows saved revisions, author and agent labels, timestamps, change summaries, and restore ancestry. Compare versions by stable page ID, order, and HTML/CSS/JS content. A restore creates a new version; it does not erase subsequent history or change a published snapshot. Existing revisions remain intact and show unknown author metadata where it was never recorded. Members with viewer access can read saved history as well as the current draft.
+
+## Images, GIFs, video, and agent activity
+
+Create a draft first, then call `upload_media` with its `id` and `mimeType`. The local stdio bridge accepts an absolute `filePath`; hosted MCP accepts plain `dataBase64` with a `filename`. Exactly one source is required. PNG, JPEG, animated GIF, WebP, MP4, and WebM are supported, up to **8 MiB per file**, **50 files or 100 MiB per document**. Bytes must match the declared type; browser codec support still determines video playback. Re-uploading identical bytes within a document reuses the asset. Uploads require owner/editor access and do not change the content revision or acquire a lease.
+
+The result contains an absolute `url`, relative `src` such as `/media/ASSET_ID`, and an HTML snippet. Put that snippet in a `kind: "html"` page, preserve the other pages, then save with an edit lease and current revision. Add meaningful image alt text and captions. Use `<video controls playsinline preload="metadata" src="/media/ASSET_ID"></video>` for clips. External URLs, SVG, remote CSS assets, and embedded players remain blocked. Only assets uploaded to this document can be saved in its HTML. **Images & video** in each editor's properties panel offers the same upload-and-insert flow; inserting into a text page retains its text and switches it to HTML mode.
+
+Canonical media URLs require authentication. The renderer adds signed document-scoped access grants for opaque sandbox frames and thumbnails. Grants expire after 24 hours; reload the document for fresh access. Private grants recheck membership; public grants check the current publication and expose only media referenced by that saved snapshot. Republishing or revoking the link invalidates its prior media grant. Saved HTML contains canonical paths without access tokens. Media responses are not cached. Assets remain stored for historical revisions; removing an element does not free its quota, and there is no media deletion tool in this release.
+
+The authenticated **collaborators** menu and **Share → People with access** show each member's clients with company labels and icons. Codex maps to OpenAI, Claude to Anthropic, and Antigravity/Gemini to Google; other clients receive a generic MCP icon. Names come from MCP client metadata or OAuth registration and do not verify the vendor. Green means an authenticated call in the last five minutes, not a guaranteed live connection. OAuth authorizations also appear when idle. Stdio clients appear after an authenticated tool call; activity ages out after a day and revoked credentials disappear. Public readers do not receive collaborator identities.
 
 ## Agent onboarding
 
@@ -65,7 +76,7 @@ Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Cl
 
 Signed-in users can also create these presets from the document library: Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, and Delivery Review. The Custom card provides a portable prompt for Codex, Claude, Antigravity, or another connected agent. The Sales Dashboard uses fictional Northstar figures and a simulated local update stream; it is not connected to real company data.
 
-Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP blocking network, external scripts, forms, popups, and access to the parent app. Each frame receives only its section content through a source-checked message; edits recreate the frame. Authored HTML/CSS is laid out before JavaScript starts. Scripts can initialize immediately or register `DOMContentLoaded`/`load` listeners; ready events are delivered once after script insertion on each visit or replay. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
+Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP allowing only the document media gateway, with external scripts, forms, popups, and access to the parent app blocked. Each frame receives only its section content through a source-checked message; edits recreate the frame. Authored HTML/CSS is laid out before JavaScript starts. Scripts can initialize immediately or register `DOMContentLoaded`/`load` listeners; ready events are delivered once after script insertion on each visit or replay. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
 
 Documents and presentations use their saved `format` to select distinct workspaces. Documents show one portrait page at a time in the editor, preview, and shared reader. Use the outline or **←/→**, **Page Up/Down**, and **Home/End** to turn pages, and **R** or the replay button to restart the current page. Up/down arrows and Space retain normal scrolling and control behavior. Page changes reset reading to the top; leaving a page stops its scripts.
 
@@ -148,7 +159,7 @@ Google credentials are not included. Automated tests mock Google's endpoints; a 
 npm run pack:mcp
 ```
 
-Produces `dist/ayush-vish-docsync-mcp-0.4.0.tgz`. The package source is `packages/mcp/`; the archive includes a Node executable, package metadata, README, MIT license, and dependency notices. The executable is bundled and requires no runtime dependency installation. The `prepack` hook rebuilds when packing/publishing directly from the package directory.
+Produces `dist/ayush-vish-docsync-mcp-0.5.0.tgz`. The package source is `packages/mcp/`; the archive includes a Node executable, package metadata, README, MIT license, and dependency notices. The executable is bundled and requires no runtime dependency installation. The `prepack` hook rebuilds when packing/publishing directly from the package directory.
 
 The npm package is **`@ayush-vish/docsync-mcp`**. Packaging does not publish to npm. Maintainers can publish a new version after updating the manifest and authenticating to the authorized npm account:
 
@@ -162,7 +173,7 @@ Clients can install the npm package with:
 agy mcp add docsync npx -y @ayush-vish/docsync-mcp --url https://YOUR_HOST
 ```
 
-A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Fifteen tools are exposed: connection/template discovery and claiming; document list/read/create/update/publish; lock status/acquire/renew/release; history, version comparison, and restore. See [the MCP README](packages/mcp/README.md) for their contracts.
+A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Twenty tools are exposed: connection and template discovery; document list/read/create/update/publish; media upload; lock status/acquire/renew/release; history/version comparison/restore; and owner-scoped collaborator access and invitation management. See [the MCP README](packages/mcp/README.md) for their contracts.
 
 ### Hosted MCP (OAuth)
 
@@ -175,7 +186,7 @@ agy mcp add --type http docsync https://YOUR_HOST/mcp
 claude mcp add --transport http docsync https://YOUR_HOST/mcp
 ```
 
-The browser authorization page grants document access and lets the user separately allow publishing. OAuth uses authorization code with PKCE, short-lived access tokens, rotating refresh tokens, and account-scoped revocation from **Connect agent**. Approval is bound to the initiating browser by a single-use token and HttpOnly cookie. Registration, authorization, and token exchange have per-IP limits; OAuth JSON/forms are capped at 16 KiB, and API/MCP bodies at 550,000 bytes, including streamed bodies. OAuth pages block inline executable scripts, HTTPS responses use HSTS, and sensitive responses are not cached. Hosted MCP requires migrations through `0004_remote_mcp_oauth.sql`. Local stdio with private agent tokens remains available for clients without remote OAuth.
+The browser authorization page grants document access and lets the user separately allow publishing. OAuth uses authorization code with PKCE, short-lived access tokens, rotating refresh tokens, and account-scoped revocation from **Connect agent**. Approval is bound to the initiating browser by a single-use token and HttpOnly cookie. Registration, authorization, and token exchange have per-IP limits; OAuth JSON/forms are capped at 16 KiB, and ordinary API/MCP bodies at 550,000 bytes, including streamed bodies. Binary media uploads allow 8 MiB; only the `upload_media` hosted RPC allows up to 12 MiB of JSON for base64 overhead. OAuth pages block inline executable scripts, HTTPS responses use HSTS, and sensitive responses are not cached. Hosted MCP requires migrations through `0004_remote_mcp_oauth.sql`. Local stdio with private agent tokens remains available for clients without remote OAuth.
 
 ## Content and sharing
 
@@ -183,17 +194,17 @@ The document model is `{title, format?, sections: [{id, kind?, html, css, js?}]}
 
 `parse5` and `css-tree` validate content on the server. Component previews also validate drafts in the browser. Static content and thumbnails use empty-sandbox iframes; optional per-page `js` uses an opaque `allow-scripts` sandbox with restrictive CSP. HTML script tags and inline event attributes, navigation outside the app, external images, SVG, forms, embeds, remote fonts, and CSS resource requests are disabled. CSS keyframes and self-contained JavaScript animations are supported. HTML components never enter the application DOM.
 
-Limits: 40 sections; 100,000 HTML, 30,000 CSS, and 50,000 JavaScript characters per section; 500,000 bytes per document JSON; 550,000-byte API/MCP request bodies. History shows the latest 100 revisions; the library lists the latest 200 documents per account.
+Limits: 40 sections; 100,000 HTML, 30,000 CSS, and 50,000 JavaScript characters per section; 500,000 bytes per document JSON; 550,000-byte ordinary API/MCP request bodies (media uploads have separate limits below). History shows the latest 100 revisions; the library lists the latest 200 documents per account.
 
 Save before sharing. A link points to a saved revision, so later private edits do not change it. Republishing rotates the URL and revokes its predecessor. The raw link is shown only when publishing. Revocation stops future reads but cannot erase copies already downloaded. Share responses use `no-store`, prioritizing revocation over CDN caching. Localhost links are previews accessible only on the host machine.
 
 ## Deploy to Cloudflare
 
-For the collaboration upgrade, apply **`0006_collaboration.sql` before deploying this Worker**. It adds membership, invitation and lease tables and nullable revision metadata without rewriting saved content. Use the 0.4.0 MCP bridge or reconnect remote MCP to load the new lock tools; older clients cannot update documents without a lease. Rebuild/publish the npm bridge separately when releasing it; changing this repository does not update the npm registry.
+Apply all migrations through **`0007_media_and_agents.sql` before deploying this Worker**, and provision the `MEDIA` R2 binding (`docsync-media` in `wrangler.jsonc`). The media migration adds asset metadata and agent activity without rewriting existing content. Migration `0006_collaboration.sql` is also required for collaboration. It adds membership, invitation and lease tables and nullable revision metadata without rewriting saved content. Use the 0.5.0 MCP bridge or reconnect remote MCP to load the media, lock, and collaborator access tools; older clients cannot update documents without a lease. Rebuild/publish the npm bridge separately when releasing it; changing this repository does not update the npm registry.
 
 1. Run `npm run build` and authenticate with `npx wrangler@4 login`.
 2. Create a database using `npx wrangler@4 d1 create docsync` and replace the database ID placeholder in `wrangler.jsonc`.
-3. Apply all migrations with `npx wrangler@4 d1 migrations apply docsync --remote`.
+3. Create the configured media bucket with `npx wrangler r2 bucket create docsync-media`, or bind an existing bucket you control. Apply all migrations with `npx wrangler@4 d1 migrations apply docsync --remote`.
 4. Generate production credentials using `node scripts/production-secrets.mjs`. It writes private files under `.local/production-*` without deploying anything.
 5. Set `OWNER_KEY_HASH` and `SESSION_SECRET` using `npx wrangler@4 secret put NAME`, using the generated hash and session-secret files. Keep the owner key privately for the legacy workspace.
 6. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if enabling Google sign-in. Register the correct deployed callback URL with Google.
@@ -207,7 +218,7 @@ Account sessions use opaque hashed server-side tokens with a seven-day expiry, H
 
 Before upgrading the local database, run `npm run backup`. It uses SQLite's consistent backup API. Migration `0003_accounts.sql` preserves existing documents under the `legacy` account and keeps legacy credentials functional. New accounts cannot see legacy or other users' documents.
 
-Stop the server before restoring with `npm run restore-backup -- /absolute/path/to/backup.sqlite`. The restore helper checks integrity, refuses live WAL/SHM files, and preserves the old database. Protect backups and the original `.local/config.json`, which contains the password pepper.
+Stop the server before restoring with `npm run restore-backup -- /absolute/path/to/backup.sqlite`. The restore helper checks integrity, refuses live WAL/SHM files, and preserves the old database. Protect backups and the original `.local/config.json`, which contains the password pepper. Local media bytes live in `.local/media`; back up that directory alongside SQLite while uploads are stopped. D1 exports contain media metadata only; keep a separate backup of the R2 objects in production.
 
 Before production migrations, export D1:
 
@@ -225,6 +236,8 @@ npx wrangler@4 d1 export docsync --remote --output=/private/path/docsync-backup.
 npm run check
 npm test
 npm run test:browser
+npm run test:artifacts
+npm run test:media
 npm run pack:mcp
 ```
 

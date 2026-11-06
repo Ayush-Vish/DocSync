@@ -1,6 +1,6 @@
 {
   "name": "docsync",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,6 +13,7 @@
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --experimental-test-isolation=none --test test/*.test.ts && npm run test:stdio",
     "test:browser": "node --experimental-strip-types test/browser.ts",
+    "test:media": "node --experimental-strip-types test/media-browser.ts",
     "test:artifacts": "node --experimental-strip-types test/artifact-browser.ts",
     "mcp": "node dist/docsync-mcp.cjs",
     "setup": "node --experimental-strip-types scripts/setup.mjs",

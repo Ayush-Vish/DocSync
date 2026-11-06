@@ -1,7 +1,8 @@
 // Scripted artifacts get a separate response policy and an opaque sandbox origin.
 // Only inline scripts are allowed: even scripts created by artifact JS cannot
 // load external code. The host's frame-src policy also blocks external navigation.
-export const artifactPolicy = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts";
+import { mediaPolicy } from "./media-url.ts";
+export const artifactPolicy = (origin: string) => `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; ${mediaPolicy(origin)}; font-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox allow-scripts`;
 
 // Keep this script literal self-contained. Serializing a bundled function with
 // toString() can leak esbuild helpers that do not exist inside the sandbox.
@@ -21,6 +22,7 @@ const artifactRuntime = String.raw`(() => {
     const data = event.data;
     if (!data || data.type !== "docsync:render-v1" || typeof data.html !== "string" || typeof data.css !== "string" || typeof data.js !== "string" || data.html.length > 100000 || data.css.length > 30000 || data.js.length > 50000) return;
     if (data.hostCss !== undefined && (typeof data.hostCss !== "string" || data.hostCss.length > 4096)) return;
+    if (data.mediaToken !== undefined && (typeof data.mediaToken !== "string" || data.mediaToken.length > 1000)) return;
     rendered = true;
     // The iframe loads before its payload arrives. Wait for the host viewport's
     // layout, then start CSS and JavaScript together on the active page.
@@ -28,7 +30,17 @@ const artifactRuntime = String.raw`(() => {
       const styles = document.createElement("style");
       styles.textContent = data.css + (data.hostCss || "");
       document.head.append(styles);
-      document.getElementById("artifact").innerHTML = data.html;
+      const template = document.createElement("template");
+      template.innerHTML = data.html;
+      for (const element of template.content.querySelectorAll("img,video,source")) {
+        for (const attr of ["src", "poster"]) {
+          const path = element.getAttribute(attr);
+          if (!path) continue;
+          if (data.mediaToken && /^\/media\/[a-f0-9-]{36}$/.test(path)) element.setAttribute(attr, new URL(path, document.URL).href + "?access=" + encodeURIComponent(data.mediaToken));
+          else element.removeAttribute(attr);
+        }
+      }
+      document.getElementById("artifact").replaceChildren(template.content);
       void document.getElementById("artifact").offsetWidth;
       const script = document.createElement("script");
       script.textContent = data.js;
@@ -40,11 +52,11 @@ const artifactRuntime = String.raw`(() => {
       if (data.navigation === "presentation" || data.navigation === "document") {
         const presenting = data.navigation === "presentation";
         const send = action => window.parent.postMessage({ type: presenting ? "docsync:presentation-v1" : "docsync:document-v1", action }, "*");
-        const interactive = target => target instanceof Element && target.closest("button,input,select,textarea,a,summary,canvas,[contenteditable],[role=button]");
+        const interactive = target => target instanceof Element && target.closest("button,input,select,textarea,a,summary,canvas,video,[contenteditable],[role=button]");
         window.addEventListener("keydown", event => {
           if (event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
           const target = event.target instanceof Element ? event.target : null;
-          if (target && target.closest("input,select,textarea,canvas,[contenteditable],[role=slider],[role=tablist],[role=listbox],[role=menu],[role=tree],[role=grid],[role=spinbutton]")) return;
+          if (target && target.closest("input,select,textarea,canvas,video,[contenteditable],[role=slider],[role=tablist],[role=listbox],[role=menu],[role=tree],[role=grid],[role=spinbutton]")) return;
           if (interactive(target) && (event.key === " " || event.key === "Enter")) return;
           const keys = presenting
             ? { ArrowRight: "next", ArrowDown: "next", PageDown: "next", " ": "next", Enter: "next", ArrowLeft: "previous", ArrowUp: "previous", PageUp: "previous", Home: "first", End: "last", Escape: "exit", g: "overview", G: "overview", r: "replay", R: "replay" }
@@ -103,5 +115,5 @@ const artifactRuntime = String.raw`(() => {
 })()`;
 
 export function artifactFrame(): Response {
-  return new Response(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;font:16px/1.6 system-ui;color:#172033;background:white;overflow-wrap:anywhere}*{box-sizing:border-box}table{border-collapse:collapse;max-width:100%}td,th{padding:8px;border:1px solid #ddd}pre{white-space:pre-wrap}</style></head><body><main id="artifact"></main><script>${artifactRuntime}</script></body></html>`, { headers: { "Content-Type": "text/html;charset=utf-8" } });
+  return new Response(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;font:16px/1.6 system-ui;color:#172033;background:white;overflow-wrap:anywhere}*{box-sizing:border-box}img,video{max-width:100%;height:auto}table{border-collapse:collapse;max-width:100%}td,th{padding:8px;border:1px solid #ddd}pre{white-space:pre-wrap}</style></head><body><main id="artifact"></main><script>${artifactRuntime}</script></body></html>`, { headers: { "Content-Type": "text/html;charset=utf-8" } });
 }

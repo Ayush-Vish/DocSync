@@ -1,7 +1,7 @@
 import { HttpError } from "./content.ts";
 
 // Check the actual stream too: Content-Length can be absent or untrusted.
-async function readBody(request: Request, limit: number) {
+export async function readBody(request: Request, limit: number) {
   if (Number(request.headers.get("Content-Length")) > limit)
     throw new HttpError(413, "Request body is too large.");
   const reader = request.body?.getReader();

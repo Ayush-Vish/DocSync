@@ -1,6 +1,7 @@
 import { cleanCss, cleanHtml, frameSource } from "../content";
 import type { Content } from "../document";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { MediaContext } from "./MediaContext";
 
 export type NavigationAction = "next" | "previous" | "first" | "last" | "overview" | "replay" | "exit" | "activity";
 const documentActions: readonly string[] = ["next", "previous", "first", "last", "replay"];
@@ -57,6 +58,7 @@ export function ArtifactFrame({
   navigation?: "document" | "presentation";
   onNavigate?: (action: NavigationAction) => void;
 }) {
+  const mediaToken = useContext(MediaContext);
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(1056);
   useEffect(() => {
@@ -102,7 +104,7 @@ export function ArtifactFrame({
           title={title}
           sandbox=""
           scrolling={fitSlide ? "no" : undefined}
-          srcDoc={frameSource(framed)}
+          srcDoc={frameSource(framed, mediaToken ? { token: mediaToken, origin: location.origin } : undefined)}
           className="block w-full border-0"
           style={{ width: "100%", height: fitSlide ? "100%" : undefined, border: 0, display: "block" }}
         />
@@ -115,6 +117,7 @@ export function ArtifactFrame({
       css: cleanCss(section.css),
       hostCss: cleanCss(extraCss),
       js: framed.js || "",
+      mediaToken,
       autoHeight: shouldAutoHeight,
       navigation: onNavigate ? navigation : undefined,
     };
@@ -153,10 +156,12 @@ export function ArtifactFrame({
   }
 }
 
-export function ArtifactThumbnail({ section, title, slide = true }: { section: Content["sections"][number]; title: string; slide?: boolean }) {
+export function ArtifactThumbnail({ section, title, slide = true, mediaToken: override }: { section: Content["sections"][number]; title: string; slide?: boolean; mediaToken?: string }) {
+  const inherited = useContext(MediaContext);
+  const mediaToken = override ?? inherited;
   try {
     const css = section.css + (slide ? fittedSlideCss : documentPageCss) + "*{animation:none!important;transition:none!important}.speaker-notes{display:none!important}";
-    return <FrameViewport slide={slide}><iframe title={title} tabIndex={-1} sandbox="" loading="lazy" scrolling="no" srcDoc={frameSource({ ...section, css })} style={{ width: "100%", height: "100%", border: 0, display: "block", pointerEvents: "none", transform: "none" }} /></FrameViewport>;
+    return <FrameViewport slide={slide}><iframe title={title} tabIndex={-1} sandbox="" loading="lazy" scrolling="no" srcDoc={frameSource({ ...section, css }, mediaToken ? { token: mediaToken, origin: location.origin, thumbnail: true } : undefined)} style={{ width: "100%", height: "100%", border: 0, display: "block", pointerEvents: "none", transform: "none" }} /></FrameViewport>;
   } catch {
     return <iframe title={title} sandbox="" srcDoc="<!doctype html><p>Preview unavailable.</p>" />;
   }

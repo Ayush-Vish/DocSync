@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import { api } from "./api";
 import { Button } from "@/components/ui/button";
 
-type Sharing = { members: { accountId: string; name: string; role: "owner" | "editor" | "viewer" }[]; invitations: { id: string; role: string; expiresAt: number }[] };
+import type { Collaborator } from "../agent-client";
+import { AgentIdentity } from "./AgentIdentity";
+
+type Sharing = { members: Collaborator[]; invitations: { id: string; role: string; expiresAt: number }[] };
 
 export function Collaborators({ documentId }: { documentId: string }) {
   const [data, setData] = useState<Sharing | null>(null), [role, setRole] = useState("editor"), [url, setUrl] = useState(""), [busy, setBusy] = useState(false), [error, setError] = useState(""), [copied, setCopied] = useState(false);
@@ -23,7 +26,7 @@ export function Collaborators({ documentId }: { documentId: string }) {
     <h3>People with access</h3>
     <p>Invite a signed-in user to this draft. Their connected agents receive the same document access. Editors take turns using an edit lock.</p>
     {data?.members.map(member => <div className="collaborator-row" key={member.accountId}>
-      <span>{member.name}</span>
+      <span>{member.name}<span className="collaborator-agents">{member.agents.map(agent => <AgentIdentity key={agent.name} agent={agent} />)}</span></span>
       {member.role === "owner" ? <small>Owner</small> : <>
         <select aria-label={`Access for ${member.name}`} disabled={busy} value={member.role} onChange={event => void run(async () => { await api(path, "PATCH", { accountId: member.accountId, role: event.target.value }); })}><option value="editor">Editor</option><option value="viewer">Viewer</option></select>
         <Button variant="ghost" size="sm" disabled={busy} onClick={() => void run(async () => { await api(path, "DELETE", { accountId: member.accountId }); })}>Remove</Button>
