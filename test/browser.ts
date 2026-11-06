@@ -18,6 +18,13 @@ import { handle } from "../src/worker.ts";
 import { hash } from "../src/auth.ts";
 
 const f = await fixture();
+const invitationEmails: { to: unknown; text?: string }[] = [];
+f.env.DOCSYNC_EMAIL_FROM = "invites@example.com";
+f.env.EMAIL = { async send(message) {
+  assert.ok("subject" in message);
+  invitationEmails.push({ to: message.to, text: message.text });
+  return { messageId: `browser-mock-${invitationEmails.length}` };
+} };
 const root = resolve("dist/public");
 f.env.ASSETS = {
   fetch: async (request) => {
@@ -339,6 +346,7 @@ try {
   assert.equal(await page.$eval(".share-dialog footer button:last-child", button => (button as HTMLButtonElement).disabled), true);
   assert.equal(await page.$$eval(".share-dialog footer button", buttons => (buttons.find(button => button.textContent?.trim() === "Copy link") as HTMLButtonElement).disabled), true);
   assert.ok(await page.$('.share-dialog select[aria-label="Invitation access"]'), "Private draft collaboration has an explicit role selector");
+  assert.ok(await page.$('input[aria-label="Invitation email address"]'), "Configured email invitations have a recipient field");
   await page.screenshot({ path: "/tmp/docsync-share.png" });
   await page.keyboard.press("Escape");
   await page.waitForSelector("dialog.share-dialog", { hidden: true });
@@ -427,12 +435,18 @@ try {
   assert.ok(sharedLayout.readerWidth >= 900);
   assert.ok(sharedLayout.frameWidth >= 760);
   assert.ok(sharedLayout.frameHeight >= 640);
-  // A second signed-in account accepts a one-time editor invitation. Its
+  // A second signed-in account accepts an invitation sent through a mock email binding. Its
   // browser waits for the owner's lease, then saves an attributed version.
   await click("Share");
-  await click("Create invitation");
+  await page.waitForSelector('input[aria-label="Invitation email address"]');
+  await fill('input[aria-label="Invitation email address"]', 'collaborator@example.com');
+  await click("Send invitation");
+  await page.waitForFunction(() => document.querySelector('.collaborators [role="status"]')?.textContent?.includes('collaborator@example.com'));
   await page.waitForSelector('input[aria-label="Invitation link"]');
   const invitationUrl = await page.$eval('input[aria-label="Invitation link"]', input => (input as HTMLInputElement).value);
+  assert.equal(invitationEmails.length, 1);
+  assert.equal(invitationEmails[0].to, 'collaborator@example.com');
+  assert.ok(invitationEmails[0].text?.includes(invitationUrl));
   await page.screenshot({ path: '/tmp/docsync-collaborator-sharing.png', fullPage: true });
   await page.keyboard.press("Escape");
   await publicPage.goto(invitationUrl);

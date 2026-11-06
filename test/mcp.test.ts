@@ -133,6 +133,20 @@ test("official MCP client exercises document tools and real Worker API in-proces
   assert.equal(restored.revision, 3);
   assert.equal((await client.callTool({ name: "release_document_lock", arguments: { id: doc.id, lockToken } })).isError, false);
   assert.equal(parse(await client.callTool({ name: "get_document_lock", arguments: { id: doc.id } })).lock, null);
+  assert.equal(tools.tools.find(tool => tool.name === "invite_document_collaborator")!.annotations?.openWorldHint, true);
+  const unavailable = await client.callTool({ name: "invite_document_collaborator", arguments: { id: doc.id, role: "viewer", email: "collaborator@example.com" } });
+  assert.equal(unavailable.isError, true);
+  assert.equal(parse(unavailable).details.code, "EMAIL_NOT_CONFIGURED");
+  let recipient = "";
+  f.env.DOCSYNC_EMAIL_FROM = "invites@example.com";
+  f.env.EMAIL = { async send(message) { assert.ok("subject" in message); recipient = String(message.to); return { messageId: "mcp-invitation" }; } };
+  const emailed = await client.callTool({ name: "invite_document_collaborator", arguments: { id: doc.id, role: "editor", email: "collaborator@example.com" } });
+  assert.equal(emailed.isError, false);
+  assert.equal(recipient, "collaborator@example.com");
+  assert.equal(parse(emailed).emailDelivery.messageId, "mcp-invitation");
+  const sharing = parse(await client.callTool({ name: "get_document_access", arguments: { id: doc.id } }));
+  assert.equal(sharing.invitations[0].recipientEmail, recipient);
+  assert.equal((await client.callTool({ name: "revoke_document_invitation", arguments: { id: doc.id, invitationId: parse(emailed).id } })).isError, false);
 });
 
 test("stdio media capability uploads exactly the chosen local file bytes", async t => {

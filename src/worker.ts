@@ -21,6 +21,7 @@ import { maxMediaBytes } from "./media-config.ts";
 import { readBody } from "./request.ts";
 import type { Document } from "./document.ts";
 import { agentActivity, collaborators } from "./agents.ts";
+import { invitationEmailAvailable, inviteByEmail } from "./invitation-email.ts";
 
 const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -328,10 +329,12 @@ async function route(request: Request, env: Env): Promise<Response> {
       if (method === "DELETE") return json(await collaboration.releaseLock(env.DB, id, principal, collaboration.lockToken(input.lockToken)));
     }
     if (action === "access") {
-      if (method === "GET") return json({ ...await collaboration.sharing(env.DB, id, principal.accountId), members: await collaborators(env.DB, id, principal.accountId) });
+      if (method === "GET") return json({ ...await collaboration.sharing(env.DB, id, principal.accountId), members: await collaborators(env.DB, id, principal.accountId), emailInvitationsAvailable: invitationEmailAvailable(env) });
       await collaboration.access(env.DB, id, principal.accountId, "owner");
       const input = await body(request);
-      if (method === "POST") return json(await collaboration.invite(env.DB, id, principal.accountId, input.role, new URL(request.url).origin), 201);
+      if (method === "POST") return json(input.email === undefined
+        ? await collaboration.invite(env.DB, id, principal.accountId, input.role, new URL(request.url).origin)
+        : await inviteByEmail(request, env, id, principal.accountId, input.role, input.email), 201);
       if (method === "PATCH" && input.role === undefined) throw new HttpError(400, "Choose editor or viewer access");
       if (method === "PATCH" || method === "DELETE") return json(await collaboration.changeMember(env.DB, id, principal.accountId, input.accountId, method === "PATCH" ? input.role : undefined));
     }

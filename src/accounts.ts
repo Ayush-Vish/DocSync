@@ -30,9 +30,10 @@ export async function rateLimit(
   category: string,
   max: number,
   seconds = 900,
+  subject?: string,
 ) {
   const key = await hash(
-      `${category}:${request.headers.get("CF-Connecting-IP") || "local"}`,
+      `${category}:${subject ?? (request.headers.get("CF-Connecting-IP") || "local")}`,
     ),
     time = now();
   await env.DB.prepare(

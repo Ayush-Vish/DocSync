@@ -1,3 +1,5 @@
+import type { CloudflareBindings } from "./cloudflare-env";
+
 export interface Statement {
   bind(...values: unknown[]): Statement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
@@ -17,6 +19,8 @@ export interface MediaBucket {
 export interface Env {
   DB: Database;
   MEDIA?: MediaBucket;
+  EMAIL?: Pick<CloudflareBindings["EMAIL"], "send">;
+  DOCSYNC_EMAIL_FROM?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   OWNER_KEY_HASH: string;

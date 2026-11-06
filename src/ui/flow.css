@@ -65,6 +65,9 @@
 .edit-lock-status > span { flex: 1; min-width: 180px; }
 .edit-lock-status > small { width: 100%; font-size: 11px; }
 .collaborators { border-block: 1px solid var(--border); padding: 16px 0; margin: 16px 0; }
+.collaborator-invite { margin-top: 12px; }
+.collaborator-invite label { display: grid; gap: 6px; font-size: 12px; }
+.collaborator-invite input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); color: var(--foreground); }
 .collaborator-presence { position: relative; font-size: 12px; }
 .collaborator-presence > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; list-style: none; }
 .collaborator-presence > summary::-webkit-details-marker { display: none; }

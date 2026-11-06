@@ -97,6 +97,8 @@ The skill supplies instructions and templates; it does not authenticate the MCP 
 
 Owners invite signed-in editors/viewers through Share → People with access. Agents inherit that account’s document role; never copy credentials between collaborators. Public links are read-only. Invite links grant access to their first signed-in accepter, expire after 24 hours and work once. Viewers may read version history. Use backend/bridge 0.5.0 or reconnect remote MCP for lease tools; older update calls without a lock are rejected.
 
+Owner agents manage read/write access with `get_document_access` and `update_document_collaborator_access` (`viewer`, `editor`, or `remove`). To send an email invitation explicitly requested by the user, call `invite_document_collaborator` with `id`, `role`, and `email`; accepting requires the recipient’s signed-in email. Bridge/backend 0.5.1 adds the email input. Email Sending must be configured on the server. A successful send confirms service acceptance only. Never retry uncertain sends automatically or silently replace requested email delivery with a link. Read the MCP reference for delivery errors and limits.
+
 
 ## Images, GIFs, and video
 

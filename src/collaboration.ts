@@ -90,26 +90,30 @@ export async function members(db: Database, id: string, accountId: string) {
 export async function sharing(db: Database, id: string, accountId: string) {
   await access(db, id, accountId, "owner");
   const people = await members(db, id, accountId);
-  const invitations = await db.prepare("SELECT id,role,expires_at AS expiresAt FROM document_invitations WHERE document_id=? AND accepted_by IS NULL AND expires_at>unixepoch() ORDER BY expires_at DESC LIMIT 50").bind(id).all();
+  const invitations = await db.prepare("SELECT id,role,recipient_email AS recipientEmail,expires_at AS expiresAt FROM document_invitations WHERE document_id=? AND accepted_by IS NULL AND expires_at>unixepoch() ORDER BY expires_at DESC LIMIT 50").bind(id).all();
   return { members: people, invitations: invitations.results };
 }
-export async function invite(db: Database, id: string, accountId: string, role: unknown, origin: string) {
+export async function invite(db: Database, id: string, accountId: string, role: unknown, origin: string, recipientEmail: string | null = null) {
   await access(db, id, accountId, "owner");
   const permission = memberRole(role), token = randomToken(), invitationId = crypto.randomUUID();
-  const result = await db.prepare("INSERT INTO document_invitations(id,document_id,token_hash,role,expires_at) SELECT ?,id,?,?,unixepoch()+86400 FROM documents WHERE id=? AND account_id=? AND (SELECT COUNT(*) FROM document_invitations WHERE document_id=documents.id AND accepted_by IS NULL AND expires_at>unixepoch())<50").bind(invitationId, await hash(token), permission, id, accountId).run();
+  const result = await db.prepare("INSERT INTO document_invitations(id,document_id,token_hash,role,expires_at,recipient_email) SELECT ?,id,?,?,unixepoch()+86400,? FROM documents WHERE id=? AND account_id=? AND (SELECT COUNT(*) FROM document_invitations WHERE document_id=documents.id AND accepted_by IS NULL AND expires_at>unixepoch())<50").bind(invitationId, await hash(token), permission, recipientEmail, id, accountId).run();
   if (!result.meta.changes) { await access(db, id, accountId, "owner"); throw new HttpError(400, "Revoke an unused invitation before creating another"); }
-  return { id: invitationId, url: `${origin}/invite#invite=${token}`, role: permission };
+  return { id: invitationId, url: `${origin}/invite#invite=${token}`, role: permission, recipientEmail };
 }
 export async function invitation(db: Database, token: string) {
-  const row = await db.prepare("SELECT i.document_id AS documentId,d.title,i.role,i.expires_at AS expiresAt FROM document_invitations i JOIN documents d ON d.id=i.document_id WHERE i.token_hash=? AND i.accepted_by IS NULL AND i.expires_at>unixepoch()")
-    .bind(await hash(token)).first<{ documentId: string; title: string; role: "editor" | "viewer"; expiresAt: number }>();
+  const row = await db.prepare("SELECT i.document_id AS documentId,d.title,i.role,i.recipient_email AS recipientEmail,i.expires_at AS expiresAt FROM document_invitations i JOIN documents d ON d.id=i.document_id WHERE i.token_hash=? AND i.accepted_by IS NULL AND i.expires_at>unixepoch()")
+    .bind(await hash(token)).first<{ documentId: string; title: string; role: "editor" | "viewer"; recipientEmail: string | null; expiresAt: number }>();
   if (!row) throw new HttpError(404, "Invitation expired, revoked, or already used");
   return row;
 }
 export async function acceptInvitation(db: Database, token: string, accountId: string) {
   const target = await invitation(db, token), acceptanceId = crypto.randomUUID(), digest = await hash(token);
+  if (target.recipientEmail) {
+    const account = await db.prepare("SELECT email FROM accounts WHERE id=?").bind(accountId).first<{ email: string | null }>();
+    if (account?.email?.toLowerCase() !== target.recipientEmail) throw new HttpError(403, "Sign in with the email address this invitation was sent to");
+  }
   const results = await db.batch([
-    db.prepare("UPDATE document_invitations SET accepted_by=?,acceptance_id=? WHERE token_hash=? AND accepted_by IS NULL AND expires_at>unixepoch() AND EXISTS(SELECT 1 FROM documents d WHERE d.id=document_id AND d.account_id<>?)").bind(accountId, acceptanceId, digest, accountId),
+    db.prepare("UPDATE document_invitations SET accepted_by=?,acceptance_id=? WHERE token_hash=? AND accepted_by IS NULL AND expires_at>unixepoch() AND EXISTS(SELECT 1 FROM documents d WHERE d.id=document_id AND d.account_id<>?) AND (recipient_email IS NULL OR recipient_email=(SELECT lower(email) FROM accounts WHERE id=?))").bind(accountId, acceptanceId, digest, accountId, accountId),
     db.prepare("INSERT INTO document_members(document_id,account_id,role) SELECT document_id,?,role FROM document_invitations WHERE token_hash=? AND accepted_by=? AND acceptance_id=? ON CONFLICT(document_id,account_id) DO UPDATE SET role=CASE WHEN document_members.role='editor' THEN 'editor' ELSE excluded.role END").bind(accountId, digest, accountId, acceptanceId),
   ]);
   if (!results[0].meta.changes) throw new HttpError(409, "Invitation was already used or this document belongs to you");

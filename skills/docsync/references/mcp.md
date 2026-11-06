@@ -30,7 +30,7 @@ Use the DocSync tools exposed by the current client; prefixes vary between Codex
 | Tool | Inputs / purpose |
 | --- | --- |
 | `get_document_access` | `id`. List members, access roles, connected agents, and pending invitation IDs for an owned document. |
-| `invite_document_collaborator` | `id`, `role`. Create a one-time invitation link for a document you own. |
+| `invite_document_collaborator` | `id`, `role` (`viewer` = read only, `editor` = read/write), optional `email`. Send a recipient-bound email invitation when supplied; otherwise create a private single-use link. |
 | `update_document_collaborator_access` | `id`, `accountId`, `role`: `editor`, `viewer`, or `remove`. Manage member access. |
 | `revoke_document_invitation` | `id`, `invitationId`. Revoke a pending invite. |
 | `get_document_lock` | `id`. Read holder and expiry without exposing the lease secret. |
@@ -73,7 +73,9 @@ Publishing makes a snapshot readable by anyone with the hosted link. Later draft
 
 Acquire a document lease before editing, read after acquisition, renew at least once a minute during long work, save with the token and current revision, verify, then release. On `423` preserve generated work and wait for/reacquire a lease; on `409` read and reconcile. Never blindly retry mutations or change only the expected revision. Leases expire five minutes after their last renewal. If acquisition’s result is uncertain, check status and allow expiry instead of repeatedly acquiring.
 
-The owner shares the private draft through one-time, 24-hour invitations accepted by a signed-in account. Account-connected agents inherit owner/editor/viewer access. Viewers can read current content and history. Editors can edit/restore with a lease. Only document owners can publish or manage access; their connected agents can manage invitations and member roles through MCP; publishing also requires the credential’s grant. Public viewing links remain read-only. Use backend/bridge 0.5.0 or reconnect remote MCP to discover these tools.
+The owner shares the private draft through one-time, 24-hour invitations accepted by a signed-in account. Account-connected agents inherit owner/editor/viewer access. Viewers can read current content and history. Editors can edit/restore with a lease. Only document owners can publish or manage access; their connected agents can manage invitations and member roles through MCP; publishing also requires the credential’s grant. Public viewing links remain read-only. Use backend/bridge 0.5.1 or reconnect remote MCP to discover email invitation inputs.
+
+Supply `email` only when the user requests an invitation to that recipient. Email invitations require migration `0008_email_invitations.sql`, the `EMAIL` Workers binding, a Cloudflare Email Sending sender domain, and `DOCSYNC_EMAIL_FROM`. The signed-in accepting account must match the recipient email. `emailDelivery.status: "accepted"` confirms sending-service acceptance, not inbox delivery. Failed or uncertain sends revoke the invitation; never retry them automatically. Sending is limited to 10 attempts per owner per hour, surviving revocation. `EMAIL_NOT_CONFIGURED` creates no invitation; omit email only if the user wants a private link instead.
 
 
 ## Uploaded media
