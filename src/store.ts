@@ -97,7 +97,31 @@ export async function listDocuments(db: Database, accountId = "legacy") {
   return (
     await db
       .prepare(
-        "SELECT d.id, d.title, d.current_revision AS revision, d.updated_at, CASE WHEN json_extract(r.content, '$.format') IN ('presentation', 'slides') OR json_extract(r.content, '$.sections[0].html') LIKE '%slide%' THEN 'presentation' ELSE COALESCE(json_extract(r.content, '$.format'), 'document') END AS format FROM documents d LEFT JOIN revisions r ON r.document_id = d.id AND r.revision = d.current_revision WHERE d.account_id=? ORDER BY d.updated_at DESC LIMIT 200",
+        // Explicit formats always win. Infer old untyped decks from slide class
+        // tokens on every page, without returning snapshot bodies to the list.
+        `SELECT d.id, d.title, d.current_revision AS revision, d.updated_at,
+          CASE
+            WHEN json_extract(r.content, '$.format') = 'document' THEN 'document'
+            WHEN json_extract(r.content, '$.format') IN ('presentation', 'slides') THEN 'presentation'
+            WHEN json_array_length(r.content, '$.sections') > 0 AND NOT EXISTS (
+              SELECT 1 FROM json_each(r.content, '$.sections') s
+              WHERE NOT EXISTS (
+                WITH RECURSIVE classes(rest, attribute) AS (
+                  SELECT json_extract(s.value, '$.html'), 0
+                  UNION ALL
+                  SELECT substr(rest, instr(rest, ' class="') + 8), 1
+                  FROM classes WHERE instr(rest, ' class="') > 0
+                )
+                SELECT 1 FROM classes WHERE attribute = 1 AND instr(
+                  ' ' || replace(replace(replace(substr(rest, 1, instr(rest, '"') - 1), char(9), ' '), char(10), ' '), char(13), ' ') || ' ',
+                  ' slide '
+                ) > 0
+              )
+            ) THEN 'presentation'
+            ELSE 'document'
+          END AS format
+        FROM documents d LEFT JOIN revisions r ON r.document_id = d.id AND r.revision = d.current_revision
+        WHERE d.account_id=? ORDER BY d.updated_at DESC LIMIT 200`,
       )
       .bind(accountId)
       .all()

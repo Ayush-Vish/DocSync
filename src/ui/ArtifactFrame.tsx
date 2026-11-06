@@ -2,8 +2,9 @@ import { cleanCss, cleanHtml, frameSource } from "../content";
 import type { Content } from "../document";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-export type PresentationAction = "next" | "previous" | "first" | "last" | "overview" | "replay" | "exit" | "activity";
-const presentationActions: readonly string[] = ["next", "previous", "first", "last", "overview", "replay", "exit", "activity"];
+export type NavigationAction = "next" | "previous" | "first" | "last" | "overview" | "replay" | "exit" | "activity";
+const documentActions: readonly string[] = ["next", "previous", "first", "last", "replay"];
+const presentationActions: readonly string[] = [...documentActions, "overview", "exit", "activity"];
 
 // Keep the authored viewport stable. Resize the canvas, never reflow a slide into a mobile document.
 function FrameViewport({ children, slide = true }: { children: ReactNode; slide?: boolean }) {
@@ -37,17 +38,8 @@ html,body,*{scrollbar-width:none!important}
 ::-webkit-scrollbar{display:none!important}
 body>nav[aria-label="Preview controls"],body>nav[aria-label="Presentation controls"],#ds-progress,#ds-float-bar,#ds-grid-overlay{display:none!important}
 body:has(>.page),body:has(>#artifact>.page){padding:0!important;background:white!important}
-body>.page,#artifact>.page{margin:0!important;max-width:none!important;min-height:1056px;box-shadow:none!important}
-`;
-
-const interactiveBlockCss = `
-html,body{margin:0!important;padding:0!important;width:100%!important;min-width:0!important;background:transparent!important;overflow:hidden!important;scrollbar-width:none!important}
-::-webkit-scrollbar{display:none!important}
-body>nav[aria-label="Preview controls"],body>nav[aria-label="Presentation controls"],#ds-progress,#ds-float-bar,#ds-grid-overlay{display:none!important}
-#artifact{width:100%!important;min-width:0!important;margin:0!important;padding:0!important;display:block!important}
-body>.page,#artifact>.page,.page{width:100%!important;max-width:100%!important;min-width:0!important;margin:0!important;padding:clamp(16px,2.5vw,28px)!important;box-shadow:none!important;border-top:none!important}
-table{width:100%!important;max-width:100%!important}
-.metric-grid,.grid,.region-grid{width:100%!important;max-width:100%!important}
+body>.page,#artifact>.page{margin:0!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:1056px;box-shadow:none!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 `;
 
 export function ArtifactFrame({
@@ -55,31 +47,31 @@ export function ArtifactFrame({
   title,
   fitSlide = false,
   documentPage = false,
-  fitBlock = false,
-  minHeight = 240,
-  onPresentationAction,
+  navigation,
+  onNavigate,
 }: {
   section: Content["sections"][number];
   title: string;
   fitSlide?: boolean;
   documentPage?: boolean;
-  fitBlock?: boolean;
-  minHeight?: number;
-  onPresentationAction?: (action: PresentationAction) => void;
+  navigation?: "document" | "presentation";
+  onNavigate?: (action: NavigationAction) => void;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(fitBlock ? minHeight : 1056);
+  const [height, setHeight] = useState(1056);
   useEffect(() => {
-    if (!onPresentationAction) return;
+    if (!onNavigate || !navigation) return;
+    const actions = navigation === "document" ? documentActions : presentationActions;
+    const type = navigation === "document" ? "docsync:document-v1" : "docsync:presentation-v1";
     const receive = (event: MessageEvent) => {
-      if (event.source === frame.current?.contentWindow && event.data?.type === "docsync:presentation-v1" && presentationActions.includes(event.data.action))
-        onPresentationAction(event.data.action);
+      if (event.source === frame.current?.contentWindow && event.data?.type === type && actions.includes(event.data.action))
+        onNavigate(event.data.action);
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
-  }, [onPresentationAction]);
+  }, [onNavigate, navigation]);
   useEffect(() => {
-    if (!documentPage && !fitBlock) return;
+    if (!documentPage) return;
     const resize = (event: MessageEvent) => {
       if (
         event.source !== frame.current?.contentWindow ||
@@ -88,26 +80,23 @@ export function ArtifactFrame({
         return;
       const next = event.data.height;
       if (typeof next === "number" && Number.isFinite(next) && next > 0 && next <= 100000) {
-        const floor = fitBlock ? minHeight : 1056;
-        setHeight(Math.max(floor, Math.ceil(next)));
+        setHeight(Math.max(1056, Math.ceil(next)));
       }
     };
     window.addEventListener("message", resize);
     return () => window.removeEventListener("message", resize);
-  }, [documentPage, fitBlock, minHeight]);
+  }, [documentPage]);
   try {
     const extraCss = fitSlide
       ? fittedSlideCss
-      : fitBlock
-      ? interactiveBlockCss
       : documentPage
       ? documentPageCss
       : "";
     const framed = { ...section, css: section.css + extraCss };
-    const shouldAutoHeight = documentPage || fitBlock;
+    const shouldAutoHeight = documentPage;
 
     const wrap = (element: ReactNode) => fitSlide ? <FrameViewport>{element}</FrameViewport> : element;
-    if (!framed.js && !shouldAutoHeight && !onPresentationAction) {
+    if (!framed.js && !shouldAutoHeight && !onNavigate) {
       return wrap(
         <iframe
           title={title}
@@ -127,7 +116,7 @@ export function ArtifactFrame({
       hostCss: cleanCss(extraCss),
       js: framed.js || "",
       autoHeight: shouldAutoHeight,
-      presenting: Boolean(onPresentationAction),
+      navigation: onNavigate ? navigation : undefined,
     };
 
     return wrap(
@@ -136,7 +125,6 @@ export function ArtifactFrame({
         style={{
           width: "100%",
           height: fitSlide ? "100%" : `${height}px`,
-          minHeight: fitBlock ? `${minHeight}px` : undefined,
           border: 0,
           display: "block",
         }}
@@ -144,7 +132,7 @@ export function ArtifactFrame({
         title={title}
         src="/artifact-frame"
         sandbox="allow-scripts"
-        scrolling={fitSlide || fitBlock || documentPage ? "no" : undefined}
+        scrolling={fitSlide || documentPage ? "no" : undefined}
         referrerPolicy="no-referrer"
         className="block w-full border-0"
         onLoad={(event) => {

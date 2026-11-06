@@ -1,0 +1,25 @@
+.document-viewer { display: flex; flex-direction: column; flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; background: #f5f6f8; }
+.document-page-toolbar { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 52px; padding: 8px 16px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+.document-page-toolbar nav { display: flex; align-items: center; gap: 4px; }
+.document-page-toolbar nav > button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: #475569; cursor: pointer; }
+.document-page-toolbar nav > button:hover:not(:disabled) { background: #eef2ff; color: #4f46e5; }
+.document-page-toolbar nav > button:disabled { opacity: .3; cursor: default; }
+.document-page-toolbar button:focus-visible, .doc-outline-item-info:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+.document-page-toolbar output { min-width: 100px; padding: 0 8px; text-align: center; font: 12px/1.5 system-ui; color: #475569; font-variant-numeric: tabular-nums; }
+.document-page-actions { display: flex; align-items: center; gap: 4px; }
+.document-viewer .document-pages-scroll { padding: 28px 24px 48px; overscroll-behavior: contain; scrollbar-width: thin; }
+.document-viewer .document-paper { width: min(100%, 816px); min-width: 0; min-height: 1056px; margin: 0 auto; border-radius: 3px; overflow: hidden; box-shadow: 0 2px 12px #18212f0a; }
+.document-page-enter { animation: document-page-enter 180ms ease-out both; }
+.document-text-page { min-height: 1056px; padding: 40px 48px; }
+.doc-studio-center:has(>.document-viewer) { overflow: hidden; }
+.doc-outline-item-info { padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.doc-outline-item:focus-within .doc-outline-actions { opacity: 1; }
+@keyframes document-page-enter { from { opacity: .5; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (max-width: 800px) {
+  .document-page-toolbar { padding: 8px; gap: 4px; }
+  .document-page-toolbar output { min-width: 88px; padding: 0 4px; }
+  .document-page-toolbar nav { gap: 0; }
+  .document-viewer .document-pages-scroll { padding: 16px 10px 32px; }
+  .document-text-page { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .document-page-enter { animation: none; } }

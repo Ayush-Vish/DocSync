@@ -5,6 +5,7 @@ import { ShareDialog } from "./ShareDialog";
 import { AgentSkill } from "./AgentSkill";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
+import { DocumentViewer } from "./DocumentViewer";
 import { DocumentCover } from "./DocumentCover";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -125,6 +126,7 @@ const brand = (
 
 const blank = (): Content => ({
   title: "Untitled document",
+  format: "document",
   sections: [
     {
       id: crypto.randomUUID(),
@@ -162,20 +164,8 @@ const VISUAL_TEMPLATES = [
   },
 ];
 
-function Preview({ sections }: { sections: Content["sections"] }) {
-  return (
-    <div className="preview-stack">
-      {sections.map((section, index) => (
-        <section className="document-paper" key={section.id} aria-label={`Page ${index + 1}`}>
-          <ArtifactFrame title={`Page ${index + 1}: ${section.id}`} section={section} documentPage />
-        </section>
-      ))}
-    </div>
-  );
-}
-
 const slideMarkup = (html: string) =>
-  /class\s*=\s*["'][^"']*\bslide\b[^"']*["']/i.test(html);
+  [...html.matchAll(/\sclass\s*=\s*(["'])(.*?)\1/gis)].some(match => match[2].split(/\s+/).includes("slide"));
 
 const isPresentationContent = (content: Content) =>
   content.format ? content.format === "presentation" : content.sections.every((section) => slideMarkup(section.html));
@@ -203,22 +193,23 @@ function SharedViewer({
   const itemName = isPresentation ? "slide" : "page";
 
   useEffect(() => {
+    if (!isPresentation) return;
     const navigate = (event: KeyboardEvent) => {
-      if (slideshow || (event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) return;
+      if (slideshow || event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || (event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) return;
       if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        event.preventDefault();
         setPage((value) => Math.max(0, value - 1));
       } else if (
         event.key === "ArrowRight" ||
-        event.key === "PageDown" ||
-        (slideshow && (event.key === " " || event.key === "Enter"))
+        event.key === "PageDown"
       ) {
-        if (event.key === " ") event.preventDefault();
+        event.preventDefault();
         setPage((value) => Math.min(lastPage, value + 1));
       }
     };
     window.addEventListener("keydown", navigate);
     return () => window.removeEventListener("keydown", navigate);
-  }, [lastPage, onSlideshowChange, slideshow]);
+  }, [isPresentation, lastPage, slideshow]);
 
   const controls = (
     <div className="shared-viewer-toolbar" aria-label={`${isPresentation ? "Slide" : "Page"} navigation`}>
@@ -294,13 +285,9 @@ function SharedViewer({
     </section>
   );
 
-  return (
-    <section className="shared-viewer shared-document-viewer" aria-label="Document viewer">
-      <div className="document-pages-scroll">
-        <Preview sections={content.sections} />
-      </div>
-    </section>
-  );
+  return <div className="shared-viewer shared-document-viewer">
+    <DocumentViewer sections={content.sections} page={page} onPageChange={setPage} title={content.title} />
+  </div>;
 }
 
 function SharedWorkspace({ content, error }: { content: Content | null; error: string }) {
@@ -309,22 +296,7 @@ function SharedWorkspace({ content, error }: { content: Content | null; error: s
     typeof window !== "undefined" && (location.hash === "#present" || new URLSearchParams(location.search).get("mode") === "present")
   );
 
-  const changeSlideshow = (open: boolean) => {
-    setSlideshow(open);
-    if (open) {
-      void document.documentElement.requestFullscreen?.().catch(() => undefined);
-    } else if (document.fullscreenElement) {
-      void document.exitFullscreen?.().catch(() => undefined);
-    }
-  };
-
-  useEffect(() => {
-    const syncFullscreen = () => {
-      if (!document.fullscreenElement) setSlideshow(false);
-    };
-    document.addEventListener("fullscreenchange", syncFullscreen);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
-  }, []);
+  const changeSlideshow = setSlideshow;
 
   return (
     <div className="app-shell shared-app-shell document-shell">
@@ -1388,7 +1360,7 @@ function getSectionTitle(s: Content["sections"][number], idx: number): string {
       if (text) return text;
     }
   }
-  return s.kind === "text" ? `Text Section ${idx + 1}` : `Block ${idx + 1}`;
+  return `Page ${idx + 1}`;
 }
 
 function getSectionIcon(s: Content["sections"][number]): React.ComponentType<{ className?: string }> {
@@ -1423,7 +1395,7 @@ function SlashCommandMenu({
     <div className="slash-menu-overlay" onClick={onClose} role="dialog" aria-modal="true">
       <div className="slash-menu-card" onClick={(e) => e.stopPropagation()}>
         <div className="slash-menu-header">
-          <span className="title">Insert Block (or type /)</span>
+          <span className="title">Insert page (or type /)</span>
           <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={onClose}>
             <X className="w-3.5 h-3.5" />
           </Button>
@@ -1431,7 +1403,7 @@ function SlashCommandMenu({
         <div className="p-2 border-b border-slate-100">
           <Input
             autoFocus
-            placeholder="Search block type..."
+            placeholder="Search page type..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="h-8 text-xs bg-slate-50 border-slate-200"
@@ -1470,7 +1442,6 @@ function DocStudio({
   change,
   busy,
   preview,
-  setPreview,
   outlineOpen,
   setOutlineOpen,
   propertiesOpen,
@@ -1479,7 +1450,6 @@ function DocStudio({
   setPropertiesTab,
   codeTab,
   setCodeTab,
-  run,
   setNotice,
 }: {
   doc: Document;
@@ -1488,7 +1458,6 @@ function DocStudio({
   change: (next: Document) => void;
   busy: boolean;
   preview: boolean;
-  setPreview: React.Dispatch<React.SetStateAction<boolean>>;
   outlineOpen: boolean;
   setOutlineOpen: React.Dispatch<React.SetStateAction<boolean>>;
   propertiesOpen: boolean;
@@ -1497,7 +1466,6 @@ function DocStudio({
   setPropertiesTab: React.Dispatch<React.SetStateAction<"layout" | "style" | "code">>;
   codeTab: "html" | "css" | "js";
   setCodeTab: React.Dispatch<React.SetStateAction<"html" | "css" | "js">>;
-  run: (action: () => Promise<void>) => Promise<void>;
   setNotice: (n: string) => void;
 }) {
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
@@ -1531,7 +1499,7 @@ function DocStudio({
       ? Math.min(activeSectionIndex, doc.sections.length - 1)
       : 0;
 
-  const insertBlock = (arch: DocArchetype, index: number) => {
+  const insertPage = (arch: DocArchetype, index: number) => {
     if (doc.sections.length >= 40) return;
     const newSection = {
       id: crypto.randomUUID(),
@@ -1547,7 +1515,7 @@ function DocStudio({
     setNotice(`Added ${arch.name}.`);
   };
 
-  const duplicateBlock = (idx: number) => {
+  const duplicatePage = (idx: number) => {
     if (doc.sections.length >= 40) return;
     const target = doc.sections[idx];
     if (!target) return;
@@ -1556,19 +1524,19 @@ function DocStudio({
     updated.splice(idx + 1, 0, clone);
     change({ ...doc, sections: updated });
     setActiveSectionIndex(idx + 1);
-    setNotice("Block duplicated.");
+    setNotice("Page duplicated.");
   };
 
-  const deleteBlock = (idx: number) => {
+  const deletePage = (idx: number) => {
     if (doc.sections.length <= 1) return;
-    if (!confirm(`Delete section ${idx + 1}?`)) return;
+    if (!confirm(`Delete page ${idx + 1}?`)) return;
     const filtered = doc.sections.filter((_, i) => i !== idx);
     change({ ...doc, sections: filtered });
     setActiveSectionIndex(Math.max(0, idx - 1));
-    setNotice("Section removed.");
+    setNotice("Page removed.");
   };
 
-  const moveBlock = (idx: number, dir: -1 | 1) => {
+  const movePage = (idx: number, dir: -1 | 1) => {
     const targetIdx = idx + dir;
     if (targetIdx < 0 || targetIdx >= doc.sections.length) return;
     const updated = [...doc.sections];
@@ -1582,11 +1550,11 @@ function DocStudio({
       ...doc,
       sections: doc.sections.map((s, idx) =>
         idx === safeActiveSection
-          ? { ...s, html: arch.html, css: arch.css, kind: arch.kind }
+          ? { ...s, html: arch.html, css: arch.css, kind: arch.kind, js: undefined }
           : s,
       ),
     });
-    setNotice(`Applied ${arch.name} to section ${safeActiveSection + 1}.`);
+    setNotice(`Applied ${arch.name} to page ${safeActiveSection + 1}.`);
   };
 
   const applyTheme = (theme: ThemeCatalogItem) => {
@@ -1622,7 +1590,7 @@ function DocStudio({
           {outlineOpen ? (
             <>
               <div className="title">
-                <span>Outline</span>
+                <span>Pages</span>
                 <span className="count-badge">{doc.sections.length}</span>
               </div>
               <Button
@@ -1663,14 +1631,14 @@ function DocStudio({
               }}
             >
               <Plus className="w-3.5 h-3.5 mr-1.5" />
-              Add block
+              Add page
             </Button>
           ) : (
             <Button
               variant="outline"
               size="icon"
               className="h-8 w-8 rounded-lg border-dashed"
-              title="Add block"
+              title="Add page"
               disabled={doc.sections.length >= 40 || busy}
               onClick={() => {
                 setSlashMenuIndex(doc.sections.length);
@@ -1694,11 +1662,10 @@ function DocStudio({
                   key={s.id}
                   type="button"
                   className={cn("slide-studio-mini-pill", isActive && "active")}
-                  title={`Section ${idx + 1}: ${title}`}
-                  onClick={() => {
-                    setActiveSectionIndex(idx);
-                    document.getElementById("doc-section-" + idx)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }}
+                  title={`Page ${idx + 1}: ${title}`}
+                  aria-label={`Show page ${idx + 1}: ${title}`}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => setActiveSectionIndex(idx)}
                 >
                   <Icon className="w-3.5 h-3.5" />
                 </button>
@@ -1709,23 +1676,19 @@ function DocStudio({
               <div
                 key={s.id}
                 className={cn("doc-outline-item", isActive && "active")}
-                onClick={() => {
-                  setActiveSectionIndex(idx);
-                  document.getElementById("doc-section-" + idx)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                }}
               >
-                <div className="doc-outline-item-info">
+                <button type="button" className="doc-outline-item-info" aria-label={`Show page ${idx + 1}: ${title}`} aria-current={isActive ? "page" : undefined} onClick={() => setActiveSectionIndex(idx)}>
                   <span className="doc-outline-num">{String(idx + 1).padStart(2, "0")}</span>
                   <Icon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   <span className="doc-outline-title">{title}</span>
-                </div>
+                </button>
                 <div className="doc-outline-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                     title="Move up"
                     disabled={idx === 0 || busy}
-                    onClick={() => moveBlock(idx, -1)}
+                    onClick={() => movePage(idx, -1)}
                   >
                     <ArrowUp className="w-3 h-3" />
                   </button>
@@ -1734,16 +1697,16 @@ function DocStudio({
                     className="p-1 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                     title="Move down"
                     disabled={idx === doc.sections.length - 1 || busy}
-                    onClick={() => moveBlock(idx, 1)}
+                    onClick={() => movePage(idx, 1)}
                   >
                     <ArrowDown className="w-3 h-3" />
                   </button>
                   <button
                     type="button"
                     className="p-1 rounded hover:bg-destructive/10 text-slate-400 hover:text-destructive disabled:opacity-30 cursor-pointer border-0 bg-transparent"
-                    title="Delete section"
+                    title="Delete page"
                     disabled={doc.sections.length <= 1 || busy}
-                    onClick={() => deleteBlock(idx)}
+                    onClick={() => deletePage(idx)}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -1754,167 +1717,27 @@ function DocStudio({
         </div>
       </aside>
 
-      {/* 2. Center Stage: Document Canvas */}
       <main className="doc-studio-center">
-        {!propertiesOpen && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="doc-properties-trigger bg-white/90 backdrop-blur shadow-xs text-xs font-medium border-slate-200 hover:bg-slate-50"
-            onClick={() => setPropertiesOpen(true)}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5" />
-            Properties
-          </Button>
-        )}
-
-        {preview ? (
-          <div className="doc-canvas-wrapper">
-            <Preview sections={doc.sections} />
-          </div>
-        ) : (
-          <div className="doc-canvas-wrapper">
-            {doc.sections.map((section, index) => {
-              const isActive = index === safeActiveSection;
-              const Icon = getSectionIcon(section);
-              const title = getSectionTitle(section, index);
-
-              return (
-                <React.Fragment key={section.id}>
-                  {/* Block Card */}
-                  <article
-                    id={"doc-section-" + index}
-                    className={cn("doc-block-card", isActive && "active")}
-                    onClick={() => setActiveSectionIndex(index)}
-                  >
-                    {/* Hover Block Header Bar */}
-                    <header className="doc-block-header">
-                      <div className="doc-block-pill">
-                        <Icon className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Section {index + 1} · {title}</span>
-                      </div>
-                      <div className="doc-block-actions" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                          title="Move up"
-                          disabled={index === 0 || busy}
-                          onClick={() => moveBlock(index, -1)}
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                          title="Move down"
-                          disabled={index === doc.sections.length - 1 || busy}
-                          onClick={() => moveBlock(index, 1)}
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                          title="Duplicate section"
-                          disabled={doc.sections.length >= 40 || busy}
-                          onClick={() => duplicateBlock(index)}
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          title="Delete section"
-                          disabled={doc.sections.length <= 1 || busy}
-                          onClick={() => deleteBlock(index)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground hover:text-indigo-600"
-                          title="Inspect properties"
-                          onClick={() => {
-                            setActiveSectionIndex(index);
-                            setPropertiesOpen(true);
-                          }}
-                        >
-                          <SlidersHorizontal className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </header>
-
-                    {/* Block Content */}
-                    {section.kind === "text" ? (
-                      <div className="doc-block-content">
-                        <RichText
-                          key={section.id + "-" + doc.revision}
-                          disabled={busy}
-                          html={section.html}
-                          onChange={(html) =>
-                            change({
-                              ...doc,
-                              sections: doc.sections.map((s, idx) =>
-                                idx === index ? { ...s, html } : s,
-                              ),
-                            })
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <div className="doc-block-content raw-rendered w-full min-w-0 overflow-hidden">
-                        <ArtifactFrame
-                          title={title}
-                          section={section}
-                          fitBlock={true}
-                          minHeight={260}
-                        />
-                      </div>
-                    )}
-                  </article>
-
-                  {/* In-Between Block Inserter */}
-                  <div className="doc-in-between-inserter">
-                    <div className="doc-in-between-line" />
-                    <button
-                      type="button"
-                      className="doc-in-between-btn"
-                      onClick={() => {
-                        setSlashMenuIndex(index + 1);
-                        setSlashMenuOpen(true);
-                      }}
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add block
-                    </button>
-                  </div>
-                </React.Fragment>
-              );
-            })}
-
-            {/* Bottom Inserter Button */}
-            <div className="flex flex-col items-center justify-center pt-2 pb-6 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-4 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600 text-xs font-medium"
-                disabled={doc.sections.length >= 40 || busy}
-                onClick={() => {
-                  setSlashMenuIndex(doc.sections.length);
-                  setSlashMenuOpen(true);
-                }}
-              >
-                <Plus className="w-3.5 h-3.5 mr-1.5" />
-                Insert Block (or press /)
-              </Button>
-            </div>
-          </div>
-        )}
+        <DocumentViewer
+          sections={doc.sections}
+          page={safeActiveSection}
+          onPageChange={setActiveSectionIndex}
+          title={doc.title}
+          actions={<>
+            <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate page" aria-label="Duplicate page" disabled={doc.sections.length >= 40 || busy} onClick={() => duplicatePage(safeActiveSection)}><Copy size={15} /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" title="Delete page" aria-label="Delete page" disabled={doc.sections.length <= 1 || busy} onClick={() => deletePage(safeActiveSection)}><Trash2 size={15} /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" title="Inspect properties" aria-label="Inspect properties" onClick={() => setPropertiesOpen(value => !value)}><SlidersHorizontal size={15} /></Button>
+          </>}
+        >
+          {!preview && doc.sections[safeActiveSection]?.kind === "text" && <div className="document-text-page">
+            <RichText
+              key={doc.sections[safeActiveSection].id + "-" + doc.revision}
+              disabled={busy}
+              html={doc.sections[safeActiveSection].html}
+              onChange={(html) => change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSection ? { ...section, html } : section) })}
+            />
+          </div>}
+        </DocumentViewer>
       </main>
 
       {/* 3. Right Panel: Properties Inspector */}
@@ -1923,7 +1746,7 @@ function DocStudio({
           <span className="title">Properties</span>
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
-              Section {safeActiveSection + 1}
+              Page {safeActiveSection + 1}
             </span>
             <Button
               variant="ghost"
@@ -1946,7 +1769,7 @@ function DocStudio({
             onClick={() => setPropertiesTab("layout")}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            Block
+            Page
           </button>
           <button
             type="button"
@@ -1972,13 +1795,13 @@ function DocStudio({
             <>
               <div>
                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Block Type
+                  Page Type
                 </div>
                 <div className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50">
                   <span className="text-xs font-semibold text-slate-800">
                     {doc.sections[safeActiveSection]?.kind === "text"
-                      ? "Rich Text Block"
-                      : "Interactive HTML Block"}
+                      ? "Rich Text Page"
+                      : "Interactive HTML Page"}
                   </span>
                   <Button
                     variant="outline"
@@ -2053,14 +1876,14 @@ function DocStudio({
 
               <div>
                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Block Actions
+                  Page Actions
                 </div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="flex-1 text-xs h-8"
-                    onClick={() => duplicateBlock(safeActiveSection)}
+                    onClick={() => duplicatePage(safeActiveSection)}
                   >
                     <Copy className="w-3.5 h-3.5 mr-1.5" />
                     Duplicate
@@ -2070,7 +1893,7 @@ function DocStudio({
                     size="sm"
                     className="flex-1 text-xs h-8 text-destructive hover:bg-destructive/10 hover:text-destructive border-slate-200"
                     disabled={doc.sections.length <= 1}
-                    onClick={() => deleteBlock(safeActiveSection)}
+                    onClick={() => deletePage(safeActiveSection)}
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1.5" />
                     Delete
@@ -2088,7 +1911,7 @@ function DocStudio({
                   Preset Document Themes
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {themes.map((t) => (
+                  {themes.filter(t => t.format === "document").map((t) => (
                     <button
                       key={t.id}
                       type="button"
@@ -2132,29 +1955,6 @@ function DocStudio({
                 </div>
               </div>
 
-              <div>
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  Section Spacing Density
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["compact", "balanced", "relaxed"] as const).map((density) => (
-                    <Button
-                      key={density}
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs capitalize"
-                      onClick={() => {
-                        const gapMap = { compact: "1rem", balanced: "1.5rem", relaxed: "2.25rem" };
-                        const wrapper = document.querySelector(".doc-canvas-wrapper") as HTMLElement;
-                        if (wrapper) wrapper.style.gap = gapMap[density];
-                        setNotice(`Set spacing to ${density}.`);
-                      }}
-                    >
-                      {density}
-                    </Button>
-                  ))}
-                </div>
-              </div>
             </>
           )}
 
@@ -2179,14 +1979,14 @@ function DocStudio({
                     </button>
                   ))}
                 </div>
-                <span className="text-[10px] text-slate-400 font-mono">Section {safeActiveSection + 1}</span>
+                <span className="text-[10px] text-slate-400 font-mono">Page {safeActiveSection + 1}</span>
               </div>
 
               <textarea
                 className="code-editor-area"
                 spellCheck={false}
                 value={doc.sections[safeActiveSection]?.[codeTab] || ""}
-                placeholder={`Enter block ${codeTab.toUpperCase()}...`}
+                placeholder={`Enter page ${codeTab.toUpperCase()}...`}
                 onChange={(e) => {
                   const nextVal = e.target.value;
                   change({
@@ -2210,7 +2010,7 @@ function DocStudio({
       {slashMenuOpen && (
         <SlashCommandMenu
           insertIndex={slashMenuIndex}
-          onSelect={insertBlock}
+          onSelect={insertPage}
           onClose={() => setSlashMenuOpen(false)}
         />
       )}
@@ -2443,7 +2243,6 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       location.pathname === "/connect" ? "connect" : "library",
     );
   const [preview, setPreview] = useState(false),
-    [editorMode, setEditorMode] = useState<"doc" | "slide">("doc"),
     [activeSlide, setActiveSlide] = useState(0),
     [activeSectionIndex, setActiveSectionIndex] = useState(0),
     [outlineOpen, setOutlineOpen] = useState(() => !matchMedia("(max-width: 800px)").matches),
@@ -2462,6 +2261,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     [codeTab, setCodeTab] = useState<"html" | "css" | "js">("html"),
     [shareModalOpen, setShareModalOpen] = useState(false),
     [copiedLink, setCopiedLink] = useState("");
+  const editorMode = doc && isPresentationContent(doc) ? "slide" : "doc";
   const safeActiveSlide = doc && doc.sections.length > 0
     ? Math.min(activeSlide, doc.sections.length - 1)
     : 0;
@@ -2675,7 +2475,6 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     if (signal?.aborted) return;
     setDoc(next);
     setPreview(openPreview);
-    setEditorMode(isPresentationContent(next) ? "slide" : "doc");
     setActiveSlide(0);
     setActiveSectionIndex(0);
     setDirty(false);
@@ -2698,9 +2497,9 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       const content = await requestJson<Content>(`/downloads/docsync/themes/${theme.id}.json`);
       const next = await api<Document>("/documents", "POST", content);
       setDoc(next);
-      setEditorMode(theme.format === "presentation" ? "slide" : "doc");
       setPreview(theme.format === "document");
       setActiveSlide(0);
+      setActiveSectionIndex(0);
       setDirty(false);
       setPublished(null);
       setShare("");
@@ -2844,7 +2643,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             void run(async () => {
               const next = await api<Document>("/documents", "POST", blank());
               setDoc(next);
-              setEditorMode("doc");
+              setActiveSectionIndex(0);
               setPreview(false);
               setView("library");
               setDirty(false);
@@ -2988,32 +2787,10 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                   placeholder="Untitled document"
                   onChange={(e) => change({ ...doc, title: e.target.value })}
                 />
-                <div className="document-mode-switch flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0 ml-1">
-                  <Button
-                    variant={editorMode === "doc" ? "secondary" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "h-6 text-[11px] px-2 font-medium shadow-none",
-                      editorMode === "doc" && "bg-white text-slate-900 shadow-xs",
-                    )}
-                    onClick={() => setEditorMode("doc")}
-                  >
-                    <FileText className="w-3 h-3 mr-1" />
-                    Document
-                  </Button>
-                  <Button
-                    variant={editorMode === "slide" ? "secondary" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "h-6 text-[11px] px-2 font-medium shadow-none",
-                      editorMode === "slide" && "bg-white text-indigo-600 font-semibold shadow-xs",
-                    )}
-                    onClick={() => setEditorMode("slide")}
-                  >
-                    <Presentation className="w-3 h-3 mr-1" />
-                    Slides
-                  </Button>
-                </div>
+                <span className="shared-format-chip document-format-label">
+                  {editorMode === "slide" ? <Presentation size={13} /> : <FileText size={13} />}
+                  {editorMode === "slide" ? "Presentation" : "Document"}
+                </span>
               </div>
 
               {/* Right Status & Actions */}
@@ -3378,7 +3155,6 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               change={change}
               busy={busy}
               preview={preview}
-              setPreview={setPreview}
               outlineOpen={outlineOpen}
               setOutlineOpen={setOutlineOpen}
               propertiesOpen={propertiesOpen}
@@ -3387,7 +3163,6 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               setPropertiesTab={setPropertiesTab}
               codeTab={codeTab}
               setCodeTab={setCodeTab}
-              run={run}
               setNotice={setNotice}
             />
           )

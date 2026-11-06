@@ -207,11 +207,84 @@ try {
   assert.equal(topNavigationBlocked, true);
   assert.equal(page.url(), before);
 
+  const pageScript = `
+    document.addEventListener('DOMContentLoaded', () => {
+      window.starts = (window.starts || 0) + 1;
+      document.getElementById('page-add').addEventListener('click', () => {
+        const count = document.getElementById('page-count');
+        count.textContent = String(Number(count.textContent) + 1);
+      });
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
+        document.querySelector('h1').animate([{transform:'translateY(24px)',opacity:.2},{transform:'none',opacity:1}], {duration:5000});
+    });
+    window.addEventListener('load', () => { window.loads = (window.loads || 0) + 1; });
+  `;
+  const pagedResponse = await f.call('/documents', 'POST', {
+    title: 'Independent document pages', format: 'document', pages: [
+      { id: 'page-one', kind: 'html', html: '<article class="page slide"><h1>First page</h1><button id="page-add">Add one</button><output id="page-count">0</output><input aria-label="Page slider" type="range"></article>', css: '.page{padding:32px}h1{color:#9c2424}', js: `window.pageName="one";${pageScript}` },
+      { id: 'page-two', kind: 'html', html: '<article class="page"><h1>Second page</h1><button id="page-add">Add one</button><output id="page-count">0</output><p id="only-second">Independent content</p></article>', css: '.page{padding:48px}h1{color:#245c9c}', js: `window.pageName="two";${pageScript}` },
+    ],
+  });
+  assert.equal(pagedResponse.status, 201);
+  const paged = await pagedResponse.json() as { id: string; revision: number };
+  const pagedPublication = await (await f.call(`/documents/${paged.id}/publish`, 'POST', { expectedRevision: paged.revision })).json() as { url: string };
+  await page.goto(origin + new URL(pagedPublication.url).pathname, { waitUntil: 'networkidle0' });
+  async function documentFrame() {
+    await page.waitForSelector('.document-paper iframe');
+    const frame = await (await page.$('.document-paper iframe'))!.contentFrame();
+    assert.ok(frame);
+    await frame.waitForFunction(() => (window as any).starts === 1 && (window as any).loads === 1);
+    return frame;
+  }
+  let documentPage = await documentFrame();
+  assert.ok(await page.$('.shared-document-viewer'), 'Explicit document format wins even with slide markup');
+  assert.equal(await page.$('.shared-slide-viewer'), null);
+  assert.equal(await page.$$eval('.document-paper iframe', frames => frames.length), 1, 'Inactive document pages are not mounted');
+  assert.equal(await documentPage.$eval('h1', node => getComputedStyle(node).color), 'rgb(156, 36, 36)');
+  await documentPage.click('#page-add');
+  await page.keyboard.press('Space');
+  assert.equal(await documentPage.$eval('#page-count', node => node.textContent), '2', 'Space keeps native button behavior');
+  await documentPage.focus('input');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.$eval('.document-page-toolbar output', node => node.textContent), 'Page 1 of 2', 'Range widgets retain arrow keys');
+  await documentPage.focus('#page-add');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.document-page-toolbar output')?.textContent === 'Page 2 of 2');
+  const oldPage = documentPage;
+  documentPage = await documentFrame();
+  assert.ok(oldPage.detached, 'Leaving a page destroys its scripts and timers');
+  assert.equal(await documentPage.$eval('h1', node => getComputedStyle(node).color), 'rgb(36, 92, 156)');
+  assert.equal(await documentPage.evaluate(() => (window as any).pageName), 'two');
+  assert.ok(await documentPage.evaluate(() => document.getAnimations().some(animation => animation.playState === 'running')), 'The next page starts its own animation');
+  await documentPage.click('#page-add');
+  await page.click('button[aria-label="Replay page animations"]');
+  documentPage = await documentFrame();
+  assert.equal(await documentPage.$eval('#page-count', node => node.textContent), '0');
+  await page.click('button[aria-label="Previous page"]');
+  documentPage = await documentFrame();
+  assert.equal(await documentPage.evaluate(() => (window as any).pageName), 'one');
+  assert.equal(await documentPage.$('#only-second'), null, 'Page DOM and CSS remain independent');
+  assert.equal(await documentPage.$eval('#page-count', node => node.textContent), '0', 'Revisiting restarts the selected page');
+  await documentPage.evaluate(() => { document.body.tabIndex = -1; document.body.focus(); });
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Space');
+  assert.equal(await page.$eval('.document-page-toolbar output', node => node.textContent), 'Page 1 of 2', 'Document scroll keys do not turn pages');
+  await page.setViewport({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector('.document-paper')!.getBoundingClientRect().width < innerWidth);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  assert.ok(await page.$eval('.document-pages-scroll', node => node.scrollHeight > node.clientHeight), 'Portrait documents keep normal reading scroll');
+  await page.$eval('.document-pages-scroll', node => { node.scrollTop = 300; });
+  await page.click('button[aria-label="Next page"]');
+  await documentFrame();
+  assert.equal(await page.$eval('.document-pages-scroll', node => node.scrollTop), 0);
+  await page.screenshot({ path: '/tmp/docsync-document-mobile.png' });
+  await page.setViewport({ width: 1280, height: 1000 });
+
   const deckResponse = await f.call("/documents", "POST", {
     title: "Two slide deck",
     sections: [
-      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9;--long:\"" + 'x'.repeat(29400) + "\"}", js: 'window.currentSlide="first";' },
-      { id: "second-slide", kind: "html", html: '<article class="slide"><h1>Second slide</h1></article>', css: ".slide{min-height:560px;aspect-ratio:16/9}" },
+      { id: "first-slide", kind: "html", html: '<article class="slide"><h1>First slide</h1><button id="page-add">Add one</button><output id="page-count">0</output><input aria-label="Slide slider" type="range"></article>', css: ".slide{min-height:560px;aspect-ratio:16/9;--long:\"" + 'x'.repeat(29400) + "\"}", js: `window.currentSlide="first";${pageScript}` },
+      { id: "second-slide", kind: "html", html: '<article class="slide"><h1>Second slide</h1><button id="page-add">Add one</button><output id="page-count">0</output></article>', css: ".slide{min-height:560px;aspect-ratio:16/9}h1{color:#245c9c}", js: `window.currentSlide="second";${pageScript}` },
     ],
   });
   assert.equal(deckResponse.status, 201);
@@ -241,7 +314,27 @@ try {
   const slideshowFrame = await (await page.$(".presentation-canvas iframe"))!.contentFrame();
   assert.ok(slideshowFrame);
   await slideshowFrame.waitForSelector("h1");
+  await slideshowFrame.waitForFunction(() => (window as any).starts === 1 && (window as any).loads === 1);
   assert.equal(await slideshowFrame.$eval("h1", node => node.textContent), "First slide");
+  await slideshowFrame.click('#page-add');
+  await page.keyboard.press('Space');
+  assert.equal(await slideshowFrame.$eval('#page-count', node => node.textContent), '2');
+  await slideshowFrame.focus('input');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.$eval('.presentation-counter', node => node.textContent), 'Slide 1 of 2');
+  await slideshowFrame.focus('#page-add');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.presentation-counter')?.textContent === 'Slide 2 of 2');
+  const animatedSlide = await (await page.$('.presentation-canvas iframe'))!.contentFrame();
+  assert.ok(animatedSlide);
+  await animatedSlide.waitForFunction(() => (window as any).starts === 1 && (window as any).loads === 1 && document.getAnimations().some(animation => animation.playState === 'running'));
+  assert.equal(await animatedSlide.evaluate(() => (window as any).currentSlide), 'second');
+  assert.equal(await animatedSlide.$eval('h1', node => getComputedStyle(node).color), 'rgb(36, 92, 156)');
+  assert.ok(slideshowFrame.detached, 'The previous slide stops running');
+  const visibleSlide = await page.$eval('.presentation-canvas iframe', node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+  assert.ok(visibleSlide, 'Right-arrow starts animations in a visible, scaled viewport');
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForFunction(() => document.querySelector('.presentation-counter')?.textContent === 'Slide 1 of 2');
   await page.click('button[aria-label="Exit presentation"]');
   await page.waitForSelector(".presentation-viewer", { hidden: true });
   await page.click('button[aria-label="Next slide"]');
@@ -253,7 +346,7 @@ try {
   assert.ok(await secondSlide.evaluate(() => document.documentElement.scrollHeight <= innerHeight));
   await page.setViewport({ width: 390, height: 844 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  console.log("Passed: all 12 template slide layouts, independent slide scripts/styles, interactive controls, replay, overview, keyboard and touch navigation, native fullscreen, reduced motion, mobile sizing, shared viewers and artifact sandbox isolation.");
+  console.log("Passed: all 12 template slide layouts, independent document pages and slide scripts/styles, DOM-ready initialization, right-arrow animations, native widget keys, replay, overview, touch navigation, fullscreen, reduced motion, mobile reading and artifact sandbox isolation.");
 } catch (error) {
   const active = (await browser.pages()).at(-1);
   await active?.screenshot({ path: '/tmp/docsync-artifact-failure.png', fullPage: true }).catch(() => {});

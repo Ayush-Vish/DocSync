@@ -22,65 +22,83 @@ const artifactRuntime = String.raw`(() => {
     if (!data || data.type !== "docsync:render-v1" || typeof data.html !== "string" || typeof data.css !== "string" || typeof data.js !== "string" || data.html.length > 100000 || data.css.length > 30000 || data.js.length > 50000) return;
     if (data.hostCss !== undefined && (typeof data.hostCss !== "string" || data.hostCss.length > 4096)) return;
     rendered = true;
-    const styles = document.createElement("style");
-    styles.textContent = data.css + (data.hostCss || "");
-    document.head.append(styles);
-    document.getElementById("artifact").innerHTML = data.html;
-    const script = document.createElement("script");
-    script.textContent = data.js;
-    document.body.append(script);
-    if (data.presenting === true) {
-      const send = action => window.parent.postMessage({ type: "docsync:presentation-v1", action }, "*");
-      const interactive = target => target instanceof Element && target.closest("button,input,select,textarea,a,summary,canvas,[contenteditable],[role=button]");
-      document.addEventListener("keydown", event => {
-        if (event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || interactive(event.target)) return;
-        const action = { ArrowRight: "next", ArrowDown: "next", PageDown: "next", " ": "next", Enter: "next", ArrowLeft: "previous", ArrowUp: "previous", PageUp: "previous", Home: "first", End: "last", Escape: "exit", g: "overview", G: "overview", r: "replay", R: "replay" }[event.key];
-        if (action) { event.preventDefault(); send(action); }
-      });
-      let touch = null, lastSwipe = -Infinity, lastMove = 0;
-      document.addEventListener("touchstart", event => {
-        if (!interactive(event.target) && event.touches.length === 1) touch = { x: event.touches[0].clientX, y: event.touches[0].clientY };
-        else touch = null;
-      }, { passive: true });
-      document.addEventListener("touchend", event => {
-        if (!touch || !event.changedTouches.length) return;
-        const dx = event.changedTouches[0].clientX - touch.x, dy = event.changedTouches[0].clientY - touch.y;
-        touch = null;
-        if (Math.abs(dx) > Math.max(60, innerWidth * .12) && Math.abs(dx) > Math.abs(dy) * 1.5) {
-          if (event.cancelable) event.preventDefault();
-          lastSwipe = performance.now(); send(dx < 0 ? "next" : "previous");
-        }
-      }, { passive: false });
-      document.addEventListener("click", event => {
-        if (!event.defaultPrevented && event.button === 0 && !interactive(event.target) && performance.now() - lastSwipe > 500) send("next");
-      });
-      document.addEventListener("pointermove", () => {
-        if (performance.now() - lastMove > 200) { lastMove = performance.now(); send("activity"); }
-      }, { passive: true });
-    }
-    if (data.autoHeight === true) {
-      let queued = false;
-      let previous = 0;
-      const measure = () => {
-        if (queued) return;
-        queued = true;
-        requestAnimationFrame(() => {
-          queued = false;
-          const body = document.body;
-          const artifact = document.getElementById("artifact");
-          const height = Math.ceil(Math.max(body.getBoundingClientRect().height,
-            artifact.getBoundingClientRect().top + artifact.scrollHeight + parseFloat(getComputedStyle(body).paddingBottom)));
-          if (height !== previous) {
-            previous = height;
-            window.parent.postMessage({ type: "docsync:height-v1", height }, "*");
-          }
+    // The iframe loads before its payload arrives. Wait for the host viewport's
+    // layout, then start CSS and JavaScript together on the active page.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const styles = document.createElement("style");
+      styles.textContent = data.css + (data.hostCss || "");
+      document.head.append(styles);
+      document.getElementById("artifact").innerHTML = data.html;
+      void document.getElementById("artifact").offsetWidth;
+      const script = document.createElement("script");
+      script.textContent = data.js;
+      document.body.append(script);
+      // Authored scripts missed the sandbox's native ready events. Deliver them
+      // once after insertion, including document/window listeners and onload.
+      document.dispatchEvent(new Event("DOMContentLoaded", { bubbles: true }));
+      window.dispatchEvent(new Event("load"));
+      if (data.navigation === "presentation" || data.navigation === "document") {
+        const presenting = data.navigation === "presentation";
+        const send = action => window.parent.postMessage({ type: presenting ? "docsync:presentation-v1" : "docsync:document-v1", action }, "*");
+        const interactive = target => target instanceof Element && target.closest("button,input,select,textarea,a,summary,canvas,[contenteditable],[role=button]");
+        window.addEventListener("keydown", event => {
+          if (event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+          const target = event.target instanceof Element ? event.target : null;
+          if (target && target.closest("input,select,textarea,canvas,[contenteditable],[role=slider],[role=tablist],[role=listbox],[role=menu],[role=tree],[role=grid],[role=spinbutton]")) return;
+          if (interactive(target) && (event.key === " " || event.key === "Enter")) return;
+          const keys = presenting
+            ? { ArrowRight: "next", ArrowDown: "next", PageDown: "next", " ": "next", Enter: "next", ArrowLeft: "previous", ArrowUp: "previous", PageUp: "previous", Home: "first", End: "last", Escape: "exit", g: "overview", G: "overview", r: "replay", R: "replay" }
+            : { ArrowRight: "next", PageDown: "next", ArrowLeft: "previous", PageUp: "previous", Home: "first", End: "last", r: "replay", R: "replay" };
+          const action = keys[event.key];
+          if (action) { event.preventDefault(); send(action); }
         });
-      };
-      const observer = new ResizeObserver(measure);
-      observer.observe(document.body);
-      observer.observe(document.getElementById("artifact"));
-      measure();
-    }
+        if (presenting) {
+          let touch = null, lastSwipe = -Infinity, lastMove = 0;
+          document.addEventListener("touchstart", event => {
+            if (!interactive(event.target) && event.touches.length === 1) touch = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+            else touch = null;
+          }, { passive: true });
+          document.addEventListener("touchend", event => {
+            if (!touch || !event.changedTouches.length) return;
+            const dx = event.changedTouches[0].clientX - touch.x, dy = event.changedTouches[0].clientY - touch.y;
+            touch = null;
+            if (Math.abs(dx) > Math.max(60, innerWidth * .12) && Math.abs(dx) > Math.abs(dy) * 1.5) {
+              if (event.cancelable) event.preventDefault();
+              lastSwipe = performance.now(); send(dx < 0 ? "next" : "previous");
+            }
+          }, { passive: false });
+          document.addEventListener("click", event => {
+            if (!event.defaultPrevented && event.button === 0 && !interactive(event.target) && performance.now() - lastSwipe > 500) send("next");
+          });
+          document.addEventListener("pointermove", () => {
+            if (performance.now() - lastMove > 200) { lastMove = performance.now(); send("activity"); }
+          }, { passive: true });
+        }
+      }
+      if (data.autoHeight === true) {
+        let queued = false;
+        let previous = 0;
+        const measure = () => {
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(() => {
+            queued = false;
+            const body = document.body;
+            const artifact = document.getElementById("artifact");
+            const height = Math.ceil(Math.max(body.getBoundingClientRect().height,
+              artifact.getBoundingClientRect().top + artifact.scrollHeight + parseFloat(getComputedStyle(body).paddingBottom)));
+            if (height !== previous) {
+              previous = height;
+              window.parent.postMessage({ type: "docsync:height-v1", height }, "*");
+            }
+          });
+        };
+        const observer = new ResizeObserver(measure);
+        observer.observe(document.body);
+        observer.observe(document.getElementById("artifact"));
+        measure();
+      }
+    }));
   });
 })()`;
 

@@ -325,10 +325,10 @@ try {
   await page.waitForSelector(".doc-studio");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
   await click("Preview");
-  await page.waitForSelector(".preview-stack");
+  await page.waitForSelector(".document-paper iframe");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}/preview`);
   await page.reload({ waitUntil: "networkidle0" });
-  await page.waitForSelector(".preview-stack");
+  await page.waitForSelector(".document-paper iframe");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}/preview`);
   await click("Edit");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
@@ -367,7 +367,7 @@ try {
   const editorLayout = await page.evaluate(() => {
     const editor = document.querySelector(".doc-studio")!.getBoundingClientRect();
     const canvas = document.querySelector(".doc-studio-center")!.getBoundingClientRect();
-    const frame = document.querySelector(".doc-block-content iframe")!.getBoundingClientRect();
+    const frame = document.querySelector(".document-paper iframe")!.getBoundingClientRect();
     return { editorWidth: editor.width, canvasWidth: canvas.width, frameWidth: frame.width, frameHeight: frame.height, contained: frame.left >= canvas.left && frame.right <= canvas.right };
   });
   assert.ok(editorLayout.editorWidth >= 1100);
@@ -413,7 +413,11 @@ try {
   );
   assert.equal(await publicPage.$eval(".sidebar", node => getComputedStyle(node).display), "none");
   assert.ok(await publicPage.$(".shared-editor-page"));
-  assert.equal(await publicPage.$$eval(".document-paper", pages => pages.length), 2);
+  assert.equal(await publicPage.$$eval(".document-paper", pages => pages.length), 1);
+  assert.equal(await publicPage.$eval('.document-page-toolbar output', node => node.textContent), 'Page 1 of 2');
+  await publicPage.click('button[aria-label="Next page"]');
+  await publicPage.waitForFunction(() => document.querySelector('.document-page-toolbar output')?.textContent === 'Page 2 of 2');
+  await publicPage.click('button[aria-label="Previous page"]');
   const sharedLayout = await publicPage.evaluate(() => {
     const reader = document.querySelector(".shared")!.getBoundingClientRect();
     const frame = document.querySelector(".shared iframe")!.getBoundingClientRect();
@@ -492,7 +496,13 @@ try {
   await page.waitForSelector(".doc-studio-right:not(.collapsed)");
   await page.locator('button[aria-label="Close properties"]').click();
   await page.waitForFunction(() => document.querySelector(".doc-studio-right")!.getBoundingClientRect().width < 1);
-  await click("Slides");
+  assert.equal(await page.$('.document-mode-switch'), null, 'Documents cannot be switched into the slide editor');
+  await click("My documents");
+  await page.evaluate(() => {
+    const card = [...document.querySelectorAll<HTMLButtonElement>('.document-card')].find(card => card.textContent?.includes('Northstar Product Pitch'));
+    if (!card) throw new Error('Missing presentation');
+    card.click();
+  });
   await page.waitForSelector(".slide-studio");
   await page.evaluate(() => { navigator.clipboard.writeText = () => Promise.reject(new Error("Permission denied")); });
   await click("AI Prompt");

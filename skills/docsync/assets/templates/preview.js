@@ -2,9 +2,21 @@
 // Self-contained controls for standalone previews and isolated DocSync artifacts.
 (() => {
   // ── 1. Detect slides ──────────────────────────────────────────────────
-  const slides = [...document.querySelectorAll(".slide, .page")];
+  const slides = [...document.querySelectorAll(".slide")];
   const isPresentation = slides.length > 1;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Document pages keep their portrait flow. Each hosted page receives its own
+  // script and restarts these entrances when selected or replayed by the reader.
+  if (!reducedMotion) {
+    for (const page of document.querySelectorAll(".page")) {
+      page.querySelectorAll("h1,h2,.metric-grid,.chart-panel,.live-panel,.doc-callout").forEach((element, index) => {
+        element.animate([{ opacity: .3, transform: "translateY(12px)" }, { opacity: 1, transform: "none" }], {
+          duration: 480, delay: Math.min(index, 5) * 60, easing: "ease-out", fill: "backwards",
+        });
+      });
+    }
+  }
 
   // Accent color: try to read from the first slide's computed style
   function getAccent() {

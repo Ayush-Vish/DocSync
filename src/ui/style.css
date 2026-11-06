@@ -1683,7 +1683,7 @@ blockquote {
 }
 
 @media (max-width: 768px) {
-  .shared-app-shell {
+  .app-shell.shared-app-shell {
     display: flex;
     flex-direction: column;
   }

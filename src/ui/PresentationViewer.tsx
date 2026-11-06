@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Grid2X2, Maximize, Minimize, RotateCcw, X } from "lucide-react";
-import { ArtifactFrame, ArtifactThumbnail, type PresentationAction } from "./ArtifactFrame";
+import { ArtifactFrame, ArtifactThumbnail, type NavigationAction } from "./ArtifactFrame";
 import type { Content } from "../document";
 import "./presentation.css";
 
@@ -56,7 +56,7 @@ export function PresentationViewer({ sections, initialSlide = 0, title = "Presen
     else dialog.current?.focus();
   }, [overview]);
 
-  const action = useCallback((command: PresentationAction) => {
+  const action = useCallback((command: NavigationAction) => {
     showControls();
     if (command === "next") go(current + 1);
     else if (command === "previous") go(current - 1);
@@ -83,7 +83,7 @@ export function PresentationViewer({ sections, initialSlide = 0, title = "Presen
       if (event.key === "Escape") { event.preventDefault(); action("exit"); return; }
       if (event.key.toLowerCase() === "g") { event.preventDefault(); action("overview"); return; }
       if (overview || (target.closest("button") && [" ", "Enter"].includes(event.key))) return;
-      const command: Record<string, PresentationAction> = { ArrowRight: "next", ArrowDown: "next", PageDown: "next", " ": "next", Enter: "next", ArrowLeft: "previous", ArrowUp: "previous", PageUp: "previous", Home: "first", End: "last", r: "replay", R: "replay" };
+      const command: Record<string, NavigationAction> = { ArrowRight: "next", ArrowDown: "next", PageDown: "next", " ": "next", Enter: "next", ArrowLeft: "previous", ArrowUp: "previous", PageUp: "previous", Home: "first", End: "last", r: "replay", R: "replay" };
       if (command[event.key]) { event.preventDefault(); action(command[event.key]); }
     };
     window.addEventListener("keydown", navigate);
@@ -105,7 +105,7 @@ export function PresentationViewer({ sections, initialSlide = 0, title = "Presen
         </button>)}
       </section> : <div className="presentation-canvas" aria-label={`Slide ${current + 1}`}>
         {sections[current] && <div className="presentation-slide-renderer" key={`${sections[current].id}-${replay}`}>
-          <ArtifactFrame title={`${title} — Slide ${current + 1}`} section={sections[current]} fitSlide onPresentationAction={action} />
+          <ArtifactFrame title={`${title} — Slide ${current + 1}`} section={sections[current]} fitSlide navigation="presentation" onNavigate={action} />
         </div>}
       </div>}
     </div>

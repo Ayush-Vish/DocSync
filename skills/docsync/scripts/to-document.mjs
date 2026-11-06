@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 export function toDocument(directory, title) {
   if (!directory || !title?.trim() || title.length > 200) throw new Error("Document title must contain 1–200 characters.");
   const source = readFileSync(join(directory, "index.html"), "utf8");
-  const presentation = /class=["'][^"']*\bslide\b/.test(source);
+  const presentation = [...source.matchAll(/\sclass\s*=\s*(["'])(.*?)\1/gis)].some(match => match[2].split(/\s+/).includes("slide"));
   const css = readFileSync(join(directory, "..", "charts.css"), "utf8") + "\n" + (presentation ? readFileSync(join(directory, "..", "presentation-base.css"), "utf8") + "\n" : "") + readFileSync(join(directory, "styles.css"), "utf8");
   const js = readFileSync(join(directory, "..", presentation ? "slides.js" : "preview.js"), "utf8");
   const optional = (id, extension) => {

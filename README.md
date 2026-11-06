@@ -21,6 +21,7 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 - Minimal document library with search, responsive navigation, and an editor.
 - Text sections with headings, bold, italic, underline, lists, quotes, tables, and undo/redo through TipTap.
 - HTML/CSS/JavaScript component sections with source editing and isolated previews. Existing component HTML is preserved instead of being converted to rich text.
+- A separate document workspace with a page outline, portrait reading, keyboard navigation, and animation replay. Only the selected page runs its JavaScript.
 - Explicit saves, immutable revision history, restore, conflict preservation, and JSON draft download.
 - Fixed-revision public links, republishing with link rotation, and revocation.
 - Two six-slide presentation templates with entrance animation, animated charts, and self-contained interactive examples. The presentation player supports keyboard and touch navigation, slide overview, animation replay, progress, and native fullscreen.
@@ -33,7 +34,7 @@ Browser requests have a 30-second timeout and clear connection errors. Mutations
 
 Sharing shows the actual published revision. Save before publishing; only returned public links can be copied, and clipboard failures are reported. Publishing again rotates the link. New account tokens default to publishing disabled, and existing token permissions are loaded before changes can be made.
 
-Live multi-user editing, comments, uploads, offline sync, pagination, password reset/email verification, are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
+Live multi-user editing, comments, uploads, offline sync, automatic text pagination, and password reset/email verification are not implemented in this release. Google Docs-style text editing is included; Google Docs feature parity is not implied. Email/password account emails are not verified and must not be used as proof of ownership for invitations or automatic identity linking.
 
 ## Agent onboarding
 
@@ -53,9 +54,11 @@ Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Cl
 
 Signed-in users can also create these presets from the document library: Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, and Delivery Review. The Custom card provides a portable prompt for Codex, Claude, Antigravity, or another connected agent. The Sales Dashboard uses fictional Northstar figures and a simulated local update stream; it is not connected to real company data.
 
-Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP blocking network, external scripts, forms, popups, and access to the parent app. Each frame receives only its section content through a source-checked message; edits recreate the frame. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
+Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. Scripted sections use `/artifact-frame` with an opaque sandbox origin and a response CSP blocking network, external scripts, forms, popups, and access to the parent app. Each frame receives only its section content through a source-checked message; edits recreate the frame. Authored HTML/CSS is laid out before JavaScript starts. Scripts can initialize immediately or register `DOMContentLoaded`/`load` listeners; ready events are delivered once after script insertion on each visit or replay. Static sections retain their script-free renderer. Slide templates are HTML presentations; native `.pptx` export is not included. Browser printing supports saving the previews as PDF.
 
-Each presentation page has an independent `html`, `css`, and `js` payload. Slides use a 1280 × 720 design viewport that scales to the available space, including mobile screens. Only the current slide runs in the player; overview, filmstrip, and library thumbnails never execute scripts. Presentations entered from the editor or a shared link use the same player. The gallery's **Present template** button opens it without creating an account or document.
+Documents and presentations use their saved `format` to select distinct workspaces. Documents show one portrait page at a time in the editor, preview, and shared reader. Use the outline or **←/→**, **Page Up/Down**, and **Home/End** to turn pages, and **R** or the replay button to restart the current page. Up/down arrows and Space retain normal scrolling and control behavior. Page changes reset reading to the top; leaving a page stops its scripts.
+
+Each presentation page has an independent `html`, `css`, and `js` payload. Slides use a 1280 × 720 design viewport that scales to the available space, including mobile screens. Only the current page or slide runs in its viewer; overview, filmstrip, and library thumbnails never execute scripts. Presentations entered from the editor or a shared link use the same player. The gallery's **Present template** button opens it without creating an account or document.
 
 Use **←/→**, **Page Up/Down**, **Space**, **Home/End**, **G** for overview, **R** to replay, and **Esc** to leave. Keyboard and horizontal swipe navigation also work while a slide frame has focus. Buttons, inputs, canvas interactions, and events handled with `preventDefault()` keep their own behavior. The frame bridge accepts only navigation actions from the currently mounted slide and grants no account access. Fullscreen uses the browser's native control; motion respects `prefers-reduced-motion`.
 

@@ -4,6 +4,23 @@ import { fixture } from "./helpers.ts";
 import { cleanCss, cleanHtml, validateContent, lintContent } from "../src/content.ts";
 import { handle } from "../src/worker.ts";
 
+test("document lists honor explicit formats and recognize only legacy slide classes", async (t) => {
+  const f = await fixture(true);
+  t.after(f.close);
+  const cases = [
+    { title: "Document using slide markup", format: "document", html: '<article class="slide"><h1>Document</h1></article>', expected: "document" },
+    { title: "Explicit deck", format: "presentation", html: '<h1>Deck</h1>', expected: "presentation" },
+    { title: "Legacy deck", html: '<article class="cover slide featured"><h1>Deck</h1></article>', expected: "presentation" },
+    { title: "Mentioned slide", html: '<article class="slide-panel"><h1>A slide comparison</h1></article>', expected: "document" },
+    { title: "Suffixed class", html: '<article class="demo-slide"><h1>Report</h1></article>', expected: "document" },
+  ];
+  for (const { expected, html, ...input } of cases) {
+    assert.equal((await f.call("/documents", "POST", { ...input, sections: [{ id: "page", html, css: "" }] })).status, 201);
+  }
+  const list = await (await f.call("/documents")).json() as { title: string; format: string }[];
+  for (const item of cases) assert.equal(list.find(row => row.title === item.title)?.format, item.expected, item.title);
+});
+
 test("explicit pages preserve order, sanitization and format through publishing", async (t) => {
   const f = await fixture(true);
   t.after(f.close);
