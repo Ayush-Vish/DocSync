@@ -59,7 +59,7 @@ export async function withAgentAudit(request: Request, env: Env, principal: Prin
   if (principal.role !== "agent") return action(request);
   const started = Date.now(), requestId = crypto.randomUUID(), url = new URL(request.url);
   let args = options.args, actionRequest = request, bodyError: unknown;
-  if (args === undefined && request.body && request.headers.get("Content-Type")?.startsWith("application/json")) {
+  if (args === undefined && request.body && request.headers.get("Content-Type")?.split(";", 1)[0].trim().toLowerCase() === "application/json") {
     try {
       const bytes = await readBody(request, 550_000);
       actionRequest = new Request(request, { body: bytes });

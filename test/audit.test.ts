@@ -10,7 +10,7 @@ import type { Statement } from "../src/platform.ts";
 test("agent operations record server results and reported device metadata without secrets or content", async t => {
   const f = await fixture(); t.after(f.close);
   const doc = await (await f.call('/documents', 'POST', sample())).json() as { id: string };
-  const metadata = { 'X-DocSync-Client': 'Codex%20CLI', 'X-DocSync-Client-Version': '1.2.3', 'X-DocSync-Device': 'Development%20Laptop', 'X-DocSync-Platform': 'linux%20x64', 'CF-Connecting-IP': '203.0.113.9', 'User-Agent': 'Agent test/1.2.3' };
+  const metadata = { 'X-DocSync-Client': 'Codex%20CLI', 'X-DocSync-Client-Version': '1.2.3', 'X-DocSync-Device': 'Development%20Laptop', 'X-DocSync-Platform': 'linux%20x64', 'CF-Connecting-IP': '203.0.113.9', 'User-Agent': 'Agent test/1.2.3', 'Content-Type': 'Application/JSON; charset=utf-8' };
   const read = await f.call(`/documents/${doc.id}`, 'GET', undefined, 'agent', metadata);
   assert.equal(read.status, 200); assert.ok(read.headers.get('X-DocSync-Request-Id'));
   const write = await f.call(`/documents/${doc.id}`, 'PUT', { ...sample('Attempted update'), expectedRevision: 1, lockToken: 'a'.repeat(64), password: 'never-store-this', sections: [{ id: 'first', html: '<h1>PRIVATE CONTENT</h1>', css: '', js: 'SECRET_SOURCE' }] }, 'agent', metadata);
