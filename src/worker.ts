@@ -1,4 +1,6 @@
 import type { Env } from "./platform.ts";
+import type { Principal } from "./auth.ts";
+import { withAgentAudit, listAuditEvents } from "./audit.ts";
 import { HttpError } from "./content.ts";
 import {
   authenticate,
@@ -39,12 +41,12 @@ function revision(value: unknown): number {
     throw new HttpError(400, "A positive expectedRevision is required");
   return Number(value);
 }
-async function route(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env, internalMcp: boolean): Promise<Response> {
   const { pathname } = new URL(request.url),
     method = request.method;
   // Hosted MCP calls share the authenticated API handler without Worker self-fetch.
   const remote = await handleRemoteMcp(request, env, (input, init) =>
-    handle(new Request(input, init), env),
+    handleInternal(new Request(input, init), env, true),
   );
   if (remote) return remote;
   const mediaMatch = pathname.match(/^\/media\/([a-f0-9-]{36})$/);
@@ -96,6 +98,18 @@ async function route(request: Request, env: Env): Promise<Response> {
     return json({ ...shared, mediaToken: await mediaGrant(env, published.document_id, { publication, revision: shared.revision }) });
   }
   const principal = await authenticate(request, env);
+  if (pathname === "/api/audit-log" && method === "GET") return withAgentAudit(request, env, principal, async next => json(await listAuditEvents(next, env, principal)));
+  if (pathname === "/api/audit-events" && method === "POST") {
+    if (principal.role !== "agent") throw new HttpError(403, "Agent authentication required");
+    const input = await body(request, 4096);
+    if (input.tool !== "get_template_options" && !(input.tool === "upload_media" && input.failed === true)) throw new HttpError(400, "Invalid client audit event");
+    if (internalMcp) return json({ ok: true });
+    return withAgentAudit(request, env, principal, async () => json({ ok: true }), { source: "client", tool: input.tool, args: input, clientError: input.failed === true });
+  }
+  return internalMcp ? authenticatedRoute(request, env, principal) : withAgentAudit(request, env, principal, next => authenticatedRoute(next, env, principal));
+}
+async function authenticatedRoute(request: Request, env: Env, principal: Principal): Promise<Response> {
+  const { pathname } = new URL(request.url), method = request.method;
   await agentActivity(env.DB, principal);
   const documentResponse = async (value: Document | Promise<Document>, status = 200) => {
     const doc = await value;
@@ -423,10 +437,10 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   throw new HttpError(404, "Route not found");
 }
-export async function handle(request: Request, env: Env): Promise<Response> {
+async function handleInternal(request: Request, env: Env, internalMcp: boolean): Promise<Response> {
   let response: Response;
   try {
-    response = await route(request, env);
+    response = await route(request, env, internalMcp);
   } catch (error) {
     if (error instanceof HttpError)
       response = json(
@@ -469,5 +483,8 @@ export async function handle(request: Request, env: Env): Promise<Response> {
     "camera=(), microphone=(), geolocation=()",
   );
   return secured;
+}
+export async function handle(request: Request, env: Env): Promise<Response> {
+  return handleInternal(request, env, false);
 }
 export default { fetch: handle };

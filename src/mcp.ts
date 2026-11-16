@@ -8,7 +8,7 @@ import {
   chmodSync,
   renameSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, hostname, platform, arch } from "node:os";
 import { dirname, join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { readMediaFile } from "./local-media.ts";
@@ -123,7 +123,7 @@ async function main() {
         );
     }
   }
-  await createMcpServer(url.origin, token, fetch, readMediaFile).connect(new StdioServerTransport());
+  await createMcpServer(url.origin, token, fetch, readMediaFile, { deviceName: hostname(), platform: `${platform()} ${arch()}; Node ${process.version}` }).connect(new StdioServerTransport());
 }
 void main().catch((error) => {
   console.error(

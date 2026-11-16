@@ -10,6 +10,7 @@ import { MediaUpload, insertPageMedia } from "./MediaUpload";
 import { CollaboratorPresence } from "./CollaboratorPresence";
 import { AgentSkill } from "./AgentSkill";
 import { DownloadMenu } from "./DownloadMenu";
+import { AuditLog } from "./AuditLog";
 import { exportOfflineHtml } from "../offline-export";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
@@ -1961,7 +1962,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     return (
       p === "/login" ||
       p === "/signup" ||
-      p === "/connect" ||
+      p === "/connect" || p === "/audit" ||
       p === "/invite" ||
       Boolean(sessionStorage.getItem("docsync_invite")) ||
       Boolean(sessionStorage.getItem("docsync_claim")) ||
@@ -1982,8 +1983,8 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     [doc, setDoc] = useState<Document | null>(null),
     [dirty, setDirty] = useState(false),
     [search, setSearch] = useState(""),
-    [view, setView] = useState<"library" | "connect">(
-      location.pathname === "/connect" ? "connect" : "library",
+    [view, setView] = useState<"library" | "connect" | "audit">(
+      location.pathname === "/audit" ? "audit" : location.pathname === "/connect" ? "connect" : "library",
     );
   const [preview, setPreview] = useState(false),
     [activeSlide, setActiveSlide] = useState(0),
@@ -2204,6 +2205,13 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       }
       if (route) {
         void run(() => loadDocument(route.id, false, route.preview));
+      } else if (location.pathname === "/audit") {
+        setDoc(null);
+        setDirty(false);
+        setPreview(false);
+        setView("audit");
+        setError("");
+        setNotice("");
       } else if (location.pathname === "/connect") {
         setDoc(null);
         setDirty(false);
@@ -2372,7 +2380,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
         await Promise.all([refresh(), route ? loadDocument(route.id, false, route.preview) : Promise.resolve()]);
       }
       setAuthPage(false);
-      if (!doc && !documentRoute()) window.history.replaceState(null, "", view === "connect" || claim ? "/connect" : "/");
+      if (!doc && !documentRoute()) window.history.replaceState(null, "", view === "audit" ? "/audit" : view === "connect" || claim ? "/connect" : "/");
     });
   }
 
@@ -2496,6 +2504,10 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           >
             <Bot className="w-4 h-4 text-muted-foreground shrink-0" />
             <span>Connect agent</span>
+          </button>
+          <button type="button" disabled={busy} className={cn("w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors cursor-pointer border-0 bg-transparent text-left", view === "audit" ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground")}
+            onClick={() => { if (leave()) { setDoc(null); setDirty(false); setPreview(false); setError(""); setNotice(""); setView("audit"); window.history.pushState(null, "", "/audit"); } }}>
+            <Shield className="w-4 h-4 text-muted-foreground shrink-0" /><span>Audit log</span>
           </button>
         </nav>
         <div className="sidebar-note mt-auto rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
@@ -2678,7 +2690,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                 <span>Workspace</span>
                 <span className="slash">/</span>
                 <span className="text-foreground truncate">
-                  {view === "connect" ? "Connect agent" : "My documents"}
+                  {view === "audit" ? "Audit log" : view === "connect" ? "Connect agent" : "My documents"}
                 </span>
               </div>
               <div className="shrink-0">
@@ -2734,7 +2746,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           await loadDocument(id, true, false);
           sessionStorage.removeItem("docsync_invite"); setInvitation("");
           await refresh();
-        }} /> : view === "connect" ? (
+        }} /> : view === "audit" ? <AuditLog /> : view === "connect" ? (
           <section className="connect-page" aria-busy={connectionLoading}>
             {connectionLoading && <p role="status">Checking your agent connection…</p>}
             <p className="eyebrow">YOUR AGENT, YOUR WORKSPACE</p>

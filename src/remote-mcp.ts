@@ -1,3 +1,4 @@
+import { withAgentAudit } from "./audit.ts";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { authenticate, hash, randomToken } from "./auth.ts";
 import { readCookie, rateLimit } from "./accounts.ts";
@@ -131,17 +132,21 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
   if(path==="/mcp") {
     const auth=request.headers.get("Authorization")||"", match=auth.match(/^Bearer ([a-f0-9]{64})$/); if(!match)return json({error:"unauthorized"},401,{"WWW-Authenticate":`Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp", scope="docsync"`});
     const valid=await env.DB.prepare("SELECT 1 AS ok FROM oauth_access_tokens WHERE token_hash=? AND expires_at>?").bind(await hash(match[1]),now()).first(); if(!valid)return json({error:"invalid_token"},401,{"WWW-Authenticate":`Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"`});
-    let incoming = request;
+    let incoming = request, payload: { method?: string; params?: { name?: unknown; arguments?: unknown } } | undefined;
     if (method === "POST") {
       const bytes = await readBody(request, maxMediaJsonBytes);
-      if (bytes.byteLength > 550_000) {
-        let payload;
-        try { payload = JSON.parse(new TextDecoder().decode(bytes)); } catch { throw new HttpError(400, "Invalid JSON request"); }
-        if (payload?.method !== "tools/call" || payload?.params?.name !== "upload_media") throw new HttpError(413, "Request body is too large.");
-      }
+      try { payload = JSON.parse(new TextDecoder().decode(bytes)); } catch { /* The transport returns its normal parse error. */ }
+      if (bytes.byteLength > 550_000 && (payload?.method !== "tools/call" || payload?.params?.name !== "upload_media")) throw new HttpError(413, "Request body is too large.");
       incoming = new Request(request, { body: bytes });
     }
-    const server=createMcpServer(origin,match[1],fetchApi),transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true}); await server.connect(transport); return transport.handleRequest(incoming);
+    const server = createMcpServer(origin, match[1], fetchApi, undefined, { remote: true });
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    await server.connect(transport);
+    if (payload?.method === "tools/call") {
+      const principal = await authenticate(request, env);
+      return withAgentAudit(request, env, principal, () => transport.handleRequest(incoming), { source: "mcp", tool: typeof payload.params?.name === "string" ? payload.params.name : "Invalid tool call", args: payload.params?.arguments ?? {} });
+    }
+    return transport.handleRequest(incoming);
   }
   return null;
 }

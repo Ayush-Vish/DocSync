@@ -574,6 +574,27 @@ try {
   await page.evaluate(() => { navigator.clipboard.writeText = (window as any).originalClipboard; });
   await page.screenshot({ path: "/tmp/docsync-slides-mobile.png" });
   await click("My documents");
+  const auditToken = await page.evaluate(async () => (await (await fetch('/api/agent-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowPublishing: false }) })).json()).token as string);
+  for (const path of ['/api/connection', `/api/documents/${crypto.randomUUID()}`]) {
+    await fetch(origin + path, { headers: { Authorization: `Bearer ${auditToken}`, 'X-DocSync-Client': 'Codex', 'X-DocSync-Device': 'Audit-fixture-laptop', 'X-DocSync-Platform': 'linux%20x64', 'CF-Connecting-IP': '203.0.113.7', 'User-Agent': 'Audit browser fixture' } });
+  }
+  await click('Audit log');
+  await page.waitForSelector('#audit-title');
+  await page.waitForSelector('.audit-entry');
+  await fill('input[aria-label="Search audit log"]', 'Audit-fixture-laptop');
+  await page.select('select[aria-label="Audit result filter"]', 'error');
+  await click('Filter');
+  await page.waitForFunction(() => document.querySelectorAll('.audit-entry').length === 1 && document.querySelector('.audit-command code')?.textContent === 'get_document');
+  await page.click('.audit-entry summary');
+  assert.ok((await page.$eval('.audit-event-details', node => node.textContent || '')).includes('203.0.113.7'));
+  assert.ok(!(await page.$eval('.audit-page', node => node.textContent || '')).includes(auditToken));
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: '/tmp/docsync-audit-mobile.png', fullPage: true });
+  await page.setViewport({ width: 1440, height: 1000 });
+  await page.screenshot({ path: '/tmp/docsync-audit-desktop.png', fullPage: true });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForSelector('#audit-title');
+  assert.equal(new URL(page.url()).pathname, '/audit');
   await page.click('button[aria-label="Sign out"]');
   await page.waitForSelector("input[name=email]");
   assert.deepEqual(errors, []);
