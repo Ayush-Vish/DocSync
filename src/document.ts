@@ -18,6 +18,10 @@ export const contentSchema = z
   })
   .strict();
 export type Content = z.infer<typeof contentSchema>;
+export function isPresentationContent(content: Content): boolean {
+  return content.format ? content.format === "presentation" : content.sections.every(section =>
+    [...section.html.matchAll(/\sclass\s*=\s*(["'])(.*?)\1/gis)].some(match => match[2].split(/\s+/).includes("slide")));
+}
 export type RenderedContent = Content & { mediaToken?: string };
 export type DocumentAccess = "owner" | "editor" | "viewer";
 export type EditLock = { leaseId: string; holder: string; agent: string; expiresAt: number };

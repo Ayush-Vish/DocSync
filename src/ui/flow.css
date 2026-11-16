@@ -68,6 +68,14 @@
 .edit-lock-action { flex-shrink: 0; border-radius: 999px; padding-inline: 12px; box-shadow: none; }
 .edit-lock-error { flex-basis: 100%; padding: 8px 12px; }
 .edit-lock-error > div { font-size: 12px; }
+.document-download { display: inline-flex; align-items: center; gap: 3px; }
+.download-options { position: relative; }
+.download-options summary { cursor: pointer; list-style: none; }
+.download-options summary::-webkit-details-marker { display: none; }
+.download-options summary[aria-disabled=true] { cursor: default; opacity: .5; }
+.download-options-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 50; width: min(260px, calc(100vw - 32px)); padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--popover, var(--background)); color: var(--foreground); box-shadow: 0 8px 24px #17203318; }
+.download-options-panel button { width: 100%; justify-content: flex-start; }
+.download-options-panel p { margin: 6px 8px; font-size: 11px; line-height: 1.6; color: var(--muted-foreground); }
 .collaborators { border-block: 1px solid var(--border); padding: 16px 0; margin: 16px 0; }
 .collaborator-invite { margin-top: 12px; }
 .collaborator-invite label { display: grid; gap: 6px; font-size: 12px; }

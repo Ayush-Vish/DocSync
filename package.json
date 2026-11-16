@@ -16,6 +16,7 @@
     "test:browser": "node --experimental-strip-types test/browser.ts",
     "test:media": "node --experimental-strip-types test/media-browser.ts",
     "test:artifacts": "node --experimental-strip-types test/artifact-browser.ts",
+    "test:offline": "node --experimental-strip-types test/offline-export-browser.ts",
     "mcp": "node dist/docsync-mcp.cjs",
     "setup": "node --experimental-strip-types scripts/setup.mjs",
     "backup": "node --experimental-strip-types scripts/backup.ts",

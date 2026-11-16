@@ -82,7 +82,8 @@ try {
     try {
       URL.createObjectURL = blob => { captured = blob as Blob; return "blob:docsync-test-export"; };
       HTMLAnchorElement.prototype.click = () => {};
-      [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Download")!.click();
+      document.querySelector<HTMLElement>('summary[aria-label="More download options"]')!.click();
+      [...document.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Download JSON backup")!.click();
     } finally { URL.createObjectURL = create; HTMLAnchorElement.prototype.click = click; }
     return JSON.parse(await captured.text());
   });

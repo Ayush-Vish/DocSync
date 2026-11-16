@@ -6,7 +6,8 @@ export const artifactPolicy = (origin: string) => `default-src 'none'; script-sr
 
 // Keep this script literal self-contained. Serializing a bundled function with
 // toString() can leak esbuild helpers that do not exist inside the sandbox.
-const artifactRuntime = String.raw`(() => {
+const artifactRuntime = (embeddedMedia: boolean) => String.raw`(() => {
+  const embeddedMedia = ${embeddedMedia};
   let rendered = false;
   function showError(message) {
     const error = document.createElement("pre");
@@ -36,8 +37,10 @@ const artifactRuntime = String.raw`(() => {
         for (const attr of ["src", "poster"]) {
           const path = element.getAttribute(attr);
           if (!path) continue;
-          if (data.mediaToken && /^\/media\/[a-f0-9-]{36}$/.test(path)) element.setAttribute(attr, new URL(path, document.URL).href + "?access=" + encodeURIComponent(data.mediaToken));
-          else element.removeAttribute(attr);
+          ${embeddedMedia ? String.raw`const embedded = data.media && data.media[path];
+          if (typeof embedded === "string" && /^data:(?:image\/(?:png|jpeg|gif|webp)|video\/(?:mp4|webm));base64,[A-Za-z0-9+/]*={0,2}$/.test(embedded)) element.setAttribute(attr, embedded);
+          else element.removeAttribute(attr);` : String.raw`if (data.mediaToken && /^\/media\/[a-f0-9-]{36}$/.test(path)) element.setAttribute(attr, new URL(path, document.URL).href + "?access=" + encodeURIComponent(data.mediaToken));
+          else element.removeAttribute(attr);`}
         }
       }
       document.getElementById("artifact").replaceChildren(template.content);
@@ -114,6 +117,10 @@ const artifactRuntime = String.raw`(() => {
   });
 })()`;
 
+export function artifactFrameHtml(embeddedMedia = false): string {
+  const policy = embeddedMedia ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; media-src data:; connect-src 'none'; font-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">` : "";
+  return `<!doctype html><html><head><meta charset="utf-8">${policy}<meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;font:16px/1.6 system-ui;color:#172033;background:white;overflow-wrap:anywhere}*{box-sizing:border-box}img,video{max-width:100%;height:auto}table{border-collapse:collapse;max-width:100%}td,th{padding:8px;border:1px solid #ddd}pre{white-space:pre-wrap}</style></head><body><main id="artifact"></main><script>${artifactRuntime(embeddedMedia)}</script></body></html>`;
+}
 export function artifactFrame(): Response {
-  return new Response(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:24px;font:16px/1.6 system-ui;color:#172033;background:white;overflow-wrap:anywhere}*{box-sizing:border-box}img,video{max-width:100%;height:auto}table{border-collapse:collapse;max-width:100%}td,th{padding:8px;border:1px solid #ddd}pre{white-space:pre-wrap}</style></head><body><main id="artifact"></main><script>${artifactRuntime}</script></body></html>`, { headers: { "Content-Type": "text/html;charset=utf-8" } });
+  return new Response(artifactFrameHtml(), { headers: { "Content-Type": "text/html;charset=utf-8" } });
 }

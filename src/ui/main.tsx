@@ -9,6 +9,8 @@ import { MediaContext } from "./MediaContext";
 import { MediaUpload, insertPageMedia } from "./MediaUpload";
 import { CollaboratorPresence } from "./CollaboratorPresence";
 import { AgentSkill } from "./AgentSkill";
+import { DownloadMenu } from "./DownloadMenu";
+import { exportOfflineHtml } from "../offline-export";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
 import { DocumentViewer } from "./DocumentViewer";
@@ -94,7 +96,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import type { Content, Document, Revision, RenderedContent } from "../document";
+import { isPresentationContent, type Content, type Document, type Revision, type RenderedContent } from "../document";
 import themeCatalog from "../../skills/docsync/themes.json";
 
 type Summary = {
@@ -170,12 +172,6 @@ const VISUAL_TEMPLATES = [
     css: `.slide { padding: clamp(24px, 5vw, 50px) clamp(20px, 4vw, 40px); font-family: system-ui, sans-serif; background: #09090b; color: #fff; border-radius: 12px; display: flex; flex-direction: column; justify-content: center; min-height: 140px; box-sizing: border-box; }\nblockquote { font-size: clamp(15px, 3vw, 24px); font-style: italic; line-height: 1.45; margin: 0 0 12px; font-weight: 400; color: #fff; border: 0; padding: 0; }\n.author { font-size: clamp(11px, 1.8vw, 13px); color: #a1a1aa; font-weight: 500; margin: 0; }`,
   },
 ];
-
-const slideMarkup = (html: string) =>
-  [...html.matchAll(/\sclass\s*=\s*(["'])(.*?)\1/gis)].some(match => match[2].split(/\s+/).includes("slide"));
-
-const isPresentationContent = (content: Content) =>
-  content.format ? content.format === "presentation" : content.sections.every((section) => slideMarkup(section.html));
 
 const documentRoute = () => {
   const match = location.pathname.match(
@@ -2006,6 +2002,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     [codeTab, setCodeTab] = useState<"html" | "css" | "js">("html"),
     [shareModalOpen, setShareModalOpen] = useState(false),
     [copiedLink, setCopiedLink] = useState("");
+  const [exporting, setExporting] = useState(false);
   const editorMode = doc && isPresentationContent(doc) ? "slide" : "doc";
   const safeActiveSlide = doc && doc.sections.length > 0
     ? Math.min(activeSlide, doc.sections.length - 1)
@@ -2326,6 +2323,25 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     URL.revokeObjectURL(url);
   }
 
+  async function downloadHtml() {
+    if (!doc) return;
+    await run(async () => {
+      setExporting(true);
+      try {
+        const { html, filename } = await exportOfflineHtml(doc);
+        const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        setNotice("Offline HTML downloaded with your current draft, including unsaved changes.");
+      } finally { setExporting(false); }
+    });
+  }
+
   async function connect() {
     if (!leave()) return;
     setDoc(null);
@@ -2612,16 +2628,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                   <History className="w-3.5 h-3.5 mr-1" />
                   History
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs px-2.5"
-                  disabled={busy}
-                  onClick={exportDraft}
-                >
-                  <Download className="w-3.5 h-3.5 mr-1" />
-                  Download
-                </Button>
+                <DownloadMenu disabled={busy} exporting={exporting} onHtml={() => void downloadHtml()} onJson={exportDraft} />
                 {editorMode === "slide" ? (
                   <Button
                     variant="outline"
