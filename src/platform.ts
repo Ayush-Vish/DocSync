@@ -10,7 +10,7 @@ export interface Database {
   prepare(sql: string): Statement;
   batch(statements: Statement[]): Promise<{ meta: { changes: number } }[]>;
 }
-// The small R2-compatible seam also supports the local filesystem and tests.
+// Shared by Supabase, R2, the local filesystem and tests.
 export interface MediaBucket {
   put(key: string, body: Uint8Array, options: { httpMetadata: { contentType: string } }): Promise<unknown>;
   get(key: string, options?: { range?: { offset: number; length: number } }): Promise<{ body: ReadableStream<Uint8Array>; size: number } | null>;
@@ -19,6 +19,9 @@ export interface MediaBucket {
 export interface Env {
   DB: Database;
   MEDIA?: MediaBucket;
+  SUPABASE_URL?: string;
+  SUPABASE_SECRET_KEY?: string;
+  SUPABASE_STORAGE_BUCKET?: string;
   EMAIL?: Pick<CloudflareBindings["EMAIL"], "send">;
   DOCSYNC_EMAIL_FROM?: string;
   GOOGLE_CLIENT_ID?: string;

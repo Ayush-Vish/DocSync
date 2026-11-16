@@ -5,6 +5,7 @@ import { authenticate, hash, signature, verifySignature } from "./auth.ts";
 import { access, editableDocument } from "./collaboration.ts";
 import { HttpError } from "./content.ts";
 import { mediaReferences } from "./media-url.ts";
+import { mediaBucket } from "./media-store.ts";
 
 import { maxMediaBytes } from "./media-config.ts";
 type Asset = { id: string; document_id: string; filename: string; content_type: string; byte_size: number; storage_key: string; status: string };
@@ -41,7 +42,8 @@ function result(asset: Asset, origin: string) {
 }
 export async function uploadMedia(env: Env, principal: Principal, documentId: string, filename: string, contentType: string, bytes: Uint8Array, origin: string) {
   await access(env.DB, documentId, principal.accountId, "editor");
-  if (!env.MEDIA) throw new HttpError(503, "Media storage is not configured");
+  const bucket = mediaBucket(env);
+  if (!bucket) throw new HttpError(503, "Media storage is not configured");
   if (!bytes.byteLength || bytes.byteLength > maxMediaBytes) throw new HttpError(413, "Media must contain 1 byte to 8 MiB");
   if (!filename || filename.length > 160 || /[\x00-\x1f\x7f/\\]/.test(filename)) throw new HttpError(400, "Use a filename of 1–160 characters without a path");
   const detected = sniff(bytes);
@@ -60,13 +62,13 @@ export async function uploadMedia(env: Env, principal: Principal, documentId: st
     throw new HttpError(413, "Document media limit reached: 50 files or 100 MiB");
   }
   try {
-    await env.MEDIA.put(key, bytes, { httpMetadata: { contentType } });
+    await bucket.put(key, bytes, { httpMetadata: { contentType } });
     const ready = await env.DB.prepare(`UPDATE media_assets SET status='ready' WHERE id=? AND EXISTS(SELECT 1 FROM documents d WHERE d.id=media_assets.document_id AND ${editableDocument})`).bind(id, principal.accountId, principal.accountId).run();
     if (!ready.meta.changes) throw new HttpError(403, "Edit access changed during upload");
     return result({ id, document_id: documentId, filename, content_type: contentType, byte_size: bytes.byteLength, storage_key: key, status: "ready" }, origin);
   } catch (error) {
     // A failed cleanup retains its quota reservation and remains unservable.
-    try { await env.MEDIA.delete(key); await env.DB.prepare("DELETE FROM media_assets WHERE id=? AND status='pending'").bind(id).run(); } catch {}
+    try { await bucket.delete(key); await env.DB.prepare("DELETE FROM media_assets WHERE id=? AND status='pending'").bind(id).run(); } catch {}
     if (error instanceof HttpError) throw error;
     throw new HttpError(503, "Media upload failed. No embeddable link was created.");
   }
@@ -97,7 +99,8 @@ export async function serveMedia(request: Request, env: Env, id: string) {
       if (!published || !(JSON.parse(published.content) as Content).sections.some(section => mediaReferences(section.html).some(ref => ref.id === id))) throw new HttpError(403, "Media is not in this published version");
     }
   } else await access(env.DB, asset.document_id, (await authenticate(request, env)).accountId);
-  if (!env.MEDIA) throw new HttpError(503, "Media storage is not configured");
+  const bucket = mediaBucket(env);
+  if (!bucket) throw new HttpError(503, "Media storage is not configured");
   const headers = new Headers({ "Content-Type": asset.content_type, "Accept-Ranges": "bytes", "Content-Length": String(asset.byte_size), "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(asset.filename)}` });
   let range: { offset: number; length: number } | undefined;
   const input = request.method === "GET" ? request.headers.get("Range") : null;
@@ -110,7 +113,7 @@ export async function serveMedia(request: Request, env: Env, id: string) {
     headers.set("Content-Range", `bytes ${start}-${end}/${asset.byte_size}`); headers.set("Content-Length", String(range.length));
   }
   if (request.method === "HEAD") return new Response(null, { status: range ? 206 : 200, headers });
-  const object = await env.MEDIA.get(asset.storage_key, range ? { range } : undefined);
+  const object = await bucket.get(asset.storage_key, range ? { range } : undefined);
   if (!object) throw new HttpError(404, "Media file not found");
   return new Response(object.body, { status: range ? 206 : 200, headers });
 }
