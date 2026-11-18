@@ -2,7 +2,7 @@ import type { Env } from "./platform.ts";
 import type { Principal } from "./auth.ts";
 import { hash } from "./auth.ts";
 import { HttpError } from "./content.ts";
-import { readBody } from "./request.ts";
+import { errorResponse, readBody } from "./request.ts";
 
 export const auditRetentionDays = 90;
 export function auditText(value: unknown, limit = 200): string {
@@ -11,7 +11,7 @@ export function auditText(value: unknown, limit = 200): string {
 export type AuditEvent = {
   id: number; requestId: string; createdAt: string; clientName: string; clientVersion: string; credentialId: string;
   tool: string; source: "api" | "mcp" | "client"; documentId: string | null; method: string; path: string;
-  outcome: "pending" | "success" | "error"; status: number | null; durationMs: number | null; error: string;
+  outcome: "pending" | "success" | "error"; status: number | null; durationMs: number | null; localDurationMs: number | null; error: string;
   deviceName: string; platform: string; ip: string; userAgent: string; details: Record<string, unknown>;
 };
 export type AuditPage = { items: AuditEvent[]; nextCursor: number | null; retentionDays: number };
@@ -54,7 +54,7 @@ function operation(request: Request): string {
   return ({ history: "get_document_history", compare: "compare_document_versions", restore: "restore_document", publish: "publish_document", media: "upload_media", collaborators: "get_document_collaborators" } as Record<string, string>)[action || ""] || `${method} ${auditText(path, 180)}`;
 }
 
-type AuditOptions = { source?: "api" | "mcp" | "client"; tool?: string; args?: unknown; clientError?: boolean };
+type AuditOptions = { source?: "api" | "mcp" | "client"; tool?: string; args?: unknown; clientError?: boolean; localDurationMs?: number };
 export async function withAgentAudit(request: Request, env: Env, principal: Principal, action: (request: Request) => Promise<Response>, options: AuditOptions = {}): Promise<Response> {
   if (principal.role !== "agent") return action(request);
   const started = Date.now(), requestId = crypto.randomUUID(), url = new URL(request.url);
@@ -83,21 +83,22 @@ export async function withAgentAudit(request: Request, env: Env, principal: Prin
   try {
     await env.DB.batch([
       env.DB.prepare("DELETE FROM agent_audit_events WHERE account_id=? AND created_at<strftime('%Y-%m-%dT%H:%M:%fZ','now','-90 days')").bind(principal.accountId),
-      env.DB.prepare(`INSERT INTO agent_audit_events(request_id,account_id,created_at,client_name,client_version,credential_id,tool,source,document_id,method,path,outcome,device_name,platform,ip,user_agent,details)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?)`).bind(requestId, principal.accountId, new Date(started).toISOString(), auditText(principal.actorLabel, 100), header(request, "X-DocSync-Client-Version", 80), (await hash(principal.actorId)).slice(0, 16), tool, options.source || "api", documentId, request.method, auditText(url.pathname, 250), header(request, "X-DocSync-Device", 120), header(request, "X-DocSync-Platform", 160), auditText(request.headers.get("CF-Connecting-IP"), 64), auditText(request.headers.get("User-Agent"), 500), JSON.stringify(details)),
+      env.DB.prepare(`INSERT INTO agent_audit_events(request_id,account_id,created_at,client_name,client_version,credential_id,tool,source,document_id,method,path,outcome,device_name,platform,ip,user_agent,details,local_duration_ms)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,'pending',?,?,?,?,?,?)`).bind(requestId, principal.accountId, new Date(started).toISOString(), auditText(principal.actorLabel, 100), header(request, "X-DocSync-Client-Version", 80), (await hash(principal.actorId)).slice(0, 16), tool, options.source || "api", documentId, request.method, auditText(url.pathname, 250), header(request, "X-DocSync-Device", 120), header(request, "X-DocSync-Platform", 160), auditText(request.headers.get("CF-Connecting-IP"), 64), auditText(request.headers.get("User-Agent"), 500), JSON.stringify(details), options.localDurationMs ?? null),
     ]);
   } catch { throw new HttpError(503, "Audit logging is unavailable. This action was not executed."); }
   const finish = async (outcome: string, status: number, error = "") => {
     try {
       await env.DB.prepare("UPDATE agent_audit_events SET outcome=?,status=?,duration_ms=?,error=?,details=?,document_id=? WHERE request_id=? AND account_id=?")
-        .bind(outcome, status, Date.now() - started, auditText(error, 500), JSON.stringify(details), documentId, requestId, principal.accountId).run();
+        .bind(outcome, status, options.localDurationMs === undefined ? Date.now() - started : null, auditText(error, 500), JSON.stringify(details), documentId, requestId, principal.accountId).run();
       return true;
     } catch { console.error("Audit completion pending", { requestId }); return false; }
   };
   let response: Response;
   try { if (bodyError) throw bodyError; response = await action(actionRequest); }
-  catch (error) { await finish("error", error instanceof HttpError ? error.status : 500, error instanceof HttpError ? error.message : "Unexpected server error"); throw error; }
-  let failed = !response.ok || Boolean(options.clientError), error = options.clientError ? "Client-side media validation failed; no upload was sent." : "";
+  catch (error) { response = errorResponse(error); }
+  let failed = !response.ok || Boolean(options.clientError);
+  let error = options.clientError ? (options.localDurationMs === undefined ? "Client-side media validation failed; no upload was sent." : "Local MCP tool reported an error.") : "";
   if (response.headers.get("Content-Type")?.includes("application/json")) {
     try {
       let result = await response.clone().json() as Record<string, unknown>;
@@ -124,12 +125,34 @@ export async function withAgentAudit(request: Request, env: Env, principal: Prin
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+export async function recordLocalToolTiming(request: Request, env: Env, principal: Principal, input: Record<string, unknown>) {
+  const duration = input.localDurationMs;
+  if (typeof duration !== "number" || !Number.isSafeInteger(duration) || duration < 0 || duration > 86_400_000) {
+    throw new HttpError(400, "Invalid local tool duration");
+  }
+  if (input.requestId !== undefined) {
+    if (typeof input.requestId !== "string" || !/^[a-f0-9-]{36}$/.test(input.requestId)) throw new HttpError(400, "Invalid audit request reference");
+    const credentialId = (await hash(principal.actorId)).slice(0, 16);
+    await env.DB.prepare(`UPDATE agent_audit_events SET local_duration_ms=?
+      WHERE request_id=? AND account_id=? AND credential_id=? AND source='api' AND local_duration_ms IS NULL`)
+      .bind(duration, input.requestId, principal.accountId, credentialId).run();
+    return Response.json({ ok: true });
+  }
+  if (typeof input.tool !== "string" || !/^[a-z][a-z0-9_]{0,63}$/.test(input.tool) || typeof input.failed !== "boolean") {
+    throw new HttpError(400, "Invalid local tool event");
+  }
+  const args = { id: input.id, format: typeof input.format === "string" && ["document", "presentation", "all"].includes(input.format) ? input.format : undefined };
+  return withAgentAudit(request, env, principal, async () => Response.json({ ok: true }), {
+    source: "client", tool: input.tool, args, clientError: input.failed, localDurationMs: duration,
+  });
+}
+
 export async function listAuditEvents(request: Request, env: Env, principal: Principal) {
   if (principal.role !== "owner") throw new HttpError(403, "Open Audit Log in your signed-in DocSync account");
   const query = new URL(request.url).searchParams, before = query.get("before"), outcome = query.get("outcome"), search = query.get("q") || "";
   if ((before && (!/^\d{1,16}$/.test(before) || !Number.isSafeInteger(Number(before)))) || (outcome && !["success", "error", "pending"].includes(outcome)) || search.length > 100) throw new HttpError(400, "Invalid audit filters");
   const pattern = "%" + search.replace(/[\\%_]/g, "\\$&") + "%";
-  const rows = await env.DB.prepare(`SELECT id,request_id AS requestId,created_at AS createdAt,client_name AS clientName,client_version AS clientVersion,credential_id AS credentialId,tool,source,document_id AS documentId,method,path,outcome,status,duration_ms AS durationMs,error,device_name AS deviceName,platform,ip,user_agent AS userAgent,details
+  const rows = await env.DB.prepare(`SELECT id,request_id AS requestId,created_at AS createdAt,client_name AS clientName,client_version AS clientVersion,credential_id AS credentialId,tool,source,document_id AS documentId,method,path,outcome,status,duration_ms AS durationMs,local_duration_ms AS localDurationMs,error,device_name AS deviceName,platform,ip,user_agent AS userAgent,details
     FROM agent_audit_events WHERE account_id=? AND created_at>=strftime('%Y-%m-%dT%H:%M:%fZ','now','-90 days')
     AND (? IS NULL OR id<?) AND (? IS NULL OR outcome=?)
     AND (tool LIKE ? ESCAPE '\\' OR client_name LIKE ? ESCAPE '\\' OR device_name LIKE ? ESCAPE '\\') ORDER BY id DESC LIMIT 51`)

@@ -60,8 +60,28 @@ test("hosted MCP logs the real tool call and SDK validation failures exactly onc
   const data = await (await f.call('/audit-log')).json() as AuditPage;
   assert.equal(data.items.length, 2, 'Internal MCP-to-API calls must not produce duplicate audit entries');
   assert.ok(data.items.every(item => item.source === 'mcp' && item.clientName === 'Claude Code' && item.ip === '198.51.100.5'));
+  assert.ok(data.items.every(item => item.localDurationMs === null && typeof item.durationMs === 'number'));
   assert.equal(data.items.find(item => item.tool === 'get_connection')?.outcome, 'success');
   assert.equal(data.items.find(item => item.tool === 'update_document')?.outcome, 'error');
+});
+
+test("local timing updates only an API event belonging to the reporting credential", async t => {
+  const f = await fixture(); t.after(f.close);
+  const api = await f.call('/connection', 'GET', undefined, 'agent');
+  const requestId = api.headers.get('X-DocSync-Request-Id')!;
+  const report = (localDurationMs: unknown) => f.call('/audit-events', 'POST', { requestId, localDurationMs }, 'agent');
+  for (const invalid of [-1, 1.5, '123', 86_400_001]) assert.equal((await report(invalid)).status, 400);
+  assert.equal((await f.call('/audit-events', 'POST', { requestId, localDurationMs: 40 })).status, 403);
+  const token = randomToken();
+  await f.env.DB.prepare("INSERT INTO oauth_clients VALUES('other-client','Other client','[]',unixepoch())").run();
+  await f.env.DB.prepare("INSERT INTO oauth_access_tokens VALUES(?,'legacy','other-client',0,unixepoch()+3600)").bind(await hash(token)).run();
+  await f.call('/audit-events', 'POST', { requestId, localDurationMs: 20 }, 'anonymous', { Authorization: `Bearer ${token}` });
+  assert.equal((await report(123)).status, 200);
+  await report(456);
+  const { items } = await (await f.call('/audit-log')).json() as AuditPage;
+  assert.equal(items.length, 1);
+  assert.equal(items[0].localDurationMs, 123);
+  assert.ok(typeof items[0].durationMs === 'number');
 });
 
 test("audit reservation fails closed before a write; completion failures preserve an unconfirmed record", async t => {
