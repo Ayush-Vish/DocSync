@@ -1,7 +1,7 @@
 export const publicPages = {
   "/": {
     title: "DocSync — AI Documents, Reports & Presentations",
-    description: "Turn your AI agent’s work into documents, visual reports, and presentations. Save time drafting, refine in your browser, and share reviewed versions with your team.",
+    description: "Use your existing AI agent to draft documents, reports, and presentations in DocSync. Edit them in your browser and share a link to the version you reviewed.",
   },
   "/templates": {
     title: "Document & Presentation Templates | DocSync",
@@ -18,7 +18,8 @@ export function pageMetadata(path: string, origin?: string) {
   if (!page) return '<title>Workspace | DocSync</title><meta name="robots" content="noindex, nofollow" />';
   const title = escapeHtml(page.title), description = escapeHtml(page.description);
   const url = origin ? escapeHtml(origin + path) : null;
-  const image = origin ? escapeHtml(origin + "/social-card.png") : null;
+  const image = origin ? escapeHtml(origin + "/assets/landing/social-card.png") : null;
+  const imageAlt = "DocSync. Turn agent drafts into work worth sharing. An illustrative project review deck.";
   // JSON-LD is data only; escape '<' so it can never close its script element.
   const structured = JSON.stringify({
     "@context": "https://schema.org",
@@ -38,10 +39,10 @@ export function pageMetadata(path: string, origin?: string) {
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
     ${url ? `<meta property="og:url" content="${url}" />` : ""}
-    ${image ? `<meta property="og:image" content="${image}" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="DocSync: Less busywork. More shared clarity. Documents, reports, and presentations with your AI agent." />` : ""}
+    ${image ? `<meta property="og:image" content="${image}" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="${imageAlt}" />` : ""}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
-    ${image ? `<meta name="twitter:image" content="${image}" /><meta name="twitter:image:alt" content="DocSync: Less busywork. More shared clarity." />` : ""}
+    ${image ? `<meta name="twitter:image" content="${image}" /><meta name="twitter:image:alt" content="${imageAlt}" />` : ""}
     <script type="application/ld+json">${structured}</script>`;
 }

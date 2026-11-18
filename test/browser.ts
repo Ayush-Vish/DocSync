@@ -44,7 +44,11 @@ f.env.ASSETS = {
             ? "text/css"
             : file.endsWith(".svg")
               ? "image/svg+xml"
-            : "text/html",
+              : file.endsWith(".webp")
+                ? "image/webp"
+                : file.endsWith(".woff2")
+                  ? "font/woff2"
+                  : "text/html",
       },
     });
   },
@@ -139,7 +143,8 @@ try {
   page.on("request", trackHomepage);
   await page.goto(origin, { waitUntil: "networkidle0" });
   assert.equal(await page.$$eval("h1", nodes => nodes.length), 1);
-  assert.match(await page.$eval("h1", node => node.textContent || ""), /Less busywork/);
+  assert.equal(await page.$eval("h1", node => node.textContent), "Turn agent drafts into work worth sharing.");
+  assert.ok(await page.$eval(".home-hero img", img => (img as HTMLImageElement).naturalWidth > 0), "The outcome image loads from the public asset route");
   assert.ok(!homepageRequests.some(url => /\/assets\/main-/.test(url)), "Guest homepage must not load the editor bundle");
   page.off("request", trackHomepage);
   await page.screenshot({ path: "/tmp/docsync-home-desktop.png", fullPage: true });
@@ -151,6 +156,8 @@ try {
     await page.setViewport({ width, height: 844 });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   }
+  await page.setViewport({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: "/tmp/docsync-home-mobile.png", fullPage: true });
   const staticPage = await browser.newPage();
   await staticPage.setJavaScriptEnabled(false);

@@ -18,7 +18,7 @@ async function site() {
 
 test("public pages ship visible content, unique metadata, canonical URLs and structured data without JavaScript", async t => {
   const f = await site(); t.after(f.close);
-  for (const [path, heading] of [["/", "Less busywork."], ["/templates", "Choose your starting point"]]) {
+  for (const [path, heading] of [["/", "Turn agent drafts into work"], ["/templates", "Choose your starting point"]]) {
     const response = await f.request(path + "?utm_source=test");
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("X-Robots-Tag"), null);
@@ -30,7 +30,7 @@ test("public pages ship visible content, unique metadata, canonical URLs and str
     assert.equal((html.match(/<h1\b/g) || []).length, 1);
     assert.equal((html.match(/<title>/g) || []).length, 1);
     assert.ok(html.includes(`rel="canonical" href="https://docs.example${path}"`));
-    assert.ok(html.includes('property="og:image" content="https://docs.example/social-card.png"'));
+    assert.ok(html.includes('property="og:image" content="https://docs.example/assets/landing/social-card.png"'));
     assert.ok(html.includes('name="description"'));
     const structured = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)![1]);
     assert.equal(structured.url, "https://docs.example" + path);
@@ -68,14 +68,14 @@ test("workspace and shared links remain noindex, and unknown URLs are real 404s"
     assert.equal(response.headers.get("Cache-Control"), "no-store");
     const html = await response.text();
     assert.ok(html.includes('name="robots" content="noindex, nofollow"'));
-    assert.ok(!html.includes("Less busywork."));
+    assert.ok(!html.includes("Turn agent drafts into work"));
     assert.ok(!html.includes('rel="canonical"'));
     assert.ok(!html.includes("application/ld+json"));
   }
   assert.equal((await f.request("/api/session")).headers.get("X-Robots-Tag"), "noindex, nofollow");
   assert.equal((await f.request("/not-a-page")).status, 404);
   assert.equal((await f.request("/share/not-a-token")).status, 404);
-  const social = await f.request("/social-card.png");
+  const social = await f.request("/assets/landing/social-card.png");
   assert.equal(social.status, 200);
   assert.equal(social.headers.get("Content-Type"), "image/png");
   assert.equal(social.headers.get("X-Robots-Tag"), null);
