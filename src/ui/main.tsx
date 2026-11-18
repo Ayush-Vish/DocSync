@@ -11,6 +11,8 @@ import { CollaboratorPresence } from "./CollaboratorPresence";
 import { AgentSkill } from "./AgentSkill";
 import { DownloadMenu } from "./DownloadMenu";
 import { AuditLog } from "./AuditLog";
+import { PageLockButton, PageLockDialog, PageLockInbox, usePageLockFeed, type PageLockControls } from "./PageLocks";
+import type { PageLockRequest, PageLockState } from "../document";
 import { exportOfflineHtml } from "../offline-export";
 import { ArtifactFrame, ArtifactThumbnail } from "./ArtifactFrame";
 import { PresentationViewer } from "./PresentationViewer";
@@ -399,6 +401,7 @@ function RichText({
 
 function SlideStudio({
   doc,
+  pageLocks,
   safeActiveSlide,
   setActiveSlide,
   change,
@@ -418,6 +421,7 @@ function SlideStudio({
   setNotice,
 }: {
   doc: Document;
+  pageLocks: PageLockControls;
   safeActiveSlide: number;
   setActiveSlide: React.Dispatch<React.SetStateAction<number>>;
   change: (next: Document) => void;
@@ -437,6 +441,7 @@ function SlideStudio({
   setNotice: (n: string) => void;
 }) {
   const editingDisabled = busy || readOnly;
+  const slideReadOnly = editingDisabled || pageLocks.lockedIds.has(doc.sections[safeActiveSlide].id);
   const addSlide = () => {
     if (doc.sections.length >= 40) return;
     const newSection = {
@@ -601,6 +606,7 @@ function SlideStudio({
                 <div className="slide-studio-card-bar">
                   <span>Slide {idx + 1}</span>
                   <div className="slide-studio-card-actions" onClick={(e) => e.stopPropagation()}>
+                    {pageLocks.button(s.id, `Slide ${idx + 1}`)}
                     <button
                       type="button"
                       className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer border-0 bg-transparent"
@@ -632,7 +638,7 @@ function SlideStudio({
                       type="button"
                       className="p-1 rounded hover:bg-destructive/10 text-slate-400 hover:text-destructive disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                       title="Delete slide"
-                      disabled={doc.sections.length <= 1 || editingDisabled}
+                      disabled={doc.sections.length <= 1 || editingDisabled || pageLocks.lockedIds.has(s.id)}
                       onClick={() => deleteSlide(idx)}
                     >
                       <Trash2 className="w-3 h-3" />
@@ -710,6 +716,7 @@ function SlideStudio({
             <span className="text-xs font-semibold text-slate-700 min-w-[50px] text-center select-none">
               {safeActiveSlide + 1} / {doc.sections.length}
             </span>
+            {pageLocks.button(doc.sections[safeActiveSlide].id, `Active slide ${safeActiveSlide + 1}`)}
             <Button
               variant="ghost"
               size="icon"
@@ -782,8 +789,9 @@ function SlideStudio({
           </button>
         </div>
 
-        <div className="slide-studio-right-body" inert={editingDisabled}>
-          <MediaUpload key={doc.sections[safeActiveSlide].id} documentId={doc.id} textPage={doc.sections[safeActiveSlide].kind === "text"} disabled={editingDisabled}
+        {pageLocks.lockedIds.has(doc.sections[safeActiveSlide].id) && <p className="page-lock-readonly">Reserved for an agent</p>}
+        <div className="slide-studio-right-body" inert={slideReadOnly}>
+          <MediaUpload key={doc.sections[safeActiveSlide].id} documentId={doc.id} textPage={doc.sections[safeActiveSlide].kind === "text"} disabled={slideReadOnly}
             onInsert={html => {
               change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSlide ? { ...section, kind: "html", html: insertPageMedia(section.html, html) } : section) });
               setNotice("Media inserted. Save to keep this change.");
@@ -827,7 +835,7 @@ function SlideStudio({
                   <div className="border border-slate-200 rounded-lg p-2 bg-white">
                     <RichText
                       key={doc.sections[safeActiveSlide].id + "-" + doc.revision}
-                      disabled={editingDisabled}
+                      disabled={slideReadOnly}
                       html={doc.sections[safeActiveSlide].html}
                       onChange={(html) =>
                         change({
@@ -929,7 +937,7 @@ function SlideStudio({
                     const activeSlideCss = doc.sections[safeActiveSlide].css;
                     change({
                       ...doc,
-                      sections: doc.sections.map((s) => ({ ...s, css: activeSlideCss })),
+                      sections: doc.sections.map(s => pageLocks.lockedIds.has(s.id) ? s : { ...s, css: activeSlideCss }),
                     });
                     setNotice("Style applied to all slides in this presentation.");
                   }}
@@ -966,7 +974,7 @@ function SlideStudio({
 
               <textarea
                 className="code-editor-area"
-                disabled={editingDisabled}
+                disabled={slideReadOnly}
                 spellCheck={false}
                 value={doc.sections[safeActiveSlide]?.[codeTab] || ""}
                 placeholder={`Enter slide ${codeTab.toUpperCase()}...`}
@@ -1176,6 +1184,7 @@ function SlashCommandMenu({
 
 function DocStudio({
   doc,
+  pageLocks,
   activeSectionIndex,
   setActiveSectionIndex,
   change,
@@ -1192,6 +1201,7 @@ function DocStudio({
   setNotice,
 }: {
   doc: Document;
+  pageLocks: PageLockControls;
   activeSectionIndex: number;
   setActiveSectionIndex: React.Dispatch<React.SetStateAction<number>>;
   change: (next: Document) => void;
@@ -1421,6 +1431,7 @@ function DocStudio({
                   <Icon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   <span className="doc-outline-title">{title}</span>
                 </button>
+                {pageLocks.button(s.id, `Page ${idx + 1}`)}
                 <div className="doc-outline-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
@@ -1444,7 +1455,7 @@ function DocStudio({
                     type="button"
                     className="p-1 rounded hover:bg-destructive/10 text-slate-400 hover:text-destructive disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                     title="Delete page"
-                    disabled={doc.sections.length <= 1 || busy}
+                    disabled={doc.sections.length <= 1 || busy || pageLocks.lockedIds.has(s.id)}
                     onClick={() => deletePage(idx)}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -1463,15 +1474,16 @@ function DocStudio({
           onPageChange={setActiveSectionIndex}
           title={doc.title}
           actions={<>
+            {pageLocks.button(doc.sections[safeActiveSection].id, `Active page ${safeActiveSection + 1}`)}
             <Button variant="ghost" size="icon" className="h-7 w-7" title="Duplicate page" aria-label="Duplicate page" disabled={doc.sections.length >= 40 || busy} onClick={() => duplicatePage(safeActiveSection)}><Copy size={15} /></Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Delete page" aria-label="Delete page" disabled={doc.sections.length <= 1 || busy} onClick={() => deletePage(safeActiveSection)}><Trash2 size={15} /></Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" title="Delete page" aria-label="Delete page" disabled={doc.sections.length <= 1 || busy || pageLocks.lockedIds.has(doc.sections[safeActiveSection].id)} onClick={() => deletePage(safeActiveSection)}><Trash2 size={15} /></Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" title="Inspect properties" aria-label="Inspect properties" onClick={() => setPropertiesOpen(value => !value)}><SlidersHorizontal size={15} /></Button>
           </>}
         >
           {!preview && doc.sections[safeActiveSection]?.kind === "text" && <div className="document-text-page">
             <RichText
               key={doc.sections[safeActiveSection].id + "-" + doc.revision}
-              disabled={busy}
+              disabled={busy || pageLocks.lockedIds.has(doc.sections[safeActiveSection].id)}
               html={doc.sections[safeActiveSection].html}
               onChange={(html) => change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSection ? { ...section, html } : section) })}
             />
@@ -1528,7 +1540,8 @@ function DocStudio({
           </button>
         </div>
 
-        <div className="doc-studio-right-body" inert={busy}>
+        {pageLocks.lockedIds.has(doc.sections[safeActiveSection].id) && <p className="page-lock-readonly">Reserved for an agent</p>}
+        <div className="doc-studio-right-body" inert={busy || pageLocks.lockedIds.has(doc.sections[safeActiveSection].id)}>
           <MediaUpload key={doc.sections[safeActiveSection].id} documentId={doc.id} textPage={doc.sections[safeActiveSection].kind === "text"} disabled={busy}
             onInsert={html => {
               change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSection ? { ...section, kind: "html", html: insertPageMedia(section.html, html) } : section) });
@@ -2007,7 +2020,18 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     [shareModalOpen, setShareModalOpen] = useState(false),
     [copiedLink, setCopiedLink] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [pageLockTarget, setPageLockTarget] = useState<{ documentId: string; pageId: string } | null>(null);
+  const [pageLockInboxOpen, setPageLockInboxOpen] = useState(false);
+  const pageLockFeed = usePageLockFeed<PageLockState>(doc ? `/documents/${doc.id}/page-locks` : null);
+  const pageRequestFeed = usePageLockFeed<PageLockRequest[]>(session ? "/page-lock-requests" : null);
+  const lockedPageIds = new Set(pageLockFeed.data?.locks.map(item => item.pageId));
+  const pageLockControls: PageLockControls = {
+    lockedIds: lockedPageIds,
+    button: (pageId, title) => <PageLockButton title={title} locked={lockedPageIds.has(pageId)}
+      onClick={() => { if (doc) setPageLockTarget({ documentId: doc.id, pageId }); }} />,
+  };
   const editorMode = doc && isPresentationContent(doc) ? "slide" : "doc";
+  const showPageLockInbox = () => { pageRequestFeed.refresh(); setPageLockInboxOpen(true); };
   const safeActiveSlide = doc && doc.sections.length > 0
     ? Math.min(activeSlide, doc.sections.length - 1)
     : 0;
@@ -2243,6 +2267,14 @@ export default function App({ initialSession }: { initialSession?: Session }) {
 
   function change(next: Document) {
     if (!lock.canWrite) { setNotice("Start editing with an active lock to change this document. Your draft is still here."); return; }
+    for (const protectedPage of latestDoc.current?.sections ?? []) {
+      if (!lockedPageIds.has(protectedPage.id)) continue;
+      const after = next.sections.find(section => section.id === protectedPage.id);
+      if (!after || (["kind", "html", "css", "js"] as const).some(field => after[field] !== protectedPage[field])) {
+        setNotice("This page is reserved for an agent. The document owner can unlock it in Page lock settings.");
+        return;
+      }
+    }
     draftVersion.current += 1;
     latestDoc.current = next;
     setDoc(next);
@@ -2522,6 +2554,11 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             onClick={() => { if (leave()) { setDoc(null); setDirty(false); setPreview(false); setError(""); setNotice(""); setView("audit"); window.history.pushState(null, "", "/audit"); } }}>
             <Shield className="w-4 h-4 text-muted-foreground shrink-0" /><span>Audit log</span>
           </button>
+          {!doc && <button type="button" aria-label="Page lock requests" className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md cursor-pointer border-0 bg-transparent text-left text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+            onClick={showPageLockInbox}>
+            <Lock className="w-4 h-4 shrink-0" aria-hidden="true" /> Page lock requests
+            {!!pageRequestFeed.data?.length && <Badge variant="outline" className="ml-auto">{pageRequestFeed.data.length}</Badge>}
+          </button>}
         </nav>
         <div className="sidebar-note mt-auto rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5 font-medium text-foreground mb-1">
@@ -2727,6 +2764,9 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             else if (!editingRequested) setEditingRequested(true);
             else void lock.start().catch(() => {});
           }}>{lock.canWrite ? <Eye aria-hidden="true" /> : <Lock aria-hidden="true" />}{lock.stopping ? "Releasing…" : lock.releaseUncertain ? "Retry release" : lock.canWrite ? "Stop editing" : "Start editing"}</Button>}
+          <Button type="button" variant="ghost" size="sm" className="edit-lock-action" aria-label="Page lock requests" onClick={showPageLockInbox}>
+            Page lock requests{!!pageRequestFeed.data?.length && <Badge variant="outline">{pageRequestFeed.data.length}</Badge>}
+          </Button>
           {lock.error && !lock.canWrite && <Alert variant="destructive" className="edit-lock-error"><AlertDescription>{lock.error}</AlertDescription></Alert>}
         </div>}
         {busy && <div className="request-progress" role="status" aria-label="Request in progress"><span /></div>}
@@ -2757,6 +2797,28 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             {notice}
           </div>
         )}
+        {pageLockInboxOpen && <PageLockInbox requests={pageRequestFeed.data} error={pageRequestFeed.error}
+          onClose={() => setPageLockInboxOpen(false)} onReview={request => {
+            if (doc?.id === request.documentId) {
+              setPageLockInboxOpen(false);
+              setPageLockTarget({ documentId: request.documentId, pageId: request.pageId });
+            } else if (leave()) {
+              setPageLockInboxOpen(false);
+              void run(async () => {
+                await loadDocument(request.documentId, true, false);
+                setPageLockTarget({ documentId: request.documentId, pageId: request.pageId });
+              });
+            }
+          }} />}
+        {doc && pageLockTarget?.documentId === doc.id && doc.sections.some(section => section.id === pageLockTarget.pageId) &&
+          <PageLockDialog key={doc.id + ":" + pageLockTarget.pageId} doc={doc} pageId={pageLockTarget.pageId}
+            slide={editorMode === "slide"} dirty={dirty} state={pageLockFeed.data} loadError={pageLockFeed.error}
+            onClose={() => setPageLockTarget(null)} onUpdate={action => {
+              pageLockFeed.refresh();
+              pageRequestFeed.refresh();
+              setPageLockTarget(null);
+              setNotice(action === "request" ? "Unlock request sent." : action === "lock" ? "Selected pages reserved for the agent." : "Selected pages unlocked.");
+            }} />}
         {invitation ? <AcceptInvitation token={invitation} onDismiss={() => { sessionStorage.removeItem("docsync_invite"); setInvitation(""); window.history.replaceState(null, "", "/"); }} onAccepted={async id => {
           await loadDocument(id, true, false);
           sessionStorage.removeItem("docsync_invite"); setInvitation("");
@@ -2967,6 +3029,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           editorMode === "slide" ? (
             <SlideStudio
               doc={doc}
+              pageLocks={pageLockControls}
               safeActiveSlide={safeActiveSlide}
               setActiveSlide={setActiveSlide}
               change={change}
@@ -2988,6 +3051,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           ) : (
             <DocStudio
               doc={doc}
+              pageLocks={pageLockControls}
               activeSectionIndex={activeSectionIndex}
               setActiveSectionIndex={setActiveSectionIndex}
               change={change}

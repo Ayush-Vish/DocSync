@@ -1,9 +1,13 @@
 import { z } from "zod";
 
+const pageIdSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
+export const pageIdsSchema = z.array(pageIdSchema).min(1).max(40)
+  .refine(ids => new Set(ids).size === ids.length, "Page IDs must be distinct");
+
 export const sectionSchema = z
   .object({
     kind: z.enum(["text", "html"]).optional(),
-    id: z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),
+    id: pageIdSchema,
     html: z.string().max(100_000),
     css: z.string().max(30_000),
     js: z.string().max(50_000).optional().describe("Independent page/slide JavaScript for animations and interactions. Use DOM APIs or the Web Animations API, respect reduced motion, and keep meaningful content in HTML. Runs in an isolated sandbox without network or account access."),
@@ -26,6 +30,15 @@ export type RenderedContent = Content & { mediaToken?: string };
 export type DocumentAccess = "owner" | "editor" | "viewer";
 export type EditLock = { leaseId: string; holder: string; agent: string; expiresAt: number };
 export type EditLease = EditLock & { lockToken: string; revision: number };
+export type PageLockState = {
+  locks: { pageId: string; agent: string; mine: boolean }[];
+  canManage: boolean;
+  canRequest: boolean;
+  agents: { id: string; label: string }[];
+};
+export type PageLockRequest = {
+  documentId: string; title: string; pageId: string; requester: string; agent: string; createdAt: number;
+};
 export type Revision = { revision: number; created_at: string; author: string | null; agent: string | null; parent_revision: number | null; summary: string; restored_from: number | null };
 export type Document = RenderedContent & {
   id: string;

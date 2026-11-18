@@ -77,7 +77,7 @@ The signed-in account owner can review agent requests in **Audit log**. Apply mi
 
 The downloadable agent skill at `/downloads/docsync-skill.zip` includes templates and a conversion helper. It converts marked HTML sections to independent page payloads and supports optional `slides/SECTION_ID.css` and `slides/SECTION_ID.js` overrides. Install the skill separately from the MCP connection. Use a 0.5.0 backend and bridge with migration `0007_media_and_agents.sql` and the `MEDIA` R2 binding for uploads and collaborator activity. Reconnect your client after upgrading to refresh the tool schema.
 
-Twenty tools are available (bridge 0.5.0 and a backend migrated through `0007_media_and_agents.sql`):
+Bridge 0.5.4 provides 24 tools with a backend migrated through `0011_page_locks.sql`:
 
 | Tool | Purpose |
 | --- | --- |
@@ -98,6 +98,10 @@ Twenty tools are available (bridge 0.5.0 and a backend migrated through `0007_me
 | `acquire_document_lock` | Acquire an exclusive five-minute lease with `id`; returns `lockToken`, `leaseId`, expiry, and current revision. |
 | `renew_document_lock` | Extend an unexpired lease using `id` and `lockToken`. |
 | `release_document_lock` | Release the lease using `id` and `lockToken`. |
+| `get_page_locks` | Read the document’s page reservations by stable page ID. |
+| `lock_pages` | Reserve one or more `pageIds` in a document `id` for the calling agent. Requires the document owner's account and explicit user selection. |
+| `request_page_unlock` | Send the owner and assigned agent a request for the given `pageIds` in a document `id`. |
+| `get_page_lock_requests` | Read pending unlock requests addressed to this agent connection. The owner can review and unlock from the web editor. |
 | `get_document_history` | Read authors, agent labels, summaries, timestamps, and restore ancestry. |
 | `compare_document_versions` | Compare `fromRevision` and `toRevision` for an `id`, including page order and HTML/CSS/JS changes. |
 | `restore_document` | Create a new revision from a historical `revision`, with `id`, `expectedRevision`, `lockToken`, and optional `changeSummary`. |

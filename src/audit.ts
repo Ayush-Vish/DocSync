@@ -31,6 +31,10 @@ export function auditDetails(value: unknown): Record<string, unknown> {
     if (Number.isSafeInteger(input[key]) && Number(input[key]) >= 0) details[key] = input[key];
   }
   if (typeof input.allowPublishing === "boolean") details.allowPublishing = input.allowPublishing;
+  if (Array.isArray(input.pageIds) && input.pageIds.length <= 40 &&
+      input.pageIds.every(id => typeof id === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(id))) {
+    details.pageIds = input.pageIds.map(id => auditText(id, 80));
+  }
   const pages = input.pages ?? input.sections;
   if (Array.isArray(pages)) {
     details.pageCount = pages.length;
@@ -49,6 +53,8 @@ function operation(request: Request): string {
   if (/\/invitations\//.test(path)) return "revoke_document_invitation";
   if (/^\/api\/documents\/[a-f0-9-]{36}$/.test(path)) return method === "GET" ? "get_document" : "update_document";
   const action = path.split("/").at(-1);
+  if (action === "page-locks") return method === "POST" ? "lock_pages" : method === "DELETE" ? "unlock_pages" : "get_page_locks";
+  if (action === "page-lock-requests") return method === "POST" ? "request_page_unlock" : "get_page_lock_requests";
   if (action === "lock") return ({ GET: "get_document_lock", POST: "acquire_document_lock", PATCH: "renew_document_lock", DELETE: "release_document_lock" } as Record<string, string>)[method] || "document_lock";
   if (action === "access") return method === "GET" ? "get_document_access" : method === "POST" ? "invite_document_collaborator" : "update_document_collaborator_access";
   return ({ history: "get_document_history", compare: "compare_document_versions", restore: "restore_document", publish: "publish_document", media: "upload_media", collaborators: "get_document_collaborators" } as Record<string, string>)[action || ""] || `${method} ${auditText(path, 180)}`;

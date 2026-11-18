@@ -23,6 +23,7 @@ import { maxMediaBytes } from "./media-config.ts";
 import { readBody } from "./request.ts";
 import type { Document } from "./document.ts";
 import { agentActivity, collaborators } from "./agents.ts";
+import { lockPages, pageLockRequests, pageLockState, parsePageIds, requestPageUnlock, unlockPages } from "./page-locks.ts";
 import { invitationEmailAvailable, inviteByEmail } from "./invitation-email.ts";
 
 const appPolicy =
@@ -154,7 +155,9 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
   )
     ? "local_only"
     : "anyone_with_link";
-  if (pathname === "/api/connection" && method === "GET")
+  if (pathname === "/api/page-lock-requests" && method === "GET") return json(await pageLockRequests(env.DB, principal));
+  if (pathname === "/api/connection" && method === "GET") {
+    const pending = principal.role === "agent" ? await pageLockRequests(env.DB, principal) : [];
     return json({
       role: principal.role,
       canPublish: principal.canPublish,
@@ -162,7 +165,9 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
       linkAccess,
       trial: principal.kind === "trial",
       signInUrl: new URL("/connect", request.url).href,
+      ...(pending.length ? { pageLockRequests: pending } : {}),
     });
+  }
   if (pathname === "/api/session" && method === "GET") {
     owner();
     return json({
@@ -315,15 +320,33 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
     return json({ ok: true });
   }
   const match = pathname.match(
-    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail|lock|access|compare|media|collaborators))?$/,
+    /^\/api\/documents\/([a-f0-9-]{36})(?:\/(history|restore|publish|thumbnail|lock|access|compare|media|collaborators|page-locks|page-lock-requests))?$/,
   );
   if (match) {
     const [, id, action] = match;
+    if (action === "page-locks") {
+      if (method === "GET") return json(await pageLockState(env.DB, id, principal));
+      if (method === "POST" || method === "DELETE") {
+        const input = await body(request, 4096), ids = parsePageIds(input.pageIds);
+        return json(method === "POST" ? await lockPages(env.DB, id, principal, ids, input.agentId) : await unlockPages(env.DB, id, principal, ids));
+      }
+    }
+    if (action === "page-lock-requests" && method === "POST") {
+      return json(await requestPageUnlock(env.DB, id, principal, parsePageIds((await body(request, 4096)).pageIds)));
+    }
     if (action === "thumbnail" && method === "GET") return json({ ...await store.documentThumbnail(env.DB, id, principal.accountId), mediaToken: await mediaGrant(env, id, { accountId: principal.accountId }) });
     const current = await store.getDocument(env.DB, id, undefined, principal.accountId);
     if (action === "collaborators" && method === "GET") return json(await collaborators(env.DB, id, principal.accountId));
     if (!action && method === "GET") {
       const requested = new URL(request.url).searchParams.get("revision");
+      if (!requested && principal.role === "agent") {
+        const pageLocks = (await pageLockState(env.DB, id, principal)).locks;
+        const pending = await pageLockRequests(env.DB, principal, id);
+        if (pageLocks.length || pending.length) {
+          const withLocks = { ...current, pageLocks, pageLockRequests: pending };
+          return documentResponse(withLocks);
+        }
+      }
       return documentResponse(requested ? store.getDocument(env.DB, id, revision(Number(requested)), principal.accountId) : current);
     }
     if (action === "media" && method === "POST") {

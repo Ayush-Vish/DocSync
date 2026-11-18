@@ -576,6 +576,30 @@ try {
   assert.ok(!(await page.$eval("body", node => node.textContent || "")).includes("prompt copied!"));
   await page.evaluate(() => { navigator.clipboard.writeText = (window as any).originalClipboard; });
   await page.screenshot({ path: "/tmp/docsync-slides-mobile.png" });
+  await page.locator('button[aria-label^="Active slide 1 unlocked"]').click();
+  await page.waitForSelector('dialog[aria-label="Slide 1 lock"] select');
+  await page.locator('.page-lock-selection label:nth-of-type(2) input').click();
+  await click("Lock selected");
+  await page.waitForSelector('button[aria-label^="Active slide 1 locked"]');
+  const presentationId = new URL(page.url()).pathname.split("/")[2];
+  const webLocks = await page.evaluate(async id => (await (await fetch(`/api/documents/${id}/page-locks`)).json()).locks, presentationId);
+  assert.equal(webLocks.length, 2);
+  const firstPageId = await page.evaluate(async id => (await (await fetch(`/api/documents/${id}`)).json()).sections[0].id, presentationId);
+  const requesterToken = "b".repeat(64);
+  const holderAccount = await f.env.DB.prepare("SELECT account_id FROM documents WHERE id=?").bind(presentationId).first<{ account_id: string }>();
+  await f.env.DB.prepare("INSERT INTO oauth_clients VALUES('browser-lock-requester','Requesting agent','[]',unixepoch())").run();
+  await f.env.DB.prepare("INSERT INTO oauth_access_tokens VALUES(?,?,'browser-lock-requester',0,unixepoch()+3600)").bind(await hash(requesterToken), holderAccount!.account_id).run();
+  assert.equal((await fetch(`${origin}/api/documents/${presentationId}/page-lock-requests`, {
+    method: "POST", headers: { Authorization: `Bearer ${requesterToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ pageIds: [firstPageId] }),
+  })).status, 200);
+  await page.setViewport({ width: 1440, height: 1000 });
+  await page.locator('button[aria-label="Page lock requests"]').click();
+  await page.waitForFunction(() => document.querySelector("dialog.page-lock-dialog")?.textContent?.includes("Requesting agent"));
+  await click("Review");
+  await click("Unlock selected");
+  await page.waitForSelector('button[aria-label^="Active slide 1 unlocked"]');
+  await page.setViewport({ width: 390, height: 844 });
   await click("My documents");
   const auditToken = await page.evaluate(async () => (await (await fetch('/api/agent-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowPublishing: false }) })).json()).token as string);
   for (const path of ['/api/connection', `/api/documents/${crypto.randomUUID()}`]) {

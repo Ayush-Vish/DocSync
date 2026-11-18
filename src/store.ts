@@ -98,7 +98,12 @@ export async function updateDocument(
        WHERE d.id=? AND d.current_revision=? AND ${editableDocument} AND l.token_hash=? AND l.account_id=? AND l.actor_id=? AND l.expires_at>unixepoch()`,
     )
     .bind(JSON.stringify(content), time, accountId, principal.actorId, principal.actorLabel, summary, restoredFrom ?? null, id, expected, accountId, accountId, await hash(lockToken), accountId, principal.actorId)
-    .run();
+    .run().catch(error => {
+      if (error instanceof Error && error.message.includes("DOCSYNC_PAGE_LOCKED")) {
+        throw new HttpError(423, "A locked page was edited or deleted. Check page locks before saving again.", { code: "PAGE_LOCKED" });
+      }
+      throw error;
+    });
   if (result.meta.changes === 0) {
     await access(db, id, accountId, "editor");
     const lease = await db.prepare("SELECT 1 AS valid FROM edit_locks WHERE document_id=? AND token_hash=? AND actor_id=? AND account_id=? AND expires_at>unixepoch()")
