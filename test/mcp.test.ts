@@ -29,6 +29,7 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "connect_account",
     "create_document",
     "get_connection",
+    "get_docsync_skill",
     "get_document",
     "get_document_access",
     "get_document_history",
@@ -50,6 +51,13 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "upload_media",
   ]);
   const parse = (r: any) => JSON.parse(r.content[0].text);
+  assert.ok(client.getInstructions()?.includes("get_docsync_skill"));
+  const skill = parse(await client.callTool({ name: "get_docsync_skill", arguments: {} }));
+  assert.match(skill.guide.overview, /Motion builds/);
+  assert.ok(skill.otherTopics.includes("motion"));
+  assert.match(skill.install.zipUrl, /\/downloads\/docsync-skill\.zip$/);
+  const motion = parse(await client.callTool({ name: "get_docsync_skill", arguments: { topic: "motion" } }));
+  assert.match(motion.guide.motion, /class="slide motion"/);
   for (const format of ["document", "presentation", "all"]) {
     const options = parse(await client.callTool({ name: "get_template_options", arguments: { format } }));
     assert.equal(options.galleryUrl, `http://127.0.0.1:8787/templates?format=${format}`);

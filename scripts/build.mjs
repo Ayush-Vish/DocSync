@@ -1,6 +1,7 @@
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
 import { buildSkill } from "./build-skill.mjs";
+import { writeSkillAssets } from "./generate-skill-assets.mjs";
 import {
   chmodSync,
   mkdirSync,
@@ -11,6 +12,7 @@ import {
   readdirSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+writeSkillAssets();
 await viteBuild();
 // Render the same public React components into HTML for visitors and crawlers.
 await build({

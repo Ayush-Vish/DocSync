@@ -26,7 +26,8 @@
     "pretest": "npm run build",
     "mcp:configure": "node --experimental-strip-types scripts/connect.mjs",
     "dev:ui": "vite",
-    "pack:mcp": "npm run build && npm pack ./packages/mcp --ignore-scripts --pack-destination dist"
+    "pack:mcp": "npm run build && npm pack ./packages/mcp --ignore-scripts --pack-destination dist",
+    "hooks:install": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

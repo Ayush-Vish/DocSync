@@ -38,7 +38,7 @@ agy mcp add --type http docsync https://your-docsync.example/mcp
 
 Complete sign-in and approval in the browser. Publishing is a separate opt-in permission. Revoke remote client access from **Connect agent**. `connect_account` handles stdio trial claiming; it does not replace the remote OAuth flow.
 
-Ask your agent to create a report or presentation from your facts. `get_template_options` returns the template gallery and each template's preview and content URLs. Choose Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, or Delivery Review, or ask for a custom design. Both presentation templates contain six slides. Preview them at `/templates` using **Present template**. Bundled Northstar figures are fictional examples; replace them with your information.
+Ask your agent to create a report or presentation from your facts. `get_template_options` returns the template gallery and each template's preview and content URLs. Choose Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, Delivery Review, or Animated Research Talk, or ask for a custom design. Agents load the DocSync skill through `get_docsync_skill`, so no separate skill install is required. Slides or pages with class `motion` get step-by-step animation added automatically when saved. Both presentation templates contain six slides. Preview them at `/templates` using **Present template**. Bundled Northstar figures are fictional examples; replace them with your information.
 
 Each page or slide has independent **HTML, CSS, and optional JavaScript**. Set `format` to `document` or `presentation`, and provide ordered `pages` or `sections` with stable IDs. Use one of those array fields per request; reads return `sections`. Each item accepts `{id, kind?, html, css, js?}`. For example, pass this to `create_document`:
 
@@ -82,6 +82,7 @@ Bridge 0.5.4 provides 24 tools with a backend migrated through `0011_page_locks.
 | Tool | Purpose |
 | --- | --- |
 | `get_connection` | Check connectivity, trial status, publishing permission, and link access. |
+| `get_docsync_skill` | Load the DocSync skill on demand (design rules, motion builds, the research-talk workflow, MCP contract) without installing it; also returns optional install commands. |
 | `get_template_options` | Discover templates, themes, gallery links, and self-contained content URLs. |
 | `list_documents` | Find owned documents and private documents shared with the account. |
 | `get_document` | Read content, page IDs, revision, and document role. Optional `revision` reads a historical snapshot. |

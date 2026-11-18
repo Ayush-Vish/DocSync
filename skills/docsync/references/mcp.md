@@ -41,6 +41,7 @@ Use the DocSync tools exposed by the current client; prefixes vary between Codex
 | `compare_document_versions` | `id`, `fromRevision`, `toRevision`. Read page/order and HTML/CSS/JS changes. |
 | `restore_document` | `id`, historical `revision`, current `expectedRevision`, `lockToken`, optional `changeSummary`. Restore as a new revision. |
 | `get_connection` | No arguments. Check permissions and local-only vs public links. |
+| `get_docsync_skill` | `topic`: `overview`, `motion`, `research-talk`, `mcp` or `all`. Returns this skill's guide on demand, plus optional install commands. Agents without the installed skill call it first. |
 | `get_template_options` | `format`: `document`, `presentation`, or `all`. Returns the public template gallery, preview and content links, and a template-or-custom question. |
 | `list_documents` | No arguments. Find existing documents. |
 | `get_document` | `id`, optional `revision`. Read content, revision, and document role. |

@@ -1,0 +1,10 @@
+export function classesIn(html: string): Set<string>;
+export function minifyCss(css: string): string;
+export function minifyJs(js: string): string;
+export function pruneCss(css: string, classes: Set<string>): string;
+export function pruneIcons(js: string, classes: Set<string>): string;
+export function pruneFeatures(js: string, classes: Set<string>): string;
+export function motionRuntime(js: string, classes: Set<string>): string;
+export const MOTION_START: string;
+export const MOTION_END: string;
+export function stripMotionRuntime(text: string): string;

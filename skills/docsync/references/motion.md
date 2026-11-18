@@ -8,7 +8,7 @@
 
 1. Add `motion` to the section root: `<article class="slide motion">` or `<article class="page motion">`. Sections without it are untouched.
 2. In the template's `index.html` (standalone preview), link `../motion.css` after `styles.css` and load `<script src="../motion.js" defer></script>` after `preview.js`/`slides.js`.
-3. `to-document.mjs` detects the `motion` class and appends the runtime to that section only, pruned to the CSS rules, icons and features the section uses. Start a stylesheet with `/* docsync:prune */` to have it tree-shaken the same way. Budget: roughly 15 kB per animated slide, so about 30 slides fit DocSync's 500 kB document limit.
+3. You never paste the runtime yourself: when a section with class `motion` is saved, the DocSync server adds `motion.js`/`motion.css` to it and refreshes that copy on every later save. Agents connected only through MCP therefore need nothing installed. Locally, `to-document.mjs` does the same and appends the runtime to that section only, pruned to the CSS rules, icons and features the section uses. Start a stylesheet with `/* docsync:prune */` to have it tree-shaken the same way. Budget: roughly 15 kB per animated slide, so about 30 slides fit DocSync's 500 kB document limit.
 4. Theme the effects by overriding `--m-hl` / `--m-hl-soft` (highlight), `--m-on` / `--m-on-soft` / `--m-on-ink` (lit state, bars) and `--m-wire` on the root or in `styles.css`. Wire, packet, bar and network colours come from `--c`, which `styles.css` can set through classes such as `.c-amber{--c:#E1970F}`.
 
 ## How builds run

@@ -6,6 +6,10 @@ import { parseFragment, serialize } from "parse5";
 import { validateContent } from "../src/content.ts";
 import { toDocument } from "../skills/docsync/scripts/to-document.mjs";
 import { classesIn, pruneCss, pruneFeatures, pruneIcons } from "../skills/docsync/scripts/prune.mjs";
+import { skillAssets } from "../scripts/generate-skill-assets.mjs";
+import committed from "../src/generated/skill-assets.json" with { type: "json" };
+import { withMotionRuntime, withoutMotionRuntime } from "../src/motion-runtime.ts";
+import type { Content } from "../src/content.ts";
 
 const root = "skills/docsync/assets/templates";
 
@@ -21,8 +25,8 @@ test("motion sections get a pruned runtime that survives hosted sanitization", (
     assert.match(section.js, /prefers-reduced-motion/);
     assert.ok(section.css.length < 30_000 && section.js.length < 50_000);
   });
-  const agenda = deck.sections.find((s: { id: string }) => s.id === "agenda");
-  const architecture = deck.sections.find((s: { id: string }) => s.id === "architecture");
+  const section = (id: string) => { const found = deck.sections.find(s => s.id === id); assert.ok(found, id); return found; };
+  const agenda = section("agenda"), architecture = section("architecture");
   assert.ok(!agenda.js.includes("FEATURES.wires ="), "slides without wires do not carry the wire feature");
   assert.match(architecture.js, /FEATURES\.wires =/);
   assert.match(architecture.js, /server:/);
@@ -51,4 +55,27 @@ test("pruning keeps rules, icons and features a section uses", () => {
   assert.ok(!pruned.includes("x: 'x'"));
   assert.match(pruned, /W/);
   assert.ok(!pruned.includes("N/*"));
+});
+
+test("bundled skill assets match the skill files (run npm run build after editing the skill)", () => {
+  assert.deepEqual(committed, skillAssets());
+});
+
+test("saving a motion section injects one current runtime and replaces stale copies", () => {
+  const raw = { title: "Animated", format: "presentation", sections: [
+    { id: "a", html: '<article class="slide motion"><h2 class="f s1">Step</h2><span class="ic i-check"></span></article>', css: ".slide{color:red}" },
+    { id: "b", html: '<article class="slide"><h2>Static</h2></article>', css: "" },
+  ] };
+  const save = (input: unknown) => withMotionRuntime(validateContent(withoutMotionRuntime(input)));
+  const first = save(raw);
+  const [animated, plain] = first.sections;
+  assert.match(animated.js ?? "", /DocSyncMotion/);
+  assert.match(animated.js ?? "", /check:/);
+  assert.ok(!(animated.js ?? "").includes("battery:"));
+  assert.match(animated.css, /\.mo-js \.motion \.f/);
+  assert.ok(!plain.js && !plain.css.includes("mo-js"), "sections without motion are untouched");
+  const resaved = save({ ...first, sections: first.sections.map(s => ({ ...s, js: (s.js ?? "").replace("DocSyncMotion = {", "DocSyncMotion = { stale: 1,") })) } as Content);
+  assert.equal((resaved.sections[0].js ?? "").split("/*docsync:motion-runtime*/").length, 2, "exactly one runtime block");
+  assert.ok(!(resaved.sections[0].js ?? "").includes("stale: 1"), "the stale runtime is replaced");
+  assert.equal(resaved.sections[0].css.split("/*docsync:motion-runtime*/").length, 2);
 });

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
-import { classesIn, minifyCss, motionRuntime, pruneCss } from "./prune.mjs";
+import { MOTION_END, MOTION_START, classesIn, minifyCss, motionRuntime, pruneCss } from "./prune.mjs";
 
 // media: optional {"figures/fig3.png": "/media/<asset-id>"} map from upload_media results for local <img> paths.
 export function toDocument(directory, title, media = {}) {
@@ -25,8 +25,9 @@ export function toDocument(directory, title, media = {}) {
       html = html.replace(/(<img\b[^>]*\ssrc\s*=\s*)(["'])([^"']+)\2/g, (tag, start, quote, src) => media[src] ? `${start}${quote}${media[src]}${quote}` : tag);
       const classes = classesIn(html);
       if (!classes.has("motion")) return { id, kind: "html", html, css: (parts.some(prunable) ? parts.map(p => prunable(p) ? pruneCss(p, classes) : p).join("\n") : css) + optional(id, "css"), js: js + optional(id, "js") };
-      const sectionCss = [...parts, motionCss].map(p => pruneCss(p, classes)).join("") + minifyCss(optional(id, "css"));
-      return { id, kind: "html", html, css: sectionCss, js: js + "\n;\n" + motionRuntime(motionJs, classes) + optional(id, "js") };
+      // The DocSync server refreshes the marked runtime blocks on every save, so saved decks keep the current runtime.
+      const sectionCss = parts.map(p => pruneCss(p, classes)).join("") + minifyCss(optional(id, "css")) + MOTION_START + pruneCss(motionCss, classes) + MOTION_END;
+      return { id, kind: "html", html, css: sectionCss, js: js + "\n;\n" + MOTION_START + motionRuntime(motionJs, classes) + MOTION_END + optional(id, "js") };
     });
   if (!sections.length || sections.length > 40 || (source.match(/<!-- docsync:/g) || []).length !== sections.length || (source.match(/<!-- \/docsync -->/g) || []).length !== sections.length || new Set(sections.map(s => s.id)).size !== sections.length || sections.some(s => s.html.length > 100_000 || s.css.length > 30_000 || s.js.length > 50_000)) {
     throw new Error("Use 1–40 uniquely marked sections within DocSync size limits.");

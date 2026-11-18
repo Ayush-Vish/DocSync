@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Deploy DocSync to Cloudflare Workers whenever main is pushed to origin.
+#
+# Builds and deploys the exact commit being pushed, in a temporary git worktree, so uncommitted local changes
+# are never deployed. The push is blocked when the build or deploy fails.
+#
+#   SKIP_DEPLOY=1 git push        push without deploying
+#   DEPLOY_DRY_RUN=1 git push     build and run `wrangler deploy --dry-run` only
+#
+# Enable once per clone with: npm run hooks:install   (sets core.hooksPath to .githooks)
+set -euo pipefail
+
+remote="${1:-}"
+if [ "${SKIP_DEPLOY:-}" = 1 ]; then echo "pre-push: SKIP_DEPLOY=1, not deploying."; exit 0; fi
+[ "$remote" = origin ] || exit 0
+
+zero=0000000000000000000000000000000000000000
+deploy_sha=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$remote_ref" = refs/heads/main ] || continue
+  [ "$local_sha" = "$zero" ] && continue # deleting the remote branch
+  if [ "$remote_sha" != "$zero" ] && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo "pre-push: this push is not a fast-forward of $remote/main (or $remote/main is not fetched). Pull first; nothing was deployed." >&2
+    exit 1
+  fi
+  deploy_sha="$local_sha"
+done
+[ -n "$deploy_sha" ] || exit 0
+
+root="$(git rev-parse --show-toplevel)"
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+work="$(mktemp -d "${TMPDIR:-/tmp}/docsync-deploy.XXXXXX")"
+cleanup() { git -C "$root" worktree remove --force "$work" >/dev/null 2>&1 || rm -rf "$work"; git -C "$root" worktree prune >/dev/null 2>&1 || true; }
+trap cleanup EXIT
+
+echo "pre-push: deploying $(git -C "$root" log -1 --format='%h %s' "$deploy_sha")"
+git -C "$root" worktree add --detach --quiet "$work" "$deploy_sha"
+ln -s "$root/node_modules" "$work/node_modules"
+cd "$work"
+
+# Never apply production migrations implicitly: stop and let a person run them.
+if ! migrations="$(npx wrangler d1 migrations list docsync --remote 2>&1)"; then
+  echo "$migrations" >&2
+  echo "pre-push: could not check remote D1 migrations (is wrangler logged in?). Nothing was deployed; use SKIP_DEPLOY=1 to push anyway." >&2
+  exit 1
+fi
+if ! grep -q "No migrations to apply" <<<"$migrations"; then
+  echo "$migrations" >&2
+  echo "pre-push: the remote database has unapplied migrations. Run 'npx wrangler d1 migrations apply docsync --remote', then push again. Nothing was deployed." >&2
+  exit 1
+fi
+
+npm run build
+if [ "${DEPLOY_DRY_RUN:-}" = 1 ]; then
+  npx wrangler deploy --keep-vars --dry-run
+else
+  npx wrangler deploy --keep-vars
+fi
+echo "pre-push: $([ "${DEPLOY_DRY_RUN:-}" = 1 ] && echo "dry run finished for" || echo deployed) $(git -C "$root" log -1 --format=%h "$deploy_sha"); continuing with the push."

@@ -47,3 +47,8 @@ export const pruneFeatures = (js, classes) => js.replace(/\/\*@feature ([\w-]+)\
 
 /** The motion runtime trimmed to what one section uses. */
 export const motionRuntime = (js, classes) => minifyJs(pruneFeatures(pruneIcons(js, classes), classes));
+
+// Injected runtime blocks are wrapped in these markers so a later save can replace them with the current runtime.
+export const MOTION_START = "/*docsync:motion-runtime*/";
+export const MOTION_END = "/*docsync:motion-runtime:end*/";
+export const stripMotionRuntime = text => text.replace(/\/\*docsync:motion-runtime\*\/[\s\S]*?\/\*docsync:motion-runtime:end\*\//g, "");

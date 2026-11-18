@@ -3,6 +3,7 @@ import type { Principal } from "./auth.ts";
 import { hash } from "./auth.ts";
 import { access, readableDocument, editableDocument, lostLock } from "./collaboration.ts";
 import { validateMedia } from "./media.ts";
+import { withMotionRuntime, withoutMotionRuntime } from "./motion-runtime.ts";
 import {
   HttpError,
   validateContent,
@@ -56,7 +57,7 @@ export async function createDocument(
   accountId = "legacy",
   actor?: Principal,
 ): Promise<Document> {
-  const content = validateContent(input),
+  const content = withMotionRuntime(validateContent(withoutMotionRuntime(input))),
     warnings = lintContent(content),
     id = crypto.randomUUID(),
     time = new Date().toISOString();
@@ -87,7 +88,7 @@ export async function updateDocument(
 ): Promise<Document> {
   const accountId = principal.accountId;
   const permission = await access(db, id, accountId, "editor");
-  const content = validateContent(input),
+  const content = withMotionRuntime(validateContent(withoutMotionRuntime(input))),
     warnings = lintContent(content),
     time = new Date().toISOString();
   await validateMedia(db, id, content);
