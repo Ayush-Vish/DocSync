@@ -403,6 +403,7 @@ function SlideStudio({
   setActiveSlide,
   change,
   busy,
+  readOnly,
   presenting,
   setFullscreen,
   slidesSidebarOpen,
@@ -421,6 +422,7 @@ function SlideStudio({
   setActiveSlide: React.Dispatch<React.SetStateAction<number>>;
   change: (next: Document) => void;
   busy: boolean;
+  readOnly: boolean;
   presenting: boolean;
   setFullscreen: (open: boolean) => void;
   slidesSidebarOpen: boolean;
@@ -434,6 +436,7 @@ function SlideStudio({
   run: (action: () => Promise<void>) => Promise<void>;
   setNotice: (n: string) => void;
 }) {
+  const editingDisabled = busy || readOnly;
   const addSlide = () => {
     if (doc.sections.length >= 40) return;
     const newSection = {
@@ -553,7 +556,7 @@ function SlideStudio({
               variant="outline"
               size="sm"
               className="w-full text-xs font-medium justify-center h-8 border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/50 hover:text-indigo-600"
-              disabled={doc.sections.length >= 40 || busy}
+              disabled={doc.sections.length >= 40 || editingDisabled}
               onClick={() => addSlide()}
             >
               <Plus className="w-3.5 h-3.5 mr-1.5" />
@@ -565,7 +568,7 @@ function SlideStudio({
               size="icon"
               className="h-8 w-8 rounded-lg border-dashed"
               title="Add slide"
-              disabled={doc.sections.length >= 40 || busy}
+              disabled={doc.sections.length >= 40 || editingDisabled}
               onClick={() => addSlide()}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -602,7 +605,7 @@ function SlideStudio({
                       type="button"
                       className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                       title="Move up"
-                      disabled={idx === 0 || busy}
+                      disabled={idx === 0 || editingDisabled}
                       onClick={() => moveSlide(idx, -1)}
                     >
                       <ArrowUp className="w-3 h-3" />
@@ -611,7 +614,7 @@ function SlideStudio({
                       type="button"
                       className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                       title="Move down"
-                      disabled={idx === doc.sections.length - 1 || busy}
+                      disabled={idx === doc.sections.length - 1 || editingDisabled}
                       onClick={() => moveSlide(idx, 1)}
                     >
                       <ArrowDown className="w-3 h-3" />
@@ -620,7 +623,7 @@ function SlideStudio({
                       type="button"
                       className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer border-0 bg-transparent"
                       title="Duplicate slide"
-                      disabled={doc.sections.length >= 40 || busy}
+                      disabled={doc.sections.length >= 40 || editingDisabled}
                       onClick={() => duplicateSlide(idx)}
                     >
                       <Copy className="w-3 h-3" />
@@ -629,7 +632,7 @@ function SlideStudio({
                       type="button"
                       className="p-1 rounded hover:bg-destructive/10 text-slate-400 hover:text-destructive disabled:opacity-30 cursor-pointer border-0 bg-transparent"
                       title="Delete slide"
-                      disabled={doc.sections.length <= 1 || busy}
+                      disabled={doc.sections.length <= 1 || editingDisabled}
                       onClick={() => deleteSlide(idx)}
                     >
                       <Trash2 className="w-3 h-3" />
@@ -779,8 +782,8 @@ function SlideStudio({
           </button>
         </div>
 
-        <div className="slide-studio-right-body" inert={busy}>
-          <MediaUpload key={doc.sections[safeActiveSlide].id} documentId={doc.id} textPage={doc.sections[safeActiveSlide].kind === "text"} disabled={busy}
+        <div className="slide-studio-right-body" inert={editingDisabled}>
+          <MediaUpload key={doc.sections[safeActiveSlide].id} documentId={doc.id} textPage={doc.sections[safeActiveSlide].kind === "text"} disabled={editingDisabled}
             onInsert={html => {
               change({ ...doc, sections: doc.sections.map((section, index) => index === safeActiveSlide ? { ...section, kind: "html", html: insertPageMedia(section.html, html) } : section) });
               setNotice("Media inserted. Save to keep this change.");
@@ -824,7 +827,7 @@ function SlideStudio({
                   <div className="border border-slate-200 rounded-lg p-2 bg-white">
                     <RichText
                       key={doc.sections[safeActiveSlide].id + "-" + doc.revision}
-                      disabled={busy}
+                      disabled={editingDisabled}
                       html={doc.sections[safeActiveSlide].html}
                       onChange={(html) =>
                         change({
@@ -963,7 +966,7 @@ function SlideStudio({
 
               <textarea
                 className="code-editor-area"
-                disabled={busy}
+                disabled={editingDisabled}
                 spellCheck={false}
                 value={doc.sections[safeActiveSlide]?.[codeTab] || ""}
                 placeholder={`Enter slide ${codeTab.toUpperCase()}...`}
@@ -2024,7 +2027,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     }
     return sessionStorage.getItem("docsync_invite") || "";
   });
-  const [editingRequested, setEditingRequested] = useState(true);
+  const [editingRequested, setEditingRequested] = useState(false);
   const [shared, setShared] = useState<RenderedContent | null>(null);
   const [mcpClients, setMcpClients] = useState<{client_id:string;client_name:string;access_expires:number}[]>([]);
   const sharePath = location.pathname.startsWith("/share/");
@@ -2045,7 +2048,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       latestDoc.current = fresh;
       setDoc(fresh);
     }
-  });
+  }, dirty);
   useEffect(() => {
     if (lock.documentId === doc?.id && lock.access && lock.access !== doc.access) {
       setDoc(current => current?.id === lock.documentId ? { ...current, access: lock.access } : current);
@@ -2253,7 +2256,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     ]);
     if (signal?.aborted) return;
     setDoc(next);
-    setEditingRequested(true);
+    setEditingRequested(false);
     setPreview(openPreview || next.access === "viewer");
     setActiveSlide(0);
     setActiveSectionIndex(0);
@@ -2277,7 +2280,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       const content = await requestJson<Content>(`/downloads/docsync/themes/${theme.id}.json`);
       const next = await api<Document>("/documents", "POST", content);
       setDoc(next);
-      setEditingRequested(true);
+      setEditingRequested(false);
       setPreview(theme.format === "document");
       setActiveSlide(0);
       setActiveSectionIndex(0);
@@ -2374,7 +2377,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       setSession(signedIn);
       setSessionExpired(false);
       setAuthenticationNeeded(false);
-      if (doc && canEdit && !preview && editingRequested) await lock.start();
+      if (doc && canEdit && !preview && editingRequested && lock.lease && !lock.releaseUncertain) await lock.start();
       if (!doc) {
         const route = documentRoute();
         await Promise.all([refresh(), route ? loadDocument(route.id, false, route.preview) : Promise.resolve()]);
@@ -2435,6 +2438,16 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   const list = documents.filter((d) =>
     d.title.toLowerCase().includes(search.toLowerCase()),
   );
+  const anotherSession = Boolean(lock.lock && lock.lock.leaseId !== lock.lease?.leaseId && !lock.error);
+  const ownBrowserSession = lock.lock?.agent === "Browser" && lock.lock.holder === session?.email;
+  const lockDescription = lock.stopping ? "Releasing this tab’s lock and confirming the handoff…"
+    : lock.releaseUncertain ? "The handoff is not confirmed. Retry release before another session edits."
+    : lock.pending ? "Requesting edit access…"
+    : lock.canWrite ? "This tab is editing. Stop editing to hand off to another tab or agent."
+    : doc?.access === "viewer" ? "You can view this document. Ask the owner for edit access."
+    : anotherSession ? ownBrowserSession ? "Another browser tab or window signed in as you is editing. Stop editing there to hand off." : `${lock.lock!.holder} is editing with ${lock.lock!.agent}. You can keep viewing; edit access updates automatically.`
+    : lock.error ? "Edit access needs verification. Your draft stays in this tab."
+    : lock.notice || "Viewing does not hold a lock. Start editing when you’re ready to make changes.";
 
   return (
     <MediaContext.Provider value={doc?.mediaToken}><div className={cn("app-shell", doc && "document-shell")}>
@@ -2448,7 +2461,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             void run(async () => {
               const next = await api<Document>("/documents", "POST", blank());
               setDoc(next);
-              setEditingRequested(true);
+              setEditingRequested(false);
               setActiveSectionIndex(0);
               setPreview(false);
               setView("library");
@@ -2656,16 +2669,15 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                     variant="outline"
                     size="sm"
                     className="h-8 text-xs px-2.5"
-                    disabled={busy}
+                    disabled={busy || lock.pending || lock.stopping || lock.releaseUncertain}
                     onClick={() => {
                       const nextPreview = !preview;
-                      setEditingRequested(true);
-                      setPreview(nextPreview);
-                      window.history.pushState(
-                        null,
-                        "",
-                        `/documents/${doc.id}${nextPreview ? "/preview" : ""}`,
-                      );
+                      void (async () => {
+                        if (nextPreview && lock.lease) await lock.stop();
+                        setEditingRequested(!nextPreview);
+                        setPreview(nextPreview);
+                        window.history.pushState(null, "", `/documents/${doc.id}${nextPreview ? "/preview" : ""}`);
+                      })().catch(() => {});
                     }}
                   >
                     {preview ? <Edit3Icon className="w-3.5 h-3.5 mr-1" /> : <Eye className="w-3.5 h-3.5 mr-1" />}
@@ -2702,16 +2714,19 @@ export default function App({ initialSession }: { initialSession?: Session }) {
         {doc && <div className="edit-lock-status" data-editing={lock.canWrite ? "true" : "false"}>
           <div className="edit-lock-summary" role="status" aria-live="polite" aria-atomic="true">
             <Badge variant="outline" className="edit-lock-badge">
-              {lock.pending ? <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : lock.canWrite ? <Lock className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
-              {lock.canWrite ? "Editing" : lock.pending ? "Connecting" : doc.access === "viewer" ? "Viewer access" : "Read only"}
+              {lock.pending || lock.stopping ? <LoaderCircle className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : lock.canWrite ? <Lock className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
+              {lock.stopping ? "Releasing" : lock.releaseUncertain ? "Release not confirmed" : lock.pending ? "Connecting" : lock.canWrite ? "Editing" : doc.access === "viewer" ? "Viewer access" : "Viewing"}
             </Badge>
-            <span className="edit-lock-description">{lock.canWrite ? "Only you can edit right now." : lock.pending ? "Requesting edit access…" : doc.access === "viewer" ? "Ask the owner for edit access." : lock.lock ? `${lock.lock.holder} is editing with ${lock.lock.agent}.` : "Start editing when you’re ready to make changes."}</span>
+            <span className="edit-lock-description">{lockDescription}</span>
           </div>
-          {canEdit && !preview && <Button variant={lock.canWrite ? "secondary" : "default"} size="sm" className="edit-lock-action" disabled={busy || lock.pending} onClick={() => {
-            if (lock.canWrite) setEditingRequested(false);
+          {canEdit && !preview && <Button variant={lock.canWrite ? "secondary" : "default"} size="sm" className="edit-lock-action" disabled={busy || lock.pending || lock.stopping || anotherSession} onClick={() => {
+            if (lock.canWrite || lock.releaseUncertain) void lock.stop().then(() => {
+              setEditingRequested(false);
+              setNotice("Editing stopped. Your draft stays in this tab; other sessions can now edit.");
+            }).catch(() => {});
             else if (!editingRequested) setEditingRequested(true);
-            else void lock.start().catch(fail);
-          }}>{lock.canWrite ? <Eye aria-hidden="true" /> : <Lock aria-hidden="true" />}{lock.canWrite ? "Stop editing" : "Start editing"}</Button>}
+            else void lock.start().catch(() => {});
+          }}>{lock.canWrite ? <Eye aria-hidden="true" /> : <Lock aria-hidden="true" />}{lock.stopping ? "Releasing…" : lock.releaseUncertain ? "Retry release" : lock.canWrite ? "Stop editing" : "Start editing"}</Button>}
           {lock.error && !lock.canWrite && <Alert variant="destructive" className="edit-lock-error"><AlertDescription>{lock.error}</AlertDescription></Alert>}
         </div>}
         {busy && <div className="request-progress" role="status" aria-label="Request in progress"><span /></div>}
@@ -2955,7 +2970,8 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               safeActiveSlide={safeActiveSlide}
               setActiveSlide={setActiveSlide}
               change={change}
-              busy={busy || !lock.canWrite}
+              busy={busy}
+              readOnly={!lock.canWrite}
               presenting={fullscreen}
               setFullscreen={setFullscreen}
               slidesSidebarOpen={slidesSidebarOpen}

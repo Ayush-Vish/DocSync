@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Research talk · DocSync example</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap">
+<link rel="stylesheet" href="../charts.css"><link rel="stylesheet" href="../presentation-base.css"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="../motion.css"><link rel="stylesheet" href="slides/architecture.css">
+<script src="../preview.js" defer></script><script src="../slides.js" defer></script><script src="../motion.js" defer></script>
+</head><body>
+<!-- Example motion deck: a pattern library for presenting a research paper. Every visible string is a placeholder; replace it with facts from the source and delete patterns you do not need. -->
+
+<!-- docsync:cover -->
+<article id="cover" class="slide research motion">
+  <div class="abs" style="left:64px;top:96px;width:640px">
+    <div class="cover-venue auto">Venue · Volume, issue · Month year</div>
+    <h1 class="cover-title auto">Short Paper Title</h1>
+    <p class="cover-sub auto" style="--d:.1s">Full subtitle of the paper, exactly as printed</p>
+    <p class="cover-hook auto" style="--d:1.3s">One plain-language sentence: what this paper makes possible</p>
+    <div class="cover-meta auto" style="--d:.2s">
+      <div class="k">Author One · Author Two · Author Three [1]</div>
+      <div class="t-muted">Presented by: presenter names</div>
+      <div class="t-muted">Course · Instructor</div>
+    </div>
+  </div>
+  <div class="node b-blue o-blue" style="left:760px;top:150px;width:230px;height:130px"><span class="ic lg i-server t-blue"></span><b>Component A</b><span class="small t-blue">prepares the artifact</span></div>
+  <span class="abs tag blue" style="left:760px;top:292px">Prepare</span>
+  <span class="wire c-amber dashed pk-doc" style='--path:"M990 215 C 1090 215, 1085 300, 1085 398";--pk-delay:.4;--pk-dur:1'></span>
+  <div class="node b-teal o-teal" style="left:960px;top:400px;width:250px;height:160px"><span class="ic lg i-chip t-teal"></span><b>Component B</b><span class="small t-teal">input → local result</span></div>
+  <div class="abs auto t-amber" style="--d:1.45s;left:930px;top:368px;display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600"><span class="ic sm i-model"></span>artifact delivered</div>
+  <span class="abs tag teal" style="left:960px;top:572px">Use</span>
+  <aside class="speaker-notes" title="Presenter 1 · ≈ 30 s">“This paper asks [the research question in one sentence]. The authors build [the system] that [what moves from A to B]. We will explain the problem, the design, how it was built, and what was measured.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:agenda -->
+<article id="agenda" class="slide research motion">
+  <h2 style="top:52px;text-align:center">Agenda</h2>
+  <div class="abs" style="left:150px;top:140px;width:980px;display:grid;grid-template-columns:1fr 1fr;gap:0 80px">
+    <ol class="agenda f up s1">
+      <li><span class="badge">1</span><span>Introduction</span><em>3–4</em></li>
+      <li><span class="badge">2</span><span>Motivation</span><em>5</em></li>
+      <li><span class="badge">3</span><span>Related Work</span><em>6–7</em></li>
+      <li><span class="badge">4</span><span>Research Gap</span><em>8</em></li>
+      <li><span class="badge">5</span><span>Objective</span><em>9</em></li>
+      <li><span class="badge">6</span><span>Proposed Method</span><em>10–11</em></li>
+    </ol>
+    <ol class="agenda f up s2">
+      <li><span class="badge">7</span><span>Methodology</span><em>12–15</em></li>
+      <li><span class="badge">8</span><span>Results</span><em>16–20</em></li>
+      <li><span class="badge">9</span><span>Conclusion</span><em>21</em></li>
+      <li><span class="badge">10</span><span>Future Work</span><em>22–23</em></li>
+      <li><span class="badge">11</span><span>References &amp; Q&amp;A</span><em>24</em></li>
+    </ol>
+  </div>
+  <div class="abs f up s3" style="left:150px;top:560px;width:980px">
+    <div class="label" style="margin-bottom:8px">Who presents what</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:15px">
+      <div class="box" style="padding:10px 12px"><b class="k">Presenter 1</b><br><span class="t-muted">Sections 1–3</span></div>
+      <div class="box" style="padding:10px 12px"><b class="k">Presenter 2</b><br><span class="t-muted">Sections 4–6</span></div>
+      <div class="box" style="padding:10px 12px"><b class="k">Presenter 3</b><br><span class="t-muted">Sections 7–8</span></div>
+      <div class="box" style="padding:10px 12px"><b class="k">Presenter 4</b><br><span class="t-muted">Sections 9–11</span></div>
+    </div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 1 · ≈ 30 s">“We start with context and motivation, identify the gap, and state the objective. Then we cover the method and the results, and close with conclusions and future work.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:divider -->
+<article id="divider" class="slide research motion">
+  <div class="abs" style="left:96px;top:140px;width:1088px">
+    <div class="dv-eyebrow">Section 2 · Presenter 2</div>
+    <h1 class="dv-title">Research Gap, Objective &amp; Method</h1>
+    <ol class="dv-list">
+      <li class="f up s1"><span class="badge">4</span>Research gap: what earlier work leaves open</li>
+      <li class="f up s2"><span class="badge">5</span>Objective</li>
+      <li class="f up s3"><span class="badge">6</span>Proposed method</li>
+    </ol>
+  </div>
+  <div class="dv-map abs" style="left:96px;top:590px"><span class="label">Agenda</span><span class="d">1</span><span class="d">2</span><span class="d">3</span><span class="d on">4</span><span class="d on">5</span><span class="d on">6</span><span class="d">7</span><span class="d">8</span><span class="d">9</span><span class="d">10</span><span class="d">11</span></div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 10 s">“This section covers what is still missing, the objective the authors set, and the method they propose.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:pipeline -->
+<article id="pipeline" class="slide research motion">
+  <p class="kick">1 · Introduction <span class="ev concept">Concept</span></p>
+  <h2>From raw input to a useful decision</h2>
+  <div class="node row b-blue o-blue f s5" style="left:986px;top:142px;width:230px;height:78px"><span class="ic i-server t-blue"></span><b>Supporting system</b></div>
+  <div class="node o-teal b-teal f up s1" style="left:64px;top:270px;width:220px;height:120px"><span class="ic lg i-sensor t-teal"></span><b>Input</b><span class="small t-muted">what is observed</span></div>
+  <div class="node o-line f up s2" style="left:374px;top:270px;width:220px;height:120px"><span class="ic lg i-wave t-muted"></span><b>Representation</b><span class="small t-muted mono">x₁, x₂, x₃ …</span></div>
+  <div class="node o-teal f up s3" style="left:684px;top:270px;width:220px;height:120px"><span class="ic lg i-model t-teal"></span><b>Model</b><span class="small t-muted">the paper’s focus</span></div>
+  <div class="node o-ink f up s4" style="left:996px;top:270px;width:220px;height:120px"><span class="ic lg i-target t-ink"></span><b>Output</b><span class="small t-muted">decision / action</span></div>
+  <span class="wire c-grey draw s2" style='--path:"M290 330 H 366"'></span>
+  <span class="wire c-grey draw s3" style='--path:"M600 330 H 676"'></span>
+  <span class="wire c-grey draw s4" style='--path:"M910 330 H 988"'></span>
+  <span class="wire c-amber draw s5 pk-doc" style='--path:"M986 182 C 860 182, 794 200, 794 262";--pk-delay:.3;--pk-dur:1.1;--pk-scale:.9'></span>
+  <span class="abs f s5 t-amber" style="left:812px;top:146px;font-size:16px;font-weight:600">Updated part</span>
+  <div class="abs" style="left:64px;top:430px;width:1152px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+    <div class="box dim s1"><b class="k">Term 1</b><div class="small" style="margin-top:4px">One-line definition in plain words.</div></div>
+    <div class="box dim s3"><b class="k">Term 2</b><div class="small" style="margin-top:4px">One-line definition in plain words.</div></div>
+    <div class="box dim s4"><b class="k">Term 3</b><div class="small" style="margin-top:4px">One-line definition in plain words.</div></div>
+    <div class="box b-amber dim s5"><b class="t-amber">The new requirement</b><div class="small" style="margin-top:4px">What the paper adds to this chain.</div></div>
+  </div>
+  <div class="abs f s5" style="left:64px;top:590px;width:1152px;font-size:22px"><b class="k">Takeaway:</b> one sentence the audience should remember from this slide.</div>
+  <aside class="speaker-notes" title="Presenter 1 · ≈ 60 s">“Walk the chain left to right as each box appears: input, representation, model, output. Then point at the amber arrow: this is the part the paper changes.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:split -->
+<article id="split" class="slide research motion">
+  <p class="kick">1 · Introduction <span class="ev concept">Concept + paper design</span></p>
+  <h2>Where each part of the work happens</h2>
+  <div class="abs lead" style="left:64px;top:122px;width:1150px"><b>Key term:</b> a one-line definition the next two panels depend on.</div>
+  <div class="abs box b-blue f up s1" style="left:64px;top:180px;width:440px;height:340px;padding:22px">
+    <div style="display:flex;align-items:center;gap:12px"><span class="ic lg i-server t-blue"></span><div><div class="head">Preparation</div><div class="small t-blue glow s4" style="font-weight:600;border-radius:6px;padding:0 4px;margin-left:-4px">Runs on component A</div></div></div>
+    <ul class="clean" style="margin-top:22px;font-size:19px">
+      <li><span class="dot c-blue"></span>What happens here, step one</li>
+      <li><span class="dot c-blue"></span>What happens here, step two</li>
+      <li><span class="dot c-blue"></span>What it produces</li>
+    </ul>
+  </div>
+  <span class="wire c-amber draw s2 pk-doc" style='--path:"M516 350 H 764";--pk-delay:.3;--pk-dur:1.1'></span>
+  <span class="abs f s2 t-amber" style="left:540px;top:310px;width:200px;text-align:center;font-size:16px;font-weight:600">artifact</span>
+  <span class="abs f s2 t-muted" style="left:540px;top:368px;width:200px;text-align:center;font-size:16px">small, compatible</span>
+  <div class="abs box b-teal f up s3" style="left:776px;top:180px;width:440px;height:340px;padding:22px">
+    <div style="display:flex;align-items:center;gap:12px"><span class="ic lg i-chip t-teal"></span><div><div class="head">Use</div><div class="small t-teal glow s4" style="font-weight:600;border-radius:6px;padding:0 4px;margin-left:-4px">Runs on component B</div></div></div>
+    <ul class="clean" style="margin-top:22px;font-size:19px">
+      <li><span class="dot c-teal"></span>What happens here, step one</li>
+      <li><span class="dot c-teal"></span>What happens here, step two</li>
+    </ul>
+    <div style="position:absolute;left:22px;right:22px;bottom:20px;display:flex;gap:8px;align-items:center"><span class="t-muted" style="font-size:15px">Limited:</span><span class="chip" style="font-size:15px"><span class="ic sm i-memory"></span>memory</span><span class="chip" style="font-size:15px"><span class="ic sm i-gauge"></span>compute</span><span class="chip" style="font-size:15px"><span class="ic sm i-bolt"></span>energy</span></div>
+  </div>
+  <div class="abs box f up s4" style="left:64px;top:548px;width:1152px;background:var(--amber-soft);text-align:center;font:600 24px/1.2 var(--f-head);color:var(--ink)">In this paper: <span class="t-blue">prepare on A</span>, <span class="t-teal">use on B</span>.</div>
+  <aside class="speaker-notes" title="Presenter 1 · ≈ 75 s">“Contrast the two panels. Name what the paper actually demonstrates and what it leaves to other systems, so nobody assumes more than was built.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:before-after -->
+<article id="before-after" class="slide research motion">
+  <p class="kick">2 · Motivation <span class="ev">Paper claim</span></p>
+  <h2>Why the current approach is not enough</h2>
+  <div class="abs lead" style="left:64px;top:122px;width:1150px"><b>Key term:</b> the concept the two lanes below compare.</div>
+  <div class="lane f wr s1" style="left:64px;top:186px">
+    <div class="lbl">Current practice</div>
+    <div class="st">New version</div><div class="ar"></div>
+    <div class="st b-red o-red">Costly step 1</div><div class="ar"></div>
+    <div class="st b-red o-red">Costly step 2</div><div class="ar"></div>
+    <div class="st">Resume</div>
+  </div>
+  <div class="lane f wr s2" style="left:64px;top:300px">
+    <div class="lbl">Proposed approach</div>
+    <div class="st">New version</div><div class="ar"></div>
+    <div class="st o-amber glow s3">Light step 1</div><div class="ar"></div>
+    <div class="st o-amber glow s3">Light step 2</div><div class="ar"></div>
+    <div class="st o-teal">Resume</div>
+  </div>
+  <span class="wire track c-amber s3 pk-doc" style='--path:"M349 333 H 1057";--pk-dur:1.8;--pk-scale:.9'></span>
+  <div class="abs box b-teal f wr s2" style="left:254px;top:378px;width:898px;padding:10px 16px;font-size:17px;display:flex;justify-content:space-between;gap:16px"><span><b class="t-teal">One-time prerequisite</b> · what must already be in place</span><span class="t-muted">required once</span></div>
+  <div class="abs f up s3" style="left:64px;top:470px;width:1152px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px">
+    <div class="box" style="display:flex;gap:12px;align-items:flex-start"><span class="ic i-layers t-amber"></span><span class="small">Benefit one, in one line.</span></div>
+    <div class="box" style="display:flex;gap:12px;align-items:flex-start"><span class="ic i-loop t-amber"></span><span class="small">Benefit two, in one line.</span></div>
+    <div class="box" style="display:flex;gap:12px;align-items:flex-start"><span class="ic i-memory t-teal"></span><span class="small">Constraint it must respect.</span></div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 1 · ≈ 70 s">“Top lane: today every change goes through the two red, expensive steps. Bottom lane: the paper’s goal replaces them with light steps. Say what still needs the old path.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:terms -->
+<article id="terms" class="slide research motion">
+  <p class="kick">Key terms <span class="ev concept">Background</span></p>
+  <h2>Key terms we will use</h2>
+  <div class="abs" style="left:64px;top:122px;width:1152px">
+    <div class="label f s1 t-teal" style="margin-bottom:10px">Hardware &amp; data</div>
+    <div class="term-row">
+      <div class="term f up s1"><span class="ic lg i-chip t-teal"></span><div><b>Term A</b><em>its role</em><span>Two short sentences: what it is, and why this paper needs it.</span></div></div>
+      <div class="term f up s1" style="transition-delay:.15s"><span class="ic lg i-sensor t-teal"></span><div><b>Term B</b><em>its role</em><span>Two short sentences: what it is, and why this paper needs it.</span></div></div>
+      <div class="term f up s1" style="transition-delay:.3s"><span class="ic lg i-antenna t-blue"></span><div><b>Term C</b><em>its role</em><span>Two short sentences. Add a reference [2] when the definition is not from the paper.</span></div></div>
+    </div>
+    <div class="label f s2 t-amber" style="margin:18px 0 10px">Software &amp; method</div>
+    <div class="term-row">
+      <div class="term f up s2"><span class="ic lg i-wave t-amber"></span><div><b>Term D</b><em>the idea</em><span>Two short sentences: what it is, and why this paper needs it.</span></div></div>
+      <div class="term f up s2" style="transition-delay:.15s"><span class="ic lg i-model t-amber"></span><div><b>Term E</b><em>the engine</em><span>Two short sentences: what it is, and why this paper needs it.</span></div></div>
+      <div class="term f up s2" style="transition-delay:.3s"><span class="ic lg i-code t-amber"></span><div><b>Term F</b><em>the interface</em><span>Two short sentences: what it is, and why this paper needs it.</span></div></div>
+    </div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 90 s">“Define each term once, in the order the talk uses them. Point to the colour: teal terms are the physical side, amber terms are the method.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:prior-work -->
+<article id="prior-work" class="slide research motion">
+  <p class="kick">4 · Research Gap <span class="ev">Paper related work</span></p>
+  <h2>What earlier research has already done</h2>
+  <div class="abs lead" style="left:64px;top:112px;width:1152px;font-size:20px">The paper sorts prior work into <b>three groups</b>. Each fixed one problem but left another open.</div>
+  <div class="abs spectrum f wr s1" style="left:70px;top:178px;width:1124px"></div>
+  <span class="abs spectrum-l f s1 t-red" style="left:70px;top:156px">More resources · bigger systems</span>
+  <span class="abs spectrum-l f s1 t-teal" style="right:64px;top:156px">Fewer resources · smaller systems</span>
+  <div class="abs" style="left:64px;top:198px;width:1152px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px">
+    <div class="grp f up s1">
+      <div class="grp-h"><span class="ic lg i-server t-red"></span><div><div class="label" style="margin-bottom:5px">Group 1 · refs in [1]</div><b>First family of approaches</b></div></div>
+      <div class="label">What they did</div>
+      <p>One or two sentences summarising the approach as the paper describes it.</p>
+      <div class="grp-x f wr s2"><span class="ic sm i-no t-red"></span><span><b>Left open:</b> the limitation the authors point out.</span></div>
+    </div>
+    <div class="grp f up s3">
+      <div class="grp-h"><span class="ic lg i-chip t-amber"></span><div><div class="label" style="margin-bottom:5px">Group 2 · refs in [1]</div><b>Second family</b></div></div>
+      <div class="label">What they did</div>
+      <p>One or two sentences summarising the approach as the paper describes it.</p>
+      <div class="grp-x f wr s4"><span class="ic sm i-no t-red"></span><span><b>Left open:</b> the limitation the authors point out.</span></div>
+    </div>
+    <div class="grp f up s5">
+      <div class="grp-h"><span class="ic lg i-code t-teal"></span><div><div class="label" style="margin-bottom:5px">Group 3 · refs in [1]</div><b>Third family</b></div></div>
+      <div class="label">What they did</div>
+      <p>One or two sentences summarising the approach as the paper describes it.</p>
+      <div class="grp-x f wr s6"><span class="ic sm i-no t-red"></span><span><b>Left open:</b> the limitation the authors point out.</span></div>
+    </div>
+  </div>
+  <span class="wire c-grey draw s3" style='--path:"M426 330 H 450"'></span>
+  <span class="wire c-grey draw s5" style='--path:"M823 330 H 847"'></span>
+  <div class="abs box o-ink b-paper f up s7" style="left:64px;top:566px;width:1152px;font-size:20px;display:flex;gap:14px;align-items:center"><span class="ic i-target t-amber"></span><span><b class="k">Common thread:</b> none of them can <b class="t-amber">do the thing this paper does</b>, which leads to the gap.</span></div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 80 s">“Introduce the three groups in order. For each: what they achieved, then the red box with what they left open. End on the common thread, which sets up the gap slide.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:gap -->
+<article id="gap" class="slide research motion">
+  <p class="kick">4 · Research Gap <span class="ev">Paper claim</span></p>
+  <h2>What is still missing?</h2>
+  <div class="abs lead" style="left:64px;top:112px;width:1152px;font-size:20px"><b>Gap identified by the authors:</b> one sentence that names the missing capability.</div>
+  <ul class="abs nlist" style="left:64px;top:176px;width:1152px">
+    <li class="f up s1"><span class="badge">1</span><span class="ic i-layers t-amber"></span><div><b>First missing piece</b><span>One line of evidence from the paper explaining why it is missing.</span></div></li>
+    <li class="f up s2"><span class="badge">2</span><span class="ic i-sliders t-amber"></span><div><b>Second missing piece</b><span>One line of evidence from the paper explaining why it is missing.</span></div></li>
+    <li class="f up s3"><span class="badge">3</span><span class="ic i-memory t-teal"></span><div><b>Third missing piece</b><span>One line of evidence from the paper explaining why it is missing.</span></div></li>
+    <li class="f up s4"><span class="badge">4</span><span class="ic i-antenna t-blue"></span><div><b>Fourth missing piece</b><span>One line of evidence from the paper explaining why it is missing.</span></div></li>
+  </ul>
+  <div class="abs box b-amber f up s5" style="left:64px;top:600px;width:1152px;font-size:20px"><b class="t-amber">Research question:</b> can these pieces work together under realistic constraints?</div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 70 s">“Read each gap as it appears: name it, then give the one-line reason. Finish by reading the research question aloud.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:objective -->
+<article id="objective" class="slide research motion">
+  <p class="kick">5 · Objective <span class="ev">Paper objectives</span></p>
+  <h2>Objective: what the authors set out to build</h2>
+  <div class="abs box o-ink b-paper" style="left:64px;top:118px;width:1152px;font-size:21px;padding:14px 20px"><b class="k">Main objective:</b> build and evaluate a system that <b class="t-amber">does the four key verbs</b> under the paper’s constraints.</div>
+  <ul class="abs nlist plain" style="left:64px;top:206px;width:1152px">
+    <li class="f up s1 c-ink"><span class="badge">1</span><span class="ic i-code t-teal"></span><div><b>First contribution</b><span>What it delivers, in one line. (Sec. V)</span></div></li>
+    <li class="f up s2 c-ink"><span class="badge">2</span><span class="ic i-model t-amber"></span><div><b>Second contribution</b><span>What it delivers, in one line. (Sec. III–IV)</span></div></li>
+    <li class="f up s3 c-ink"><span class="badge">3</span><span class="ic i-memory t-teal"></span><div><b>Third contribution</b><span>What it delivers, in one line. (Sec. IV)</span></div></li>
+    <li class="f up s4 c-ink"><span class="badge">4</span><span class="ic i-chart t-ink"></span><div><b>Evaluation</b><span>Which metrics were measured. (Sec. VII)</span></div></li>
+  </ul>
+  <div class="abs f up s5" style="left:64px;top:590px;width:1152px;display:grid;grid-template-columns:auto 1fr 1fr;font-size:19px">
+    <div style="display:grid;place-items:center;padding:0 20px;border-radius:12px 0 0 12px;background:var(--soft);font:700 18px/1 var(--f-head);color:var(--ink)">Boundary</div>
+    <div class="b-blue" style="padding:12px 18px"><b class="t-blue">In scope:</b> what the paper builds</div>
+    <div class="b-teal" style="padding:12px 18px;border-radius:0 12px 12px 0"><b class="t-teal">Out of scope:</b> what it relies on</div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 70 s">“State the main objective, then the numbered goals with their paper sections. The boundary bar prevents over-claiming.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:architecture -->
+<article id="architecture" class="slide research motion">
+  <p class="kick">6 · Proposed Method <span class="ev">Paper method</span></p>
+  <h2>End-to-end system</h2>
+  <div class="node b-blue o-blue f s1" style="left:64px;top:140px;width:260px;height:300px"><span class="ic lg i-server t-blue"></span><b>Component A</b><span class="small t-muted" style="margin-top:8px">Prepares and supplies</span><span class="cap" style="margin-top:6px">where it runs</span></div>
+  <div class="node o-blue f s1" style="left:430px;top:140px;width:200px;height:300px;transition-delay:.1s"><span class="ic lg i-antenna t-blue"></span><b>Connection</b><span class="small t-muted" style="margin-top:8px">Carries artifacts and feedback</span><span class="cap" style="margin-top:6px">link type</span></div>
+  <div class="node b-teal o-teal f s1" style="left:736px;top:140px;width:230px;height:300px;transition-delay:.2s;justify-content:flex-start;padding-top:12px"><span class="ic i-chip t-teal" style="width:32px;height:32px"></span><b>Component B</b><span class="cap">platform</span>
+    <div class="slots">
+      <div class="slots-h">layer 1 → layer 2</div>
+      <div class="slots-g"><span class="slot cyc" style="--cd:0s">Part A<i>case 1</i></span><span class="slot cyc" style="--cd:1.2s">Part B<i>case 2</i></span><span class="slot cyc dsh" style="--cd:2.4s">Part C<i>future</i></span><span class="slot cyc dsh" style="--cd:3.6s">Part D<i>future</i></span></div>
+      <div class="slots-c">uses the part the task needs</div>
+    </div>
+  </div>
+  <div class="node o-teal f s1" style="left:1036px;top:140px;width:180px;height:300px;transition-delay:.3s"><div class="t-teal" style="display:flex;gap:6px"><span class="ic lg i-sensor"></span><span class="ic lg i-led"></span></div><b>Physical world</b><span class="small t-muted" style="margin-top:8px">Inputs and actions</span></div>
+  <span class="wire c-amber draw s2" style='--path:"M330 245 H 424"'></span>
+  <span class="wire c-amber draw s2" style='--path:"M636 245 H 730";transition-delay:.35s'></span>
+  <span class="wire c-blue draw s3" style='--path:"M730 345 H 636"'></span>
+  <span class="wire c-blue draw s3" style='--path:"M424 345 H 330";transition-delay:.35s'></span>
+  <span class="wire c-teal s1" style='--path:"M972 270 H 1030"'></span>
+  <span class="wire c-teal s1" style='--path:"M1030 320 H 972"'></span>
+  <span class="wire track c-amber s2 pk-doc" style='--path:"M300 245 H 760";--pk-dur:1.6;--pk-scale:.9'></span>
+  <span class="wire track c-blue s3 pk-msg" style='--path:"M760 345 H 300";--pk-dur:1.6;--pk-scale:.9'></span>
+  <div class="abs" style="left:64px;top:466px;width:1152px;display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div class="box b-amber dim s2" style="display:flex;gap:14px;align-items:center"><span class="ic i-model t-amber"></span><span><b class="t-amber">Artifact delivery</b> flows toward B</span></div>
+    <div class="box b-blue dim s3" style="display:flex;gap:14px;align-items:center"><span class="ic i-file t-blue"></span><span><b class="t-blue">Feedback</b> flows back toward A</span></div>
+  </div>
+  <div class="abs cap" style="left:64px;top:566px;width:1152px;font-size:15px">Parts A and B are the paper’s two cases; C and D illustrate further ones. Adapted from [1], Fig. 1. Details simplified to their role here.</div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 75 s">“Introduce the four blocks left to right. Amber arrows: what is delivered. Blue arrows: what comes back. Inside B, the highlighted slot shows which part is active.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:layers -->
+<article id="layers" class="slide research motion">
+  <p class="kick">6 · Proposed Method <span class="ev">Paper method</span></p>
+  <h2>Layers and prototype components</h2>
+  <div class="band b-blue f up s3" style="top:140px"><div class="bl t-blue">Top</div><div><div class="br">What the top layer does</div><div class="bc"><span class="chip">Concrete component</span></div></div></div>
+  <div class="band b-amber f up s2" style="top:296px"><div class="bl t-amber">Middle</div><div><div class="br">What the middle layer does</div><div class="bc"><span class="chip">Component</span><span class="chip">Component</span></div></div></div>
+  <div class="band b-teal f up s1" style="top:452px"><div class="bl t-teal">Base</div><div><div class="br">What the base layer does</div><div class="bc"><span class="chip">Hardware</span><span class="chip">Add-on</span></div></div></div>
+  <span class="wire c-amber draw s4 pk-doc" style='--path:"M690 200 C 740 200, 740 356, 690 356";--pk-delay:.2;--pk-dur:1.1;--pk-scale:.8'></span>
+  <span class="abs f s4 t-amber" style="left:752px;top:254px;font-size:16px;font-weight:600;line-height:1.25">artifact<br>delivery</span>
+  <span class="wire c-teal draw s4" style='--path:"M690 488 C 750 488, 750 548, 690 548";transition-delay:.5s'></span>
+  <span class="abs f s4 t-teal" style="left:758px;top:498px;font-size:16px;font-weight:600;line-height:1.25">local<br>use</span>
+  <figure class="abs" style="left:860px;top:140px;width:356px"><div class="fig-ph" style="height:230px"><span class="ic lg i-image"></span>Crop the hardware or system figure from the PDF here</div><figcaption>Source: [1], Fig. 3</figcaption></figure>
+  <div class="abs" style="left:860px;top:410px;width:356px;display:flex;flex-direction:column;gap:12px;font-size:16px;line-height:1.35">
+    <div><b class="t-blue">Link:</b> what it carries, and what it is not.</div>
+    <div><b class="t-teal">Local use:</b> input → loaded part → result.</div>
+    <div class="t-muted">Layers are logical, not separate boards.</div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 2 · ≈ 90 s">“Build the stack bottom-up: base, middle, top. Then the arrows show the two flows. Point at the real figure from the paper on the right.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:workflow -->
+<article id="workflow" class="slide research motion">
+  <p class="kick">7 · Methodology <span class="ev">Paper method</span></p>
+  <h2>The recurring workflow</h2>
+  <div class="node o-ink dash f up s1" style="left:64px;top:290px;width:330px;height:124px;align-items:flex-start;text-align:left;padding:14px 18px"><span class="tag" style="margin-bottom:8px">Initial setup · once</span><div style="display:flex;gap:10px;align-items:flex-start"><span class="badge">1</span><span style="font-size:18px">One-time setup step from the paper</span></div></div>
+  <span class="wire c-line thick no-head s2" style='--path:"M800 205 A 200 200 0 1 1 799.9 205"'></span>
+  <span class="wire c-ink s1" style='--path:"M400 352 H 500"'></span>
+  <span class="wire track c-amber s3 pk-dot" style='--path:"M800 205 A 200 200 0 1 1 799.9 205";--pk-delay:.1;--pk-dur:3.2;--pk-scale:.9'></span>
+  <div class="wn f s2" style="left:700px;top:163px"><span class="badge">2</span>Load or configure the current part</div>
+  <div class="wn f s2" style="left:890px;top:301px;transition-delay:.15s"><span class="badge">3</span>Collect input and produce a result</div>
+  <div class="wn f s2" style="left:818px;top:525px;transition-delay:.3s"><span class="badge">4</span>Report what matters back</div>
+  <div class="wn o-amber f s2" style="left:582px;top:525px;transition-delay:.45s"><span class="badge c-amber">5</span>Check for a newer version</div>
+  <div class="wn o-amber f s2" style="left:510px;top:301px;transition-delay:.6s"><span class="badge c-amber">6</span>Receive, load, continue</div>
+  <div class="abs f s3" style="left:718px;top:378px;width:164px;text-align:center"><div style="font:700 21px/1.15 var(--f-head)" class="t-amber">every N cycles</div><div class="cap" style="margin-top:4px">example policy from the paper</div></div>
+  <div class="abs cap f s1" style="left:64px;top:440px;width:330px;font-size:15px">Setup sits outside the loop: it is <b>not</b> repeated every cycle.</div>
+  <aside class="speaker-notes" title="Presenter 3 · ≈ 75 s">“Setup happens once. Then follow the dot around the loop: steps two to six. Mention that the check interval is the paper’s example policy, not a requirement.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:lifecycle -->
+<article id="lifecycle" class="slide research motion">
+  <p class="kick">7 · Methodology <span class="ev">Paper method</span></p>
+  <h2>Lifecycle and configuration</h2>
+  <div class="abs cap" style="left:64px;top:132px;width:1152px;font-size:14px">Short labels are actions matching the paper’s states (Fig. 6), not exact API names.</div>
+  <div class="state lit s1" style="left:64px;top:262px">Initialize</div>
+  <div class="state lit s1" style="left:264px;top:262px;transition-delay:.25s">Load</div>
+  <div class="state lit s1" style="left:464px;top:262px;transition-delay:.5s">Resolve</div>
+  <div class="state lit s1" style="left:664px;top:262px;transition-delay:.75s">Prepare</div>
+  <div class="state lit s1" style="left:864px;top:262px;transition-delay:1s">Run</div>
+  <div class="state lit s1" style="left:1064px;top:262px;transition-delay:1.25s">Free</div>
+  <span class="wire c-grey still" style='--path:"M216 293 H 258"'></span>
+  <span class="wire c-grey still" style='--path:"M416 293 H 458"'></span>
+  <span class="wire c-grey still" style='--path:"M616 293 H 658"'></span>
+  <span class="wire c-grey still" style='--path:"M816 293 H 858"'></span>
+  <span class="wire c-grey still" style='--path:"M1016 293 H 1058"'></span>
+  <span class="wire c-teal still" style='--path:"M916 326 C 900 384, 980 384, 966 330"'></span>
+  <span class="wire track c-teal s2 pk-dot" style='--path:"M916 326 C 900 384, 980 384, 966 330";--pk-delay:.1;--pk-dur:1.1;--pk-scale:.7'></span>
+  <span class="abs t-teal" style="left:910px;top:384px;width:60px;text-align:center;font-size:16px;font-weight:600">repeat</span>
+  <span class="wire c-amber draw s3 pk-doc" style='--path:"M939 258 C 939 170, 339 170, 339 254";--pk-delay:.5;--pk-dur:1.3;--pk-scale:.85'></span>
+  <span class="abs f s3 t-amber" style="left:489px;top:160px;width:300px;text-align:center;font-size:18px;font-weight:600">Update: load another version</span>
+  <div class="abs" style="left:64px;top:420px;width:1152px;display:grid;grid-template-columns:repeat(5,1fr);gap:16px">
+    <div class="box small"><b class="k">Initialize</b><br>Reserve what is needed</div>
+    <div class="box small"><b class="k">Load / resolve</b><br>Bring in the part and what it requires</div>
+    <div class="box small"><b class="k">Prepare</b><br>Set up inputs and outputs</div>
+    <div class="box small"><b class="k">Run</b><br>Produce results repeatedly</div>
+    <div class="box small"><b class="k">Free</b><br>Release unused resources</div>
+  </div>
+  <div class="abs f up s3" style="left:64px;top:600px;width:1152px;font-size:21px"><b class="t-amber">An update returns execution to the loading path.</b></div>
+  <aside class="speaker-notes" title="Presenter 3 · ≈ 70 s">“The states light up in order. The small loop is the steady state. The amber arc is what happens on an update.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:update-types -->
+<article id="update-types" class="slide research motion">
+  <p class="kick">7 · Methodology <span class="ev illus">Paper design · illustration</span></p>
+  <h2>Two kinds of update</h2>
+  <div class="abs" style="left:64px;top:124px;width:1152px;display:flex;align-items:center;gap:22px;font-size:20px"><span>The paper represents a model as</span><span class="mono t-ink" style="font-size:28px;font-weight:600">M = {L, C, W}</span><span class="chip"><b>L</b>&nbsp;layers</span><span class="chip"><b>C</b>&nbsp;connections</span><span class="chip"><b>W</b>&nbsp;weights</span></div>
+  <div class="abs box b-paper o-line" style="left:64px;top:190px;width:560px;height:340px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><b class="head" style="font-size:22px">Full update</b><span class="mono t-amber" style="font-size:19px">M<sub>t</sub> = {L′, C′, W′}</span></div>
+    <div class="small t-muted">Structure and weights can change</div>
+    <span class="nnet c-teal fo s1" style='left:80px;top:96px;width:400px;height:200px;--layers:"3,4,2"'></span>
+    <span class="nnet c-amber f s1" style='left:60px;top:96px;width:440px;height:200px;--layers:"2,5,3,2"'></span>
+  </div>
+  <div class="abs box b-paper o-line" style="left:656px;top:190px;width:560px;height:340px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><b class="head" style="font-size:22px">Partial update</b><span class="mono t-amber" style="font-size:19px">M<sub>p</sub> = {L, C, W′}</span></div>
+    <div class="small t-muted">Weights change, structure stays</div>
+    <span class="nnet c-teal edges-only fo s2" style='left:80px;top:96px;width:400px;height:200px;--layers:"3,4,2"'></span>
+    <span class="nnet c-amber edges-only weights f s2" style='left:80px;top:96px;width:400px;height:200px;--layers:"3,4,2"'></span>
+    <span class="nnet c-teal nodes-only" style='left:80px;top:96px;width:400px;height:200px;--layers:"3,4,2"'></span>
+    <span class="abs f s2 mono t-amber" style="left:230px;top:300px;font-size:15px">w → w′</span>
+  </div>
+  <div class="abs cap" style="left:64px;top:538px;width:1152px">Both diagrams are concept illustrations, not the paper’s actual networks.</div>
+  <div class="abs box b-blue f up s3" style="left:64px;top:572px;width:1152px;font-size:21px;padding:12px 18px"><b class="t-blue">Implementation boundary:</b> what the prototype actually does versus what the design allows.</div>
+  <aside class="speaker-notes" title="Presenter 3 · ≈ 75 s">“Left: the whole network is replaced. Right: the same structure keeps its shape and only the connection weights change, shown by the thickness. Then state what was actually evaluated.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:setup -->
+<article id="setup" class="slide research motion">
+  <p class="kick">8 · Results <span class="ev">Paper experiments</span></p>
+  <h2>Experimental setup</h2>
+  <table class="t abs" style="left:64px;top:132px;width:640px;font-size:18px">
+    <thead><tr><th style="width:130px"></th><th class="dim s1">Use case 1</th><th class="dim s2">Use case 2</th></tr></thead>
+    <tbody>
+      <tr><td>Size</td><td class="dim s1"><b>2.5 KB</b></td><td class="dim s2"><b>20 KB</b></td></tr>
+      <tr><td>Input</td><td class="dim s1">What goes in</td><td class="dim s2">What goes in</td></tr>
+      <tr><td>Model</td><td class="dim s1">Architecture</td><td class="dim s2">Architecture</td></tr>
+      <tr><td>Output</td><td class="dim s1">What comes out</td><td class="dim s2">Classes / values</td></tr>
+      <tr><td>Purpose</td><td class="dim s1">What it tests</td><td class="dim s2">What it tests</td></tr>
+    </tbody>
+  </table>
+  <figure class="abs f s3" style="left:740px;top:132px;width:476px"><div class="fig-ph" style="height:300px"><span class="ic lg i-image"></span>Crop the experimental setup figure from the PDF here</div><figcaption>Source: [1], Fig. 9</figcaption></figure>
+  <div class="lane f wr s4" style="left:64px;top:540px">
+    <div class="lbl" style="width:180px">Pipeline</div>
+    <div class="st o-teal" style="width:200px">Input</div><div class="ar"></div>
+    <div class="st o-teal" style="width:200px">Window<br><span class="mono" style="font-size:14px">N × M</span></div><div class="ar"></div>
+    <div class="st b-teal o-teal" style="width:200px">Model</div><div class="ar"></div>
+    <div class="st o-ink" style="width:200px">Output</div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 95 s">“Column by column: the two test cases, their size, input and output. Then the real setup photo or figure, then the data pipeline. Sample values: replace with the paper’s table.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:results -->
+<article id="results" class="slide research motion">
+  <p class="kick">8 · Results <span class="ev measured">Measured</span></p>
+  <h2>Timing results</h2>
+  <table class="t abs" style="left:64px;top:132px;width:560px;font-size:18px">
+    <thead><tr><th>Measurement</th><th class="n">Case 1</th><th class="n">Case 2</th></tr></thead>
+    <tbody>
+      <tr><td>Size</td><td class="n">2.5 KB</td><td class="n">20 KB</td></tr>
+      <tr class="dim s2"><td>Metric B</td><td class="n"><b class="count s2">0.69 ± 0.05 ms</b></td><td class="n"><b class="count s2">0.73 ± 0.03 ms</b></td></tr>
+      <tr class="dim s3"><td>Metric C</td><td class="n"><b class="count s3">44.63 ± 0.08 ms</b></td><td class="n"><b class="count s3">48.05 ± 0.27 ms</b></td></tr>
+      <tr class="dim s1"><td>Metric A</td><td class="n"><b class="count s1">0.068 s</b></td><td class="n"><b class="count s1">0.545 s</b></td></tr>
+    </tbody>
+  </table>
+  <div class="abs small t-muted" style="left:64px;top:410px;width:560px;font-size:16px"><b class="k">Scope:</b> sample values shown; copy the paper’s numbers with their ± and units. Separate metrics are not summed into an end-to-end figure.</div>
+  <div class="abs" style="left:664px;top:132px;width:552px;display:flex;flex-direction:column;gap:18px">
+    <div class="hbars grow s1" style="--max:0.6"><div class="ttl"><span class="badge c-blue">1</span>Metric A <span class="t-muted">(seconds)</span></div>
+      <div class="hbar soft c-blue" style="--v:0.068"><span class="lab">Case 1</span><span class="trk"><span class="bar"></span></span><span class="val">0.068 s</span></div>
+      <div class="hbar c-blue" style="--v:0.545"><span class="lab">Case 2</span><span class="trk"><span class="bar"></span></span><span class="val">0.545 s</span></div>
+      <div class="axis"><span></span><div class="ax"><span style="--t:0">0</span><span style="--t:0.2">0.2</span><span style="--t:0.4">0.4</span><span style="--t:0.6">0.6</span></div><span>s</span></div></div>
+    <div class="hbars grow s2" style="--max:0.8"><div class="ttl"><span class="badge c-teal">2</span>Metric B <span class="t-muted">(milliseconds)</span></div>
+      <div class="hbar soft c-teal" style="--v:0.69"><span class="lab">Case 1</span><span class="trk"><span class="bar"></span></span><span class="val">0.69 ms</span></div>
+      <div class="hbar c-teal" style="--v:0.73"><span class="lab">Case 2</span><span class="trk"><span class="bar"></span></span><span class="val">0.73 ms</span></div>
+      <div class="axis"><span></span><div class="ax"><span style="--t:0">0</span><span style="--t:0.4">0.4</span><span style="--t:0.8">0.8</span></div><span>ms</span></div></div>
+    <div class="hbars grow s3" style="--max:60"><div class="ttl"><span class="badge c-teal">3</span>Metric C <span class="t-muted">(milliseconds)</span></div>
+      <div class="hbar soft c-teal" style="--v:44.63"><span class="lab">Case 1</span><span class="trk"><span class="bar"></span></span><span class="val">44.63 ms</span></div>
+      <div class="hbar c-teal" style="--v:48.05"><span class="lab">Case 2</span><span class="trk"><span class="bar"></span></span><span class="val">48.05 ms</span></div>
+      <div class="axis"><span></span><div class="ax"><span style="--t:0">0</span><span style="--t:20">20</span><span style="--t:40">40</span><span style="--t:60">60</span></div><span>ms</span></div></div>
+  </div>
+  <div class="abs box b-amber f up s4" style="left:664px;top:574px;width:552px;padding:12px 16px;font-size:19px;display:flex;gap:12px;align-items:center"><span class="ic i-clock t-amber"></span><span><b class="t-amber">Separately reported:</b> one headline number with its condition.</span></div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 95 s">“Each chart appears with its table row. Read the number, then its unit, then the condition it was measured under. Say clearly which numbers are not comparable.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:figure-evidence -->
+<article id="figure-evidence" class="slide research motion">
+  <p class="kick">8 · Results <span class="ev measured">Measured + original figures</span></p>
+  <h2>Behaviour with and without the mechanism</h2>
+  <div class="abs" style="left:64px;top:140px;width:330px;display:flex;flex-direction:column;gap:18px;font-size:19px;line-height:1.3">
+    <div class="dim s1"><b class="t-red">Without the mechanism</b><br>What the plots show happening.</div>
+    <div class="dim s2"><b class="t-teal">With the mechanism</b><br>What changes in the plots.</div>
+    <div class="box b-amber f up s3"><b class="t-amber">Main lesson:</b> one sentence.</div>
+  </div>
+  <div class="abs f s1" style="left:420px;top:134px;width:796px">
+    <div class="label t-red" style="margin-bottom:6px">Without</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <figure><div class="fig-ph" style="height:180px">Fig. N(a) crop</div><figcaption>(a) condition one</figcaption></figure>
+      <figure><div class="fig-ph" style="height:180px">Fig. N(b) crop</div><figcaption>(b) condition two</figcaption></figure>
+    </div>
+  </div>
+  <div class="abs f s2" style="left:420px;top:390px;width:796px">
+    <div class="label t-teal" style="margin-bottom:6px">With</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <figure><div class="fig-ph" style="height:180px">Fig. N(c) crop</div><figcaption>(c) condition one</figcaption></figure>
+      <figure><div class="fig-ph" style="height:180px">Fig. N(d) crop</div><figcaption>(d) condition two</figcaption></figure>
+    </div>
+  </div>
+  <div class="abs f s3" style="left:412px;top:412px;width:812px;height:222px;border:3px solid var(--amber);border-radius:12px"></div>
+  <div class="abs f s3 tag amber" style="left:1016px;top:384px">the key difference</div>
+  <div class="abs cap" style="left:64px;top:600px;width:330px">Source: [1], Fig. N(a–d). Original plots, not redrawn.</div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 80 s">“Top row first: the problem visible in the authors’ own plots. Bottom row: the fix. The amber frame marks what to look at.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:tradeoff -->
+<article id="tradeoff" class="slide research motion">
+  <p class="kick">8 · Results <span class="ev measured">Measured</span></p>
+  <h2>Cost and overhead</h2>
+  <div class="abs f up s1" style="left:64px;top:136px;width:540px">
+    <div class="label">Measured cost</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+      <div class="box"><div class="stat"><span class="count s1">488.8</span><small> mW</small></div><div class="small t-muted" style="margin-top:6px">Condition one</div></div>
+      <div class="box"><div class="stat"><span class="count s1">485.9</span><small> mW</small></div><div class="small t-muted" style="margin-top:6px">Condition two</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:19px">≈ <b class="k">0.49 W</b> in the tested setup. Say what is <i>not</i> claimed.</div>
+    <figure style="margin-top:12px;width:460px"><div class="fig-ph" style="height:170px">Fig. N crop (cost over time)</div><figcaption>Source: [1], Fig. N</figcaption></figure>
+  </div>
+  <div class="abs f up s2" style="left:660px;top:136px;width:556px">
+    <div class="label">Overhead · Table II</div>
+    <table class="t" style="margin-top:4px">
+      <thead><tr><th>Case</th><th class="n">Baseline</th><th class="n">This paper</th></tr></thead>
+      <tbody><tr><td>Case 1</td><td class="n">0.226 ms</td><td class="n">44.63 ms</td></tr><tr class="glow s3"><td>Case 2</td><td class="n">42 ms</td><td class="n">48.05 ms</td></tr></tbody>
+    </table>
+    <div class="hbars grow s2" style="--max:50;--lw:150px;--vw:60px;margin-top:16px">
+      <div class="hbar c-ink" style="--v:0.226"><span class="lab">Case 1 · base</span><span class="trk"><span class="bar"></span></span><span class="val">0.226</span></div>
+      <div class="hbar c-teal" style="--v:44.63"><span class="lab">Case 1 · paper</span><span class="trk"><span class="bar"></span></span><span class="val">44.63</span></div>
+      <div class="hbar c-ink" style="--v:42"><span class="lab">Case 2 · base</span><span class="trk"><span class="bar"></span></span><span class="val">42</span></div>
+      <div class="hbar c-teal" style="--v:48.05"><span class="lab">Case 2 · paper</span><span class="trk"><span class="bar"></span></span><span class="val">48.05</span></div>
+      <div class="axis"><span></span><div class="ax"><span style="--t:0">0</span><span style="--t:25">25</span><span style="--t:50">50 ms</span></div><span></span></div>
+    </div>
+  </div>
+  <div class="abs f up s3" style="left:660px;top:520px;width:556px;display:flex;flex-direction:column;gap:10px">
+    <div class="box b-amber" style="font-size:19px;padding:12px 16px"><b class="t-amber">Case 2: +6.05 ms</b> <span class="small t-muted">(derived: 48.05 − 42)</span></div>
+    <div style="font-size:18px"><b class="k">Trade-off:</b> flexibility costs time; the impact depends on the workload.</div>
+  </div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 95 s">“Big numbers first, with their conditions. Then the overhead table. Derived numbers are labelled as derived.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:evidence -->
+<article id="evidence" class="slide research motion">
+  <p class="kick">8 · Results <span class="ev measured">Measured findings + our assessment</span></p>
+  <h2>What the evidence does and does not show</h2>
+  <div class="abs box b-teal f up s1" style="left:64px;top:140px;width:560px;height:440px;padding:24px">
+    <div class="head t-teal">What the tests support</div>
+    <ul class="verdict">
+      <li><span class="ic i-check t-teal"></span><span>Finding one, with its scope</span></li>
+      <li><span class="ic i-check t-teal"></span><span>Finding two, with its scope</span></li>
+      <li><span class="ic i-check t-teal"></span><span>Headline numbers in the reported workloads</span></li>
+    </ul>
+  </div>
+  <div class="abs box b-red f up s2" style="left:656px;top:140px;width:560px;height:440px;padding:24px">
+    <div class="head t-red">What they do not establish</div>
+    <ul class="verdict">
+      <li><span class="ic i-no t-red"></span><span>A tempting claim the data does not support</span></li>
+      <li><span class="ic i-no t-red"></span><span>Generalisation beyond the tested cases</span></li>
+      <li><span class="ic i-no t-red"></span><span>Production-scale reliability</span></li>
+    </ul>
+  </div>
+  <div class="abs cap" style="left:64px;top:600px;width:1152px;font-size:15px">Scope of the evaluation in one line: how many cases, which platform, which conditions.</div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 75 s">“Left: what we can safely say. Right: what we must not claim. This is our assessment, based on the paper’s experiments.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:conclusion -->
+<article id="conclusion" class="slide research motion">
+  <p class="kick">9 · Conclusion <span class="ev">Paper conclusion</span></p>
+  <h2>What the paper contributes</h2>
+  <div class="node b-blue o-blue f s1" style="left:64px;top:136px;width:240px;height:96px"><b>Step one</b></div>
+  <div class="node b-teal o-teal f s1" style="left:368px;top:136px;width:240px;height:96px;transition-delay:.2s"><b>Step two</b></div>
+  <div class="node b-teal o-teal f s1" style="left:672px;top:136px;width:240px;height:96px;transition-delay:.4s"><b>Step three</b></div>
+  <div class="node b-amber o-amber f s1" style="left:976px;top:136px;width:240px;height:96px;transition-delay:.6s"><b>Later update</b></div>
+  <span class="wire c-grey s1" style='--path:"M310 184 H 360"'></span>
+  <span class="wire c-grey s1" style='--path:"M614 184 H 664";transition-delay:.3s'></span>
+  <span class="wire c-grey s1" style='--path:"M918 184 H 968";transition-delay:.5s'></span>
+  <span class="wire c-amber draw s1 pk-doc" style='--path:"M1096 238 C 1096 290, 488 290, 488 240";transition-delay:.8s;--pk-delay:1.3;--pk-dur:1.3;--pk-scale:.85'></span>
+  <div class="abs" style="left:64px;top:306px;width:1152px;display:grid;grid-template-columns:1fr 1fr;gap:14px 28px;font-size:19px">
+    <div style="display:flex;gap:10px"><span class="ic i-check t-teal"></span>Contribution one in one line.</div>
+    <div style="display:flex;gap:10px"><span class="ic i-check t-teal"></span>Contribution two in one line.</div>
+    <div style="display:flex;gap:10px"><span class="ic i-check t-teal"></span>Contribution three in one line.</div>
+    <div style="display:flex;gap:10px"><span class="ic i-check t-teal"></span>Evidence: what the experiments demonstrate.</div>
+  </div>
+  <div class="abs box o-ink b-paper f up s2" style="left:64px;top:452px;width:1152px;padding:18px 22px;font:600 23px/1.3 var(--f-head);color:var(--ink)">Central conclusion: one sentence, with its condition.</div>
+  <div class="abs f up s2" style="left:64px;top:566px;width:1152px;display:flex;gap:10px;flex-wrap:wrap"><span class="chip">2 use cases</span><span class="chip">≈ headline metric</span><span class="chip">≈ second metric</span><span class="chip t-muted">in tested workloads</span></div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 65 s">“Recap the flow in one breath, read the four checks, then the central conclusion. Keep the condition attached to every number.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:future -->
+<article id="future" class="slide research motion">
+  <p class="kick">10 · Future Work <span class="ev future">Future directions</span></p>
+  <h2>Next steps the paper points to</h2>
+  <div class="abs lead" style="left:64px;top:114px;width:1152px;font-size:19px">Today the system <b>does X</b>. Three directions would extend it.</div>
+  <div class="abs rows-h" style="left:64px;top:176px;width:1152px"><span></span><span>What it means</span><span>Why it fits this system</span><span>Still to solve</span></div>
+  <div class="abs" style="left:64px;top:208px;width:1152px;display:flex;flex-direction:column;gap:10px">
+    <div class="rows f up s1"><div class="rt"><span class="ic lg i-net t-blue"></span><b>Direction one</b></div><span>Plain explanation in one or two lines.</span><span>Which existing mechanism it builds on.</span><span class="t-muted">The hard open problem.</span></div>
+    <div class="rows f up s2"><div class="rt"><span class="ic lg i-layers t-teal"></span><b>Direction two</b></div><span>Plain explanation in one or two lines.</span><span>Which existing mechanism it builds on.</span><span class="t-muted">The hard open problem.</span></div>
+    <div class="rows f up s3"><div class="rt"><span class="ic lg i-antenna t-amber"></span><b>Direction three</b></div><span>Plain explanation in one or two lines.</span><span>Which existing mechanism it builds on.</span><span class="t-muted">The hard open problem.</span></div>
+  </div>
+  <div class="abs box b-amber f up s4" style="left:64px;top:588px;width:1152px;padding:12px 18px;font-size:18px"><b class="t-amber">Common need:</b> the question our own proposal answers on the next slide.</div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 80 s">“Each row: what it means, why it fits, what is still hard. These are directions from the paper’s conclusion, not evaluated results.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:proposal -->
+<article id="proposal" class="slide research motion">
+  <p class="kick">10 · Future Work <span class="ev illus">Our proposal · illustration</span></p>
+  <h2>Use case: what our extension would change</h2>
+  <div class="abs" style="left:64px;top:114px;width:1152px;font-size:18px;line-height:1.35">Scenario in one sentence, built from the paper’s own use case and numbers.</div>
+  <div class="plot" style="left:110px;top:196px;width:626px;height:214px">
+    <div class="zone" style="left:0;width:196px;background:var(--teal-soft);opacity:.45"></div>
+    <div class="zone" style="left:196px;width:214px;background:var(--red-soft);opacity:.6"></div>
+    <div class="zone" style="left:410px;width:216px;background:var(--teal-soft);opacity:.45"></div>
+    <div class="hl" style="top:54px"></div>
+    <span class="yl" style="top:18px">1.0</span><span class="yl t-ink" style="top:54px;font-weight:600">0.8</span><span class="yl" style="top:138px">0.4</span>
+    <div class="vl dashed f s2" style="left:200px"><span class="ev-l t-ink" style="left:6px">① change</span></div>
+    <div class="vl f s3" style="left:310px;--c:var(--amber)"><span class="ev-l t-amber" style="left:6px">② alarm</span></div>
+    <div class="vl f s4" style="left:410px;--c:var(--teal)"><span class="ev-l t-teal" style="left:6px">④ updated</span></div>
+  </div>
+  <span class="wire c-teal draw no-head s1" style='--path:"M112 220 L140 214 L170 222 L200 216 L230 219 L260 213 L290 218 L306 221"'></span>
+  <span class="wire c-red draw no-head s2" style='--path:"M306 221 L322 268 L344 284 L366 272 L388 292 L410 280 L432 296 L452 286"'></span>
+  <span class="wire c-grey dashed no-head s3" style='--path:"M452 286 L520 286"'></span>
+  <span class="wire c-teal draw no-head s4" style='--path:"M520 226 L548 216 L578 221 L608 214 L638 219 L668 213 L698 218 L734 215"'></span>
+  <div class="abs cap" style="left:110px;top:418px;width:626px;display:flex;justify-content:space-between"><span>score over time · threshold 0.8</span><span>time →</span></div>
+  <div class="abs cap" style="left:110px;top:440px;width:626px;font-style:italic">Illustration of expected behaviour, not measured data.</div>
+  <div class="abs usteps" style="left:768px;top:156px;width:448px">
+    <div class="ustep f up s2"><span class="badge c-red">1</span><div><b>Change appears</b><span>What the device would observe.</span></div></div>
+    <div class="ustep f up s3"><span class="badge c-amber">2</span><div><b>Alarm</b><span>What triggers the update request.</span></div></div>
+    <div class="ustep f up s3" style="transition-delay:.15s"><span class="badge c-blue">3</span><div><b>Recalibrate</b><span>What the other side does.</span></div></div>
+    <div class="ustep f up s4"><span class="badge c-teal">4</span><div><b>Resume</b><span>Using the paper’s measured figures.</span></div></div>
+  </div>
+  <div class="abs f up s5" style="left:64px;top:478px;width:1152px">
+    <table class="t" style="font-size:15.5px">
+      <tr><th style="width:230px"></th><th>Paper’s policy</th><th>Our proposal</th></tr>
+      <tr><td style="padding:7px 12px">When it acts</td><td style="padding:7px 12px">Fixed schedule</td><td style="padding:7px 12px">Only when something changes</td></tr>
+      <tr><td style="padding:7px 12px">Reaction time</td><td style="padding:7px 12px">Waits for the next tick</td><td style="padding:7px 12px">Within a few cycles of the change</td></tr>
+    </table>
+  </div>
+  <div class="abs f up s6" style="left:64px;top:640px;width:1152px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="label" style="margin-right:4px">We would measure</span><span class="chip" style="font-size:14px">requests / day</span><span class="chip" style="font-size:14px">energy / day</span><span class="chip" style="font-size:14px">detection delay</span><span class="chip" style="font-size:14px">false alarms</span></div>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 90 s">“Walk the chart left to right: normal, change, alarm, recovery. Repeat that the chart is an illustration. Close with what we would measure to test it.”</aside>
+</article>
+<!-- /docsync -->
+
+<!-- docsync:references -->
+<article id="references" class="slide research motion">
+  <p class="kick">11 · References <span class="ev">Source register</span></p>
+  <h2>References</h2>
+  <ol class="abs refs" style="left:64px;top:132px;width:1152px">
+    <li><span>[1]</span><div>A. Author, B. Author, and C. Author, “Title of the presented paper,” <i>Journal Abbrev.</i>, vol. X, no. Y, pp. 1–14, Mon. Year, doi: <span class="url">10.xxxx/xxxxx</span>.</div></li>
+    <li><span>[2]</span><div>Organisation, “Title of a background source,” Site name. Accessed: Mon. DD, YYYY. [Online]. Available: <span class="url">https://example.org/background</span></div></li>
+    <li><span>[3]</span><div>A. Author and B. Author, “Title of the work behind our proposal,” <i>Journal Abbrev.</i>, vol. X, no. Y, pp. 1–12, Mon. Year, doi: <span class="url">10.xxxx/xxxxx</span>.</div></li>
+  </ol>
+  <aside class="speaker-notes" title="Presenter 4 · ≈ 20 s + Q&amp;A">“All results come from reference 1. References 2 and onward explain background terms or support our proposal. We are happy to take questions.”</aside>
+</article>
+<!-- /docsync -->
+</body></html>

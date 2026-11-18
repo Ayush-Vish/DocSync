@@ -314,7 +314,8 @@
 
     // Read initial hash
     const initialSlide = parseHash();
-    show(initialSlide, { noHash: initialSlide === 0, force: true });
+    // Wait until the hash and grid helpers declared below are initialised.
+    queueMicrotask(() => show(initialSlide, { noHash: initialSlide === 0, force: true }));
   }
 
   // Print button (only in top-level window)

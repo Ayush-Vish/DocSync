@@ -58,5 +58,17 @@
     "color": "#282f2b",
     "accent": "#9f482f",
     "sample": "28 items shipped"
+  },
+  {
+    "id": "research-talk",
+    "name": "Animated Research Talk",
+    "format": "presentation",
+    "suggestedTheme": "clean",
+    "description": "Motion-build example: 24 slide patterns for explaining a paper or report with self-drawing diagrams and measured results.",
+    "title": "Research Talk Example",
+    "background": "#ffffff",
+    "color": "#14233f",
+    "accent": "#e1970f",
+    "sample": "24 animated patterns"
   }
 ]

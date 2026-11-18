@@ -61,6 +61,7 @@ try {
   await f.env.DB.prepare("INSERT INTO document_members VALUES(?,'member','editor')").bind(doc.id).run();
   await fetch(`${origin}/api/documents/${doc.id}`, { headers: { Authorization: `Bearer ${member}`, "X-DocSync-Client": "Claude%20Code" } });
   await page.goto(`${origin}/documents/${doc.id}`, { waitUntil: "networkidle0" });
+  await click("Start editing");
   await page.waitForSelector('.edit-lock-status[data-editing="true"]');
   await page.click(".collaborator-presence summary");
   await page.waitForFunction(() => document.querySelector(".collaborator-presence-list")?.textContent?.includes("Anthropic"));
@@ -159,6 +160,7 @@ try {
   await publicPage.screenshot({ path: "/tmp/docsync-presentation-video.png" });
   await page.bringToFront();
   await page.goto(`${origin}/documents/${doc.id}`, { waitUntil: "networkidle0" });
+  await click("Start editing");
   await page.waitForSelector('.edit-lock-status[data-editing="true"]');
   const slidePicker = await page.$('input[aria-label="Upload page media"]'); assert.ok(slidePicker); await slidePicker.uploadFile(pngPath);
   await page.waitForSelector('input[aria-label="Uploaded media URL"]'); await click("Insert into page"); await click("Save");

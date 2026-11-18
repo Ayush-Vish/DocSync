@@ -331,6 +331,8 @@ try {
   });
   await page.waitForSelector(".doc-studio");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
+  await page.waitForFunction(() => document.querySelector('.edit-lock-description')?.textContent?.includes('Viewing does not hold a lock'));
+  assert.equal((await f.env.DB.prepare("SELECT COUNT(*) n FROM edit_locks WHERE document_id=?").bind(doc.id).first<{ n: number }>())?.n, 0, "Opening a document does not acquire a lease");
   await click("Preview");
   await page.waitForSelector(".document-paper iframe");
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}/preview`);
@@ -462,6 +464,7 @@ try {
   assert.equal(await publicPage.$eval('input[aria-label="Document title"]', input => (input as HTMLInputElement).disabled), true);
   await click("Stop editing");
   await page.waitForFunction(async id => !(await (await fetch(`/api/documents/${id}/lock`)).json()).lock, {}, doc.id);
+  await publicPage.waitForFunction(() => !(document.querySelector('.edit-lock-action') as HTMLButtonElement)?.disabled);
   await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Start editing')!.click());
   await publicPage.waitForSelector('.edit-lock-status[data-editing="true"]');
   await publicPage.click('input[aria-label="Document title"]');

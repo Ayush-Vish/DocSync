@@ -82,4 +82,24 @@ Supply `email` only when the user requests an invitation to that recipient. Emai
 
 Create the draft before uploading. Call `upload_media` with its document `id`, an allowed `mimeType`, and exactly one source: an absolute `filePath` for local stdio, or plain padded `dataBase64` plus `filename` for hosted MCP. Hosted MCP cannot read server-local files. PNG, JPEG, animated GIF, WebP, MP4 and WebM are supported (8 MiB/file; 50 files or 100 MiB/document). Use its returned `src` or HTML snippet in a `kind: "html"` page; add image alt text and video captions. Video uses `controls playsinline preload="metadata"`. Upload does not save a revision; acquire/read/update/verify/release as usual to insert it. Preserve all other pages and their IDs.
 
-Only media uploaded to this document can be embedded. Canonical URLs require authentication; DocSync adds temporary scoped render grants. Published media is limited to the actual published snapshot. Reload after 24 hours for fresh grants. Never persist grant query strings or use them as share links. Assets remain for version history; removing HTML does not reclaim quota. Arbitrary external media, SVG, remote CSS, and embedded players stay blocked. Use backend/bridge 0.5.0, migration `0007_media_and_agents.sql`, and a configured MEDIA bucket.
+### Convert a local image to hosted MCP input
+
+The dependency-free Node.js helper returns `{filename, mimeType, dataBase64}` for PNG, JPEG, GIF, WebP, MP4 and WebM files up to 8 MiB. The extension supplies the MIME type; the server still verifies that the bytes match it. The conversion preserves the original bytes and does not upload anything.
+
+```sh
+node scripts/media-to-base64.mjs "/absolute/path/to/dog.png" > /tmp/dog-media.json
+```
+
+Resolve the script relative to this skill directory, or use its absolute path when running elsewhere. Read the JSON in the agent's tool runner and call `upload_media` with `{id: documentId, ...payload}`. Do not paste the multi-megabyte base64 into chat or manually transcribe it.
+
+For a tool runner with filesystem access, import the helper and pass its result directly (replace the tool name with the connected client's actual name):
+
+```js
+const { mediaToBase64 } = await import("/absolute/path/to/docsync/scripts/media-to-base64.mjs");
+const payload = await mediaToBase64("/absolute/path/to/dog.png");
+const uploaded = await tools.upload_media({ id: documentId, ...payload });
+```
+
+If an image-generation tool already returns a `data:image/png;base64,...` URL, use only the portion after the first comma as `dataBase64`, with a matching `mimeType` and a filename. Never send the `data:` prefix. Base64 belongs in the upload tool input; saved document HTML uses the returned `/media/ASSET_ID` path. The helper is included in the downloadable skill ZIP.
+
+Only media uploaded to this document can be embedded. Canonical URLs require authentication; DocSync adds temporary scoped render grants. Published media is limited to the actual published snapshot. Reload after 24 hours for fresh grants. Never persist grant query strings or use them as share links. Assets remain for version history; removing HTML does not reclaim quota. Arbitrary external media, SVG, remote CSS, and embedded players stay blocked. Use backend/bridge 0.5.0 or later, migration `0007_media_and_agents.sql`, and configured Supabase Storage (or an existing `MEDIA` R2 binding).

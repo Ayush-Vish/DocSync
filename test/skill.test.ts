@@ -1,13 +1,43 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, mkdtempSync, writeFileSync, mkdirSync, truncateSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { unzipSync } from "fflate";
 import { parseFragment, serialize } from "parse5";
 import { validateContent } from "../src/content.ts";
 import { fixture } from "./helpers.ts";
 import { handle } from "../src/worker.ts";
+
+test("skill media helper preserves binary bytes and produces hosted upload fields", t => {
+  const directory = mkdtempSync(join(tmpdir(), "docsync-base64-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSAAAAABJRU5ErkJggg==", "base64");
+  const path = join(directory, "犬 portrait.PNG");
+  writeFileSync(path, bytes);
+  const cli = JSON.parse(execFileSync(process.execPath, ["skills/docsync/scripts/media-to-base64.mjs", path], { encoding: "utf8" }));
+  const imported = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", "import {mediaToBase64} from './skills/docsync/scripts/media-to-base64.mjs'; console.log(JSON.stringify(await mediaToBase64(process.argv[1])));", path], { encoding: "utf8" }));
+  assert.deepEqual(cli, imported);
+  assert.equal(cli.filename, "犬 portrait.PNG");
+  assert.equal(cli.mimeType, "image/png");
+  assert.match(cli.dataBase64, /^[A-Za-z0-9+/]+={0,2}$/);
+  assert.deepEqual(Buffer.from(cli.dataBase64, "base64"), bytes);
+  for (const [extension, expected] of [["jpg", "image/jpeg"], ["gif", "image/gif"], ["webp", "image/webp"], ["mp4", "video/mp4"], ["webm", "video/webm"]]) {
+    const file = join(directory, `media.${extension}`); writeFileSync(file, bytes);
+    const payload = JSON.parse(execFileSync(process.execPath, ["skills/docsync/scripts/media-to-base64.mjs", file], { encoding: "utf8" }));
+    assert.equal(payload.mimeType, expected);
+  }
+  const empty = join(directory, "empty.png"); writeFileSync(empty, "");
+  const large = join(directory, "large.png"); writeFileSync(large, ""); truncateSync(large, 8 * 1024 * 1024 + 1);
+  const folder = join(directory, "directory.png"); mkdirSync(folder);
+  for (const input of [empty, large, folder, join(directory, "image.svg")]) {
+    assert.throws(() => execFileSync(process.execPath, ["skills/docsync/scripts/media-to-base64.mjs", input], { stdio: "pipe" }), error => {
+      assert.equal((error as { stdout: Buffer }).stdout.length, 0, "Rejected inputs never emit a partial payload");
+      return true;
+    });
+  }
+});
 
 test("bundled template examples allow same-origin embedding while app pages forbid framing", async (t) => {
   const f = await fixture();

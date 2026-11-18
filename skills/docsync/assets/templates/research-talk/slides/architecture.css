@@ -1,0 +1,8 @@
+/* Slide-only CSS: appended to the "architecture" slide payload only. */
+#architecture .slots{margin-top:10px;width:100%;padding:8px;border:1.5px solid var(--teal);border-radius:10px;background:var(--paper)}
+#architecture .slots-h{margin-bottom:7px;text-align:center;font:600 14px/1 var(--f-mono);color:var(--teal-ink)}
+#architecture .slots-g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#architecture .slot{display:flex;flex-direction:column;align-items:center;padding:5px 2px;border-radius:7px;border:1.5px solid var(--amber);background:var(--amber-soft);font:600 14px/1.15 var(--f-body);color:var(--amber-ink)}
+#architecture .slot i{font:400 14px/1.2 var(--f-body);font-style:normal;color:var(--muted)}
+#architecture .slot.dsh{border-style:dashed;background:var(--paper)}
+#architecture .slots-c{margin-top:6px;font-size:14px;line-height:1.25;color:var(--muted)}
