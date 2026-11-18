@@ -14,7 +14,16 @@ function AuditEntry({ event }: { event: AuditEvent }) {
   return <details className="audit-entry">
     <summary>
       <span className="audit-agent"><span className="audit-agent-icon"><AgentIcon provider={agent.provider} /></span><span><strong>{event.clientName}</strong><small>{agent.company}</small></span></span>
-      <span className="audit-command"><code>{event.tool}</code><small><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time>{event.durationMs !== null && ` · ${event.durationMs} ms`}</small></span>
+      <span className="audit-command">
+        <code>{event.tool}</code>
+        <small><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time></small>
+        {(event.localDurationMs !== null || event.durationMs !== null) && <small>
+          {[
+            event.localDurationMs !== null && `Local MCP · ${event.localDurationMs} ms`,
+            event.durationMs !== null && `${event.source === "mcp" ? "Hosted MCP" : event.source === "client" ? "Report processing" : "Server API"} · ${event.durationMs} ms`,
+          ].filter(Boolean).join(" / ")}
+        </small>}
+      </span>
       <span className="audit-device"><strong>{event.deviceName || "Device not reported"}</strong><small>{event.platform || (event.source === "mcp" ? "Remote MCP connection" : "Client metadata unavailable")}</small></span>
       <Badge variant={event.outcome === "error" ? "destructive" : "outline"} className={`audit-result audit-result-${event.outcome}`}>{event.outcome === "success" ? "Succeeded" : event.outcome === "error" ? "Failed" : "Unconfirmed"}</Badge>
       <ChevronDown size={16} className="audit-expand" aria-hidden="true" />
@@ -23,9 +32,9 @@ function AuditEntry({ event }: { event: AuditEvent }) {
       {event.error && <Alert variant="destructive"><AlertDescription>{event.error}</AlertDescription></Alert>}
       {event.outcome === "pending" && <p>The final outcome could not be confirmed. Check the saved document before retrying a change.</p>}
       <dl>
-        <div><dt>Source</dt><dd>{event.source === "mcp" ? "Hosted MCP tool call" : event.source === "client" ? "Client-reported local tool event" : "Server-observed agent API action"}</dd></div>
+        <div><dt>Source</dt><dd>{event.source === "mcp" ? "Hosted MCP tool call" : event.source === "client" ? "Client-reported local tool event" : event.localDurationMs !== null ? "Local MCP tool call with server API request" : "Server-observed agent API action"}</dd></div>
         <div><dt>Request</dt><dd><code>{event.method} {event.path}</code></dd></div>
-        <div><dt>HTTP status</dt><dd>{event.status ?? "Not finalized"}</dd></div>
+        <div><dt>{event.source === "client" ? "Report HTTP status" : "HTTP status"}</dt><dd>{event.status ?? "Not finalized"}</dd></div>
         <div><dt>UTC timestamp</dt><dd><time dateTime={event.createdAt}>{event.createdAt}</time></dd></div>
         <div><dt>Reported client version</dt><dd>{event.clientVersion || "Not reported"}</dd></div>
         <div><dt>Reported device</dt><dd>{event.deviceName || "Not reported"}</dd></div>

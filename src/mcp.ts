@@ -1,5 +1,4 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createMcpServer, validateMcpConnection } from "./mcp-server.ts";
+import { validateMcpConnection } from "./mcp-server.ts";
 import {
   existsSync,
   mkdirSync,
@@ -8,10 +7,10 @@ import {
   chmodSync,
   renameSync,
 } from "node:fs";
-import { homedir, hostname, platform, arch } from "node:os";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
-import { readMediaFile } from "./local-media.ts";
+import { connectLocalMcp } from "./mcp-stdio.ts";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -123,7 +122,7 @@ async function main() {
         );
     }
   }
-  await createMcpServer(url.origin, token, fetch, readMediaFile, { deviceName: hostname(), platform: `${platform()} ${arch()}; Node ${process.version}` }).connect(new StdioServerTransport());
+  await connectLocalMcp(url.origin, token);
 }
 void main().catch((error) => {
   console.error(

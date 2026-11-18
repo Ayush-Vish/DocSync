@@ -1,5 +1,13 @@
 import { HttpError } from "./content.ts";
 
+export function errorResponse(error: unknown): Response {
+  if (error instanceof HttpError) {
+    return Response.json({ error: error.message, details: error.details }, { status: error.status });
+  }
+  console.error("DocSync request failed:", error instanceof Error ? error.name : "Unknown error");
+  return Response.json({ error: "Unexpected server error. Retry or check server logs." }, { status: 500 });
+}
+
 // Check the actual stream too: Content-Length can be absent or untrusted.
 export async function readBody(request: Pick<Request, "headers" | "body">, limit: number) {
   if (Number(request.headers.get("Content-Length")) > limit)

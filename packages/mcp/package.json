@@ -1,6 +1,6 @@
 {
   "name": "@ayush-vish/docsync-mcp",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Create and share HTML documents from any stdio MCP-compatible coding agent",
   "license": "MIT",
   "type": "commonjs",

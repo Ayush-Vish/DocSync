@@ -1,6 +1,6 @@
 import type { Env } from "./platform.ts";
 import type { Principal } from "./auth.ts";
-import { withAgentAudit, listAuditEvents } from "./audit.ts";
+import { withAgentAudit, listAuditEvents, recordLocalToolTiming } from "./audit.ts";
 import { HttpError } from "./content.ts";
 import {
   authenticate,
@@ -15,7 +15,7 @@ import * as store from "./store.ts";
 import * as collaboration from "./collaboration.ts";
 import { handleRemoteMcp } from "./remote-mcp.ts";
 import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
-import { jsonBody as body } from "./request.ts";
+import { errorResponse, jsonBody as body } from "./request.ts";
 import { webResponse } from "./web.ts";
 import { publicPages } from "./seo.ts";
 import { mediaGrant, serveMedia, uploadMedia } from "./media.ts";
@@ -102,6 +102,8 @@ async function route(request: Request, env: Env, internalMcp: boolean): Promise<
   if (pathname === "/api/audit-events" && method === "POST") {
     if (principal.role !== "agent") throw new HttpError(403, "Agent authentication required");
     const input = await body(request, 4096);
+    if (input.localDurationMs !== undefined) return recordLocalToolTiming(request, env, principal, input);
+    // Accept reports from bridge versions that predate local timing.
     if (input.tool !== "get_template_options" && !(input.tool === "upload_media" && input.failed === true)) throw new HttpError(400, "Invalid client audit event");
     if (internalMcp) return json({ ok: true });
     return withAgentAudit(request, env, principal, async () => json({ ok: true }), { source: "client", tool: input.tool, args: input, clientError: input.failed === true });
@@ -442,21 +444,7 @@ async function handleInternal(request: Request, env: Env, internalMcp: boolean):
   try {
     response = await route(request, env, internalMcp);
   } catch (error) {
-    if (error instanceof HttpError)
-      response = json(
-        { error: error.message, details: error.details },
-        error.status,
-      );
-    else {
-      console.error(
-        "DocSync request failed:",
-        error instanceof Error ? error.name : "Unknown error",
-      );
-      response = json(
-        { error: "Unexpected server error. Retry or check server logs." },
-        500,
-      );
-    }
+    response = errorResponse(error);
   }
   const secured = new Response(response.body, response);
   const url = new URL(request.url);

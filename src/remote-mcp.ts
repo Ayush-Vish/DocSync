@@ -139,7 +139,7 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
       if (bytes.byteLength > 550_000 && (payload?.method !== "tools/call" || payload?.params?.name !== "upload_media")) throw new HttpError(413, "Request body is too large.");
       incoming = new Request(request, { body: bytes });
     }
-    const server = createMcpServer(origin, match[1], fetchApi, undefined, { remote: true });
+    const server = createMcpServer(origin, match[1], fetchApi);
     const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     await server.connect(transport);
     if (payload?.method === "tools/call") {
