@@ -31,7 +31,7 @@ try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 1000 });
   await page.goto(origin + "/templates?format=presentation", { waitUntil: "networkidle0" });
-  assert.equal(await page.$$eval("main > div button", nodes => nodes.length), 2);
+  assert.equal(await page.$$eval("main > div button", nodes => nodes.length), 3, "Bold Pitch, Delivery Review and Animated Research Talk");
   assert.match(await page.$eval('[aria-label="Selected template"]', node => node.textContent || ""), /Bold Pitch/);
   await page.click('nav[aria-label="Template format"] button:nth-child(2)');
   assert.equal(await page.$$eval("main > div button", nodes => nodes.length), 3);

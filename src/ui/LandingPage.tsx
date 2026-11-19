@@ -19,12 +19,12 @@ const agents = [
 
 const steps = [
   { title: "Connect your agent", description: "Authorize DocSync in your existing AI agent. Give it the notes, data, and audience for your first draft." },
-  { title: "Review in your browser", description: "Edit text and layouts, preview interactive components, and use version history to revisit earlier work." },
+  { title: "Review in your browser", description: "Read every page, play animated slides, reserve pages for your agent, and check its version history and activity log." },
   { title: "Publish a version", description: "Share a link to the saved version you reviewed, or present your slides straight from your browser." },
 ];
 
 const questions = [
-  { question: "Can I edit without an AI agent?", answer: "Yes. Create an account to start from a template, edit text and layouts, and publish from your browser. Connect an agent whenever you want it to draft or update content in your workspace." },
+  { question: "Can I edit in the browser?", answer: "Not for now. Your connected agent makes every edit, so drafts stay consistent with its plan. In the browser you read and present your work, reserve pages for the agent, review its activity log and version history, and publish." },
   { question: "Can I try DocSync before creating an account?", answer: "Yes. The local MCP client can create one document per installation without a web account. Sign in to claim that document and create more." },
   { question: "Who can see what I publish?", answer: "Anyone with a published link can open that saved version without signing in. Your private draft can keep changing. Republishing issues a new link and revokes the old one, and revocation cannot remove copies already downloaded." },
   { question: "Can I present or export my work?", answer: "You can present slides full screen, print previews to PDF, or download standalone HTML to open offline." },

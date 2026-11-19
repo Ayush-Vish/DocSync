@@ -14,7 +14,6 @@
     "types": "node scripts/worker-types.mjs",
     "test": "node --experimental-strip-types --experimental-test-isolation=none --test test/*.test.ts && npm run test:stdio",
     "test:browser": "node --experimental-strip-types test/browser.ts",
-    "test:locks": "node --experimental-strip-types test/lock-browser.ts",
     "test:media": "node --experimental-strip-types test/media-browser.ts",
     "test:artifacts": "node --experimental-strip-types test/artifact-browser.ts",
     "test:offline": "node --experimental-strip-types test/offline-export-browser.ts",

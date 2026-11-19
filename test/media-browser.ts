@@ -61,8 +61,6 @@ try {
   await f.env.DB.prepare("INSERT INTO document_members VALUES(?,'member','editor')").bind(doc.id).run();
   await fetch(`${origin}/api/documents/${doc.id}`, { headers: { Authorization: `Bearer ${member}`, "X-DocSync-Client": "Claude%20Code" } });
   await page.goto(`${origin}/documents/${doc.id}`, { waitUntil: "networkidle0" });
-  await click("Start editing");
-  await page.waitForSelector('.edit-lock-status[data-editing="true"]');
   await page.click(".collaborator-presence summary");
   await page.waitForFunction(() => document.querySelector(".collaborator-presence-list")?.textContent?.includes("Anthropic"));
   const presence = await page.$eval(".collaborator-presence-list", node => node.textContent || "");
@@ -70,13 +68,25 @@ try {
   assert.equal(await page.$$eval(".collaborator-presence .agent-identity svg", nodes => nodes.length), 2);
   await page.screenshot({ path: "/tmp/docsync-collaborators-media.png" });
   await page.click(".collaborator-presence summary");
-  const picker = await page.$('input[aria-label="Upload page media"]'); assert.ok(picker); await picker.uploadFile(pngPath);
-  await page.waitForSelector('input[aria-label="Uploaded media URL"]');
-  assert.match(await page.$eval('input[aria-label="Uploaded media URL"]', node => (node as HTMLInputElement).value), /\/media\//);
-  await click("Insert into HTML page");
-  await click("Save");
-  await page.waitForFunction(() => document.querySelector(".document-actions")?.textContent?.includes("Saved · v2"));
-  const saved = await api(`/documents/${doc.id}`); assert.equal(saved.sections[0].kind, "html"); assert.match(saved.sections[0].html, /Keep this text/); assert.match(saved.sections[0].html, /<img/);
+  // Agents upload media and place it; the read-only workspace renders it with protected media URLs.
+  const upload = async (bytes: Buffer, type: string, filename: string) => {
+    const response = await fetch(`${origin}/api/documents/${doc.id}/media`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": type, "X-File-Name": filename }, body: new Uint8Array(bytes).buffer });
+    const result = await response.json() as any; assert.equal(response.status, 201, JSON.stringify(result)); return result;
+  };
+  const update = async (format: string, pages: { id: string; kind: string; html: string; css: string; js?: string }[]) => {
+    const lease = await api(`/documents/${doc.id}/lock`, "POST", {}), current = await api(`/documents/${doc.id}`);
+    const result = await api(`/documents/${doc.id}`, "PUT", { title: current.title, format, sections: pages, expectedRevision: current.revision, lockToken: lease.lockToken });
+    await api(`/documents/${doc.id}/lock`, "DELETE", { lockToken: lease.lockToken }); return result;
+  };
+  const imageLoaded = async (page: Page, selector: string, width: number) => {
+    const iframe = await page.waitForSelector(selector); const frame = await iframe!.contentFrame(); assert.ok(frame);
+    await frame.waitForFunction(width => { const image = document.querySelector("img"); return image?.complete && image.naturalWidth === width; }, {}, width); return frame;
+  };
+  const png = await upload(Buffer.from(pngBase64, "base64"), "image/png", "image.png");
+  const saved = await update("document", [{ id: "intro", kind: "html", html: `<h1>Media report</h1><p>Keep this text.</p>${png.html}`, css: "" }]);
+  assert.match(saved.sections[0].html, /Keep this text/); assert.match(saved.sections[0].html, /<img/);
+  await page.reload({ waitUntil: "networkidle0" });
+  await imageLoaded(page, '[aria-label="Page 1"] iframe', 320);
   const exported = await page.evaluate(async () => {
     let captured!: Blob;
     const create = URL.createObjectURL, click = HTMLAnchorElement.prototype.click;
@@ -90,11 +100,6 @@ try {
   });
   assert.equal(exported.mediaToken, undefined, "Draft downloads never contain temporary media credentials");
   assert.equal(exported.id, doc.id); assert.match(exported.sections[0].html, /<img/);
-  await click("Stop editing");
-  const upload = async (bytes: Buffer, type: string, filename: string) => {
-    const response = await fetch(`${origin}/api/documents/${doc.id}/media`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": type, "X-File-Name": filename }, body: new Uint8Array(bytes).buffer });
-    const result = await response.json() as any; assert.equal(response.status, 201, JSON.stringify(result)); return result;
-  };
   const animatedGif = "R0lGODlhIAAgAIEAACLFXgAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQAGQAAACwAAAAAIAAgAAAINQABCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFixgzatzIsaPHjyBDihxJsqTJkyhTqlzJUmRAACH5BAEZAAEALAAAAAAgACAAgU9G5QAAAAAAAAAAAAg1AAEIHEiwoMGDCBMqXMiwocOHECNKnEixosWLGDNq3Mixo8ePIEOKHEmypMmTKFOqXMlSZEAAOw==";
   const gif = await upload(Buffer.from(animatedGif, "base64"), "image/gif", "animation.gif");
   const webm = await page.evaluate(async () => {
@@ -109,21 +114,12 @@ try {
   });
   const video = await upload(Buffer.from(webm, "base64"), "video/webm", "clip.webm");
   const sections = [saved.sections[0], { id: "animation", kind: "html", html: `<h1>GIF animation</h1>${gif.html}`, css: "img{width:160px;height:160px}", js: "document.body.dataset.ready='true'" }, { id: "video", kind: "html", html: `<h1>Video playback</h1>${video.html}`, css: "video{width:480px}", js: "document.body.dataset.ready='true'" }, { id: "closing", kind: "html", html: "<h1>Next steps</h1>", css: "" }];
-  const update = async (format: string, pages: typeof sections) => {
-    const lease = await api(`/documents/${doc.id}/lock`, "POST", {}), current = await api(`/documents/${doc.id}`);
-    const result = await api(`/documents/${doc.id}`, "PUT", { title: current.title, format, sections: pages, expectedRevision: current.revision, lockToken: lease.lockToken });
-    await api(`/documents/${doc.id}/lock`, "DELETE", { lockToken: lease.lockToken }); return result;
-  };
   const updated = await update("document", sections);
   const publicDoc = await api(`/documents/${doc.id}/publish`, "POST", { expectedRevision: updated.revision });
   const publicPage = await browser.newPage(); await publicPage.setViewport({ width: 1280, height: 900 });
   await publicPage.bringToFront();
   await publicPage.goto(publicDoc.url, { waitUntil: "networkidle0" });
   assert.equal(await publicPage.$(".collaborator-presence"), null, "Public readers see no collaborator identities");
-  const imageLoaded = async (page: Page, selector: string, width: number) => {
-    const iframe = await page.waitForSelector(selector); const frame = await iframe!.contentFrame(); assert.ok(frame);
-    await frame.waitForFunction(width => { const image = document.querySelector("img"); return image?.complete && image.naturalWidth === width; }, {}, width); return frame;
-  };
   await imageLoaded(publicPage, '[aria-label="Page 1"] iframe', 320);
   await publicPage.click('button[aria-label="Next page"]');
   await imageLoaded(publicPage, '[aria-label="Page 2"] iframe', 32);
@@ -160,14 +156,9 @@ try {
   await publicPage.screenshot({ path: "/tmp/docsync-presentation-video.png" });
   await page.bringToFront();
   await page.goto(`${origin}/documents/${doc.id}`, { waitUntil: "networkidle0" });
-  await click("Start editing");
-  await page.waitForSelector('.edit-lock-status[data-editing="true"]');
-  const slidePicker = await page.$('input[aria-label="Upload page media"]'); assert.ok(slidePicker); await slidePicker.uploadFile(pngPath);
-  await page.waitForSelector('input[aria-label="Uploaded media URL"]'); await click("Insert into page"); await click("Save");
-  await page.waitForFunction(() => !document.querySelector(".document-actions")?.textContent?.includes("Unsaved changes"));
-  const inserted = await api(`/documents/${doc.id}`); assert.equal((inserted.sections[0].html.match(/<img/g) || []).length, 2); assert.match(inserted.sections[0].html, /<img[^>]+><\/article>$/);
+  await imageLoaded(page, '.shared-page iframe', 320);
   assert.deepEqual(errors, []);
-  console.log("Media browser acceptance passed: document/PPT uploads and insertion, text preservation, collaborator companies/icons, static covers, sandbox PNG/animated GIF/video playback and seeking, public privacy, video controls.");
+  console.log("Media browser acceptance passed: agent uploads rendered in the read-only workspace, text preservation, collaborator companies/icons, static covers, sandbox PNG/animated GIF/video playback and seeking, public privacy, video controls.");
 } finally {
   await browser.close(); await new Promise<void>(done => server.close(() => done())); f.close(); await rm(directory, { recursive: true, force: true });
 }

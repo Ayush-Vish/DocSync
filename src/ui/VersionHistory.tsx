@@ -13,10 +13,10 @@ export function VersionHistory({ documentId, history, currentRevision, busy, dir
   useEffect(() => { const element = dialog.current!; element.showModal(); return () => element.close(); }, []);
   return <dialog ref={dialog} className="version-history" aria-label="Version history" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
     <header><h2>Version history</h2><Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>Close history</Button></header>
-    {!canRestore && <p>Start editing with an active lock to restore a version.</p>}
+    {!canRestore && <p>Compare any two versions here. To restore one, ask your connected agent (restore_document).</p>}
     {history.map(row => <div className="revision-row" key={row.revision}>
       <div><strong>Version {row.revision}{row.revision === currentRevision ? " · Current" : ""}</strong><small>{new Date(row.created_at).toLocaleString()} · {row.author || "Workspace member"}{row.agent ? ` · ${row.agent}` : ""}</small><p>{row.summary || "Saved version"}{row.restored_from ? ` · Restored from v${row.restored_from}` : ""}</p></div>
-      <div><Button variant="outline" size="sm" disabled={busy || comparing || row.revision === currentRevision} onClick={async () => { setComparing(true); setError(""); try { setComparison(await api(`/documents/${documentId}/compare?from=${row.revision}&to=${currentRevision}`)); } catch (error) { setError(error instanceof Error ? error.message : "Cannot compare versions"); } finally { setComparing(false); } }}>Compare</Button><Button variant="outline" size="sm" disabled={busy || dirty || !canRestore || row.revision === currentRevision} onClick={() => void onRestore(row.revision)}>Restore</Button></div>
+      <div><Button variant="outline" size="sm" disabled={busy || comparing || row.revision === currentRevision} onClick={async () => { setComparing(true); setError(""); try { setComparison(await api(`/documents/${documentId}/compare?from=${row.revision}&to=${currentRevision}`)); } catch (error) { setError(error instanceof Error ? error.message : "Cannot compare versions"); } finally { setComparing(false); } }}>Compare</Button>{canRestore && <Button variant="outline" size="sm" disabled={busy || dirty || !canRestore || row.revision === currentRevision} onClick={() => void onRestore(row.revision)}>Restore</Button>}</div>
     </div>)}
     {error && <p role="alert">{error}</p>}
     {comparison && <section className="version-comparison" aria-label="Version comparison"><h3>Version {comparison.from} → {comparison.to}</h3>
