@@ -41,6 +41,8 @@ Use the DocSync tools exposed by the current client; prefixes vary between Codex
 | `compare_document_versions` | `id`, `fromRevision`, `toRevision`. Read page/order and HTML/CSS/JS changes. |
 | `restore_document` | `id`, historical `revision`, current `expectedRevision`, `lockToken`, optional `changeSummary`. Restore as a new revision. |
 | `get_connection` | No arguments. Check permissions and local-only vs public links. |
+| `plan_presentation` | Optional `topic`. Returns the questions to ask before any presentation (detail level, slide count, animation, style, audience, speaker notes), with options, defaults and what each answer means. |
+| `get_slide_patterns` | Optional `ids` (max 8). Lists the research-talk slide patterns, or returns their HTML to copy. Root classes `slide research motion` make DocSync attach the styles and animation runtime on save. |
 | `get_docsync_skill` | `topic`: `overview`, `motion`, `research-talk`, `mcp` or `all`. Returns this skill's guide on demand, plus optional install commands. Agents without the installed skill call it first. |
 | `get_template_options` | `format`: `document`, `presentation`, or `all`. Returns the public template gallery, preview and content links, and a template-or-custom question. |
 | `list_documents` | No arguments. Find existing documents. |
@@ -50,6 +52,8 @@ Use the DocSync tools exposed by the current client; prefixes vary between Codex
 | `update_document` | `id`, `expectedRevision`, `lockToken`, `title`, complete `sections`, optional `changeSummary` (300 characters max). Saves a new revision, without publishing. |
 | `publish_document` | `id`, `expectedRevision`. Publishes a read-only snapshot. Requires publishing permission. |
 | `connect_account` | No arguments. Trial-account claim link when the server requests account claiming; this does not authenticate a remote OAuth connection. |
+
+Presentations need a `brief` on `create_document`: `{answeredBy: "user"|"defaults", audience, depth: "overview"|"standard"|"deep"|"expert", slideCount, animation: "full"|"subtle"|"none", style: "explainer"|"pitch"|"review"|"custom", speakerNotes}`. Without it the call returns `BRIEF_REQUIRED` with the questions; a deck that misses its animation or style returns `BRIEF_NOT_MET` with a list of fixes. Nothing is saved in either case. `update_document` checks the deck when you pass the brief.
 
 Example creation payload:
 

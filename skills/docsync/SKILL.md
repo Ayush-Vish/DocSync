@@ -7,6 +7,19 @@ description: Create and edit DocSync HTML documents, design documents, reports, 
 
 Use a familiar Google Docs / Google Slides workflow: draft, edit, review, and share. Here the source is HTML, CSS, and JavaScript components instead of a proprietary document format. JavaScript powers chart controls and interactive artifacts in isolated frames. This does not imply Google Docs feature parity or native PowerPoint export.
 
+## Ask before building a presentation
+
+Before building any presentation, ask the user how they want it, in one message, with your client's question UI when it has one. Skip anything they already told you.
+
+1. **Detail:** `overview` (big picture, no jargon), `standard` (parts and flows, key terms, a few real numbers), `deep` (internal sequences, protocols, algorithms, trade-offs) or `expert` (field-level detail, maths, limits, cited sources).
+2. **Slide count** (default 10).
+3. **Animation:** `full` (the benchmark: step builds on every slide, self-drawing arrows, moving data packets, as in `research-talk`), `subtle` (step reveals only) or `none` (static, best for PDF).
+4. **Style:** `explainer` (research-talk look, best for "how X works"), `pitch`, `review` or `custom`.
+5. **Audience** and what they already know.
+6. **Speaker notes:** yes or no.
+
+If the user says "you decide", use the defaults: standard, 10 slides, full animation, explainer, notes on. Through MCP, `plan_presentation` returns these questions and `create_document` requires the answers as `brief`. It rejects presentations without one, and for animated briefs it rejects decks that miss the benchmark: no `motion` class, too few build steps, no self-drawing wires, no packets. `get_slide_patterns` serves the research-talk slides to copy. Root classes `slide research motion` make DocSync attach the explainer design system and the animation runtime when you save.
+
 ## Choose an output
 
 - **Document or report:** use `assets/templates/editorial-document/` for readable prose and an executive summary.

@@ -170,3 +170,11 @@ table.t td:first-child{color:var(--ink);font-weight:600}
 .c-teal{--c:var(--teal)}.c-blue{--c:var(--blue)}.c-amber{--c:var(--amber)}.c-red{--c:var(--red)}.c-ink{--c:var(--ink)}.c-grey{--c:var(--faint)}.c-line{--c:var(--line)}
 .research .hbars .ttl{color:var(--ink)}.research .hbar .lab{color:var(--muted);opacity:1}.research .hbar .val{color:var(--ink);font-family:var(--f-mono)}.research .hbars .axis{color:var(--muted);opacity:1;font-family:var(--f-mono)}.research .hbars .ax{border-top-color:var(--faint)}
 .research .ttl .badge{width:24px;height:24px;font-size:14px}
+/* slot grid: several interchangeable parts inside one node (architecture pattern) */
+.research .slots{margin-top:10px;width:100%;padding:8px;border:1.5px solid var(--teal);border-radius:10px;background:var(--paper)}
+.research .slots-h{margin-bottom:7px;text-align:center;font:600 14px/1 var(--f-mono);color:var(--teal-ink)}
+.research .slots-g{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.research .slot{display:flex;flex-direction:column;align-items:center;padding:5px 2px;border-radius:7px;border:1.5px solid var(--amber);background:var(--amber-soft);font:600 14px/1.15 var(--f-body);color:var(--amber-ink)}
+.research .slot i{font:400 14px/1.2 var(--f-body);font-style:normal;color:var(--muted)}
+.research .slot.dsh{border-style:dashed;background:var(--paper)}
+.research .slots-c{margin-top:6px;font-size:14px;line-height:1.25;color:var(--muted)}

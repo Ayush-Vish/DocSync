@@ -31,8 +31,8 @@ test("motion sections get a pruned runtime that survives hosted sanitization", (
   assert.match(architecture.js, /FEATURES\.wires =/);
   assert.match(architecture.js, /server:/);
   assert.ok(!architecture.js.includes("battery:"), "unused icons are pruned");
-  assert.match(architecture.css, /#architecture \.slots/);
-  assert.ok(!agenda.css.includes("#architecture"), "slide CSS stays with its slide");
+  assert.match(architecture.css, /\.research \.slots/);
+  assert.ok(!agenda.css.includes(".slots"), "pattern CSS is pruned from slides that do not use it");
 });
 
 test("templates without motion sections are not given the runtime", () => {

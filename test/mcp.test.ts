@@ -36,10 +36,12 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "get_document_lock",
     "get_page_lock_requests",
     "get_page_locks",
+    "get_slide_patterns",
     "get_template_options",
     "invite_document_collaborator",
     "list_documents",
     "lock_pages",
+    "plan_presentation",
     "publish_document",
     "release_document_lock",
     "renew_document_lock",
@@ -58,6 +60,33 @@ test("official MCP client exercises document tools and real Worker API in-proces
   assert.match(skill.install.zipUrl, /\/downloads\/docsync-skill\.zip$/);
   const motion = parse(await client.callTool({ name: "get_docsync_skill", arguments: { topic: "motion" } }));
   assert.match(motion.guide.motion, /class="slide motion"/);
+
+  // Presentations: ask first (plan_presentation), then build to the brief; animated decks must meet the benchmark.
+  const plan = parse(await client.callTool({ name: "plan_presentation", arguments: { topic: "How Wi-Fi works" } }));
+  assert.deepEqual(plan.questions.map((q: any) => q.key), ["depth", "slideCount", "animation", "style", "audience", "speakerNotes"]);
+  assert.equal(plan.defaults.animation, "full");
+  const slide = (id: string, inner: string) => ({ id, html: `<article id="${id}" class="slide"><h2>${inner}</h2></article>`, css: "" });
+  const missing = await client.callTool({ name: "create_document", arguments: { title: "Wi-Fi", format: "presentation", sections: [slide("a", "One")] } });
+  assert.equal(missing.isError, true);
+  assert.equal(parse(missing).error, "BRIEF_REQUIRED");
+  assert.equal(parse(missing).questions.length, 6);
+  const brief = { answeredBy: "user", audience: "students", depth: "deep", slideCount: 3, animation: "full", style: "explainer", speakerNotes: true };
+  const weak = await client.callTool({ name: "create_document", arguments: { title: "Wi-Fi", format: "presentation", brief, sections: [slide("a", "One"), slide("b", "Two"), slide("c", "Three")] } });
+  assert.equal(weak.isError, true);
+  const weakResult = parse(weak);
+  assert.equal(weakResult.error, "BRIEF_NOT_MET");
+  for (const expected of [/class "research"/, /class "motion"/, /build step/, /self-drawing arrows/, /data packets/]) assert.ok(weakResult.problems.some((p: string) => expected.test(p)), String(expected));
+  const listed = parse(await client.callTool({ name: "get_slide_patterns", arguments: {} }));
+  assert.ok(listed.patterns.some((p: any) => p.id === "pipeline" && p.use));
+  const picked = parse(await client.callTool({ name: "get_slide_patterns", arguments: { ids: ["cover", "pipeline", "architecture"] } }));
+  assert.equal(picked.patterns.length, 3);
+  const animated = await client.callTool({ name: "create_document", arguments: { title: "Wi-Fi", format: "presentation", brief, sections: picked.patterns.map((p: any) => ({ id: p.id, html: p.html, css: "" })) } });
+  assert.equal(animated.isError, false, JSON.stringify(parse(animated)));
+  const saved = parse(animated);
+  for (const section of saved.sections) {
+    assert.match(section.js, /DocSyncMotion/);
+    assert.match(section.css, /\.slide\.research\{/);
+  }
   for (const format of ["document", "presentation", "all"]) {
     const options = parse(await client.callTool({ name: "get_template_options", arguments: { format } }));
     assert.equal(options.galleryUrl, `http://127.0.0.1:8787/templates?format=${format}`);
