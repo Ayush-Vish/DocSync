@@ -43,8 +43,7 @@ test("audit history is account-scoped, searchable, paginated and retained for 90
   const filtered = await (await f.call('/audit-log?q=Claude&outcome=success')).json() as AuditPage;
   assert.equal(filtered.items.length, 26);
   for (const params of ['before=nope', 'outcome=unknown', 'q=' + 'x'.repeat(101)]) assert.equal((await f.call('/audit-log?' + params)).status, 400);
-  const signup = await f.call('/auth/signup', 'POST', { email: 'other-audit@example.com', password: 'a long secure password 123!' }, 'anonymous', { Origin: 'http://127.0.0.1:8787' });
-  const cookie = signup.headers.getSetCookie()[0].split(';')[0];
+  const { cookie } = await f.seedUser('other-audit@example.com');
   const other = await f.call('/audit-log?accountId=legacy', 'GET', undefined, 'anonymous', { Cookie: cookie });
   assert.equal(other.status, 200); assert.deepEqual((await other.json() as AuditPage).items, []);
 });

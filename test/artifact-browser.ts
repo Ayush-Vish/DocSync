@@ -99,7 +99,19 @@ try {
     if (index < 5) await page.locator('.presentation-controls button[aria-label="Next slide"]').click();
   }
   await page.keyboard.press('Home');
-  await page.setViewport({ width: 390, height: 844 });
+  for (const [width, height] of [[1600, 900], [1024, 768], [768, 768], [844, 390], [390, 844]]) {
+    await page.setViewport({ width, height });
+    await page.waitForFunction(() => {
+      const stage = document.querySelector('.presentation-stage')!.getBoundingClientRect();
+      const slide = document.querySelector('.presentation-canvas iframe')!.getBoundingClientRect();
+      const fittedWidth = Math.min(innerWidth, innerHeight * 16 / 9);
+      const fittedHeight = fittedWidth * 9 / 16;
+      // The active slide uses the full viewport, centered without stretching or clipping.
+      return Math.abs(stage.width - innerWidth) < 1 && Math.abs(stage.height - innerHeight) < 1 &&
+        Math.abs(slide.width - fittedWidth) < 1 && Math.abs(slide.height - fittedHeight) < 1 &&
+        Math.abs(slide.left - (innerWidth - fittedWidth) / 2) < 1 && Math.abs(slide.top - (innerHeight - fittedHeight) / 2) < 1;
+    });
+  }
   const mobileFrame = await currentFrame();
   assert.equal(await mobileFrame.evaluate(() => innerWidth), 1280, 'Mobile slides keep their design viewport');
   const ratio = await page.$eval('.presentation-canvas iframe', node => { const r = node.getBoundingClientRect(); return r.width / r.height; });
@@ -292,6 +304,7 @@ try {
   const deckPublication = await (await f.call(`/documents/${deck.id}/publish`, "POST", { expectedRevision: deck.revision })).json() as { url: string };
   await page.goto(origin + new URL(deckPublication.url).pathname, { waitUntil: "networkidle0" });
   await page.waitForSelector(".shared-slide-viewer");
+  assert.equal(await page.$(".slide-screen-choice"), null);
   assert.ok(await page.$(".shared-app-shell"));
   assert.ok(await page.$(".shared-editor-page"));
   assert.equal(await page.$$eval(".shared-slide-workarea .shared-page iframe", nodes => nodes.length), 1);

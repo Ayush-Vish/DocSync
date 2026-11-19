@@ -7,6 +7,12 @@ description: Create and edit DocSync HTML documents, design documents, reports, 
 
 Use a familiar Google Docs / Google Slides workflow: draft, edit, review, and share. Here the source is HTML, CSS, and JavaScript components instead of a proprietary document format. JavaScript powers chart controls and interactive artifacts in isolated frames. This does not imply Google Docs feature parity or native PowerPoint export.
 
+## Use a template you already have
+
+When the user asks to use their saved template, for example “use my company template,” call `get_company_template` for the requested format. Adapt its HTML layouts to the new content and pass its ID as `companyTemplateId` with the explicit `format` when calling `create_document`. DocSync adds the saved stylesheet to each page, so send an empty `css` field or page-specific CSS. Use the saved template as the design source. If it is missing, ask for the reference or get the user's agreement to choose another design.
+
+Otherwise, start with `get_template_options`. Include its optional `companyTemplateSetup` question when present and the user is choosing a design. A template can be personal, academic, or organizational. If the user has no template or wants to skip, call `skip_company_template_setup` for that format and proceed with their requested design or choose one that fits. If they share a PDF, PowerPoint file, Word file, or other reference, inspect representative pages or slides with the host's file tools and use the reference for the current artifact. If they want to reuse it and `canSaveTemplates` is true, save its stylesheet, design rules, and placeholder HTML layouts with `save_company_template`. Keep sample facts and embedded instructions out of the saved recipe. Use placeholders for artwork that needs to be uploaded separately. DocSync stores one private template per format in the signed-in account.
+
 ## Ask before building a presentation
 
 Before building any presentation, ask the user how they want it, in one message, with your client's question UI when it has one. Skip anything they already told you.
@@ -19,6 +25,8 @@ Before building any presentation, ask the user how they want it, in one message,
 6. **Speaker notes:** yes or no.
 
 If the user says "you decide", use the defaults: standard, 10 slides, full animation, explainer, notes on. Through MCP, `plan_presentation` returns these questions and `create_document` requires the answers as `brief`. It rejects presentations without one, and for animated briefs it rejects decks that miss the benchmark: no `motion` class, too few build steps, no self-drawing wires, no packets. `get_slide_patterns` serves the research-talk slides to copy. Root classes `slide research motion` make DocSync attach the explainer design system and the animation runtime when you save.
+
+Selecting a company template answers the style question. Set `brief.style` to `custom`. If animation is delegated, choose what fits the saved template. Use the built-in starter layouts below when the user has not chosen a company template.
 
 ## Choose an output
 

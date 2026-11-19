@@ -1,12 +1,10 @@
 # MCP contract and renderer limits
 
-Before designing a new artifact, call `get_template_options` and share its gallery URL.
-Ask the user to reply with a template name or let the agent choose a custom design.
-Skip this question if the user already chose a template or delegated design.
-Gallery previews do not send a choice back to the agent; the user replies in chat.
-For a selected template, fetch its `contentUrl` and adapt the content to the user's
-facts. Otherwise create a custom design from their request. The gallery is at
-`/templates` and requires no sign-in. These are DocSync templates, not third-party branded templates.
+For “use my company template,” call `get_company_template` for the requested format. If it returns `COMPANY_TEMPLATE_NOT_FOUND`, ask for a reference or confirm a different design with the user. Otherwise use its placeholder layouts and pass its ID as `companyTemplateId` and the explicit `format` to `create_document`. The saved stylesheet is added to every page. For a presentation, use `brief.style: "custom"`.
+
+When the user is still choosing a design, call `get_template_options` and include its optional `companyTemplateSetup` question if present. If the user has no template or wants to skip, call `skip_company_template_setup` and continue with a suitable design. Use a supplied reference for the current artifact. If the user wants to save it and `canSaveTemplates` is true, inspect it with the host's file tools and use `save_company_template` to store reusable styles, layout examples, and design rules. An existing template can be replaced with its current ID and the user's approval.
+
+Offer available company templates and the public gallery link when the user is choosing a design. The user selects a template by replying in chat. For a gallery choice, fetch its `contentUrl` and adapt its layouts. If they delegate design, create a custom design from their request.
 
 ## Paged documents and slide decks
 
@@ -44,11 +42,14 @@ Use the DocSync tools exposed by the current client; prefixes vary between Codex
 | `plan_presentation` | Optional `topic`. Returns the questions to ask before any presentation (detail level, slide count, animation, style, audience, speaker notes), with options, defaults and what each answer means. |
 | `get_slide_patterns` | Optional `ids` (max 8). Lists the research-talk slide patterns, or returns their HTML to copy. Root classes `slide research motion` make DocSync attach the styles and animation runtime on save. |
 | `get_docsync_skill` | `topic`: `overview`, `motion`, `research-talk`, `mcp` or `all`. Returns this skill's guide on demand, plus optional install commands. Agents without the installed skill call it first. |
-| `get_template_options` | `format`: `document`, `presentation`, or `all`. Returns the public template gallery, preview and content links, and a template-or-custom question. |
+| `get_template_options` | `format`: `document`, `presentation`, or `all`. Returns company template summaries and setup status alongside the public gallery and content links. |
+| `get_company_template` | `format`. Read the account's saved template ID, styles, layout examples, and design rules. |
+| `save_company_template` | `format`, `name`, `instructions`, shared `css`, and `layouts` (each with `name` and `html`). Include `replaceTemplateId` to replace the current template. |
+| `skip_company_template_setup` | `format`. Remember that the user declined optional setup for that format. |
 | `list_documents` | No arguments. Find existing documents. |
 | `get_document` | `id`, optional `revision`. Read content, revision, and document role. |
 | `upload_media` | `id`, `mimeType`, and either local `filePath` or `filename` + plain `dataBase64`. Returns `url`, `src`, and HTML. |
-| `create_document` | `title`, `sections`. Creates a private draft. |
+| `create_document` | `title`, `sections`. Creates a private draft. Pass `companyTemplateId` with the explicit `format` to apply the chosen company stylesheet. |
 | `update_document` | `id`, `expectedRevision`, `lockToken`, `title`, complete `sections`, optional `changeSummary` (300 characters max). Saves a new revision, without publishing. |
 | `publish_document` | `id`, `expectedRevision`. Publishes a read-only snapshot. Requires publishing permission. |
 | `connect_account` | No arguments. Trial-account claim link when the server requests account claiming; this does not authenticate a remote OAuth connection. |
@@ -78,7 +79,7 @@ Publishing makes a snapshot readable by anyone with the hosted link. Later draft
 
 Acquire a document lease before editing, read after acquisition, renew at least once a minute during long work, save with the token and current revision, verify, then release. On `423` preserve generated work and wait for/reacquire a lease; on `409` read and reconcile. Never blindly retry mutations or change only the expected revision. Leases expire five minutes after their last renewal. If acquisition’s result is uncertain, check status and allow expiry instead of repeatedly acquiring.
 
-The owner shares the private draft through one-time, 24-hour invitations accepted by a signed-in account. Account-connected agents inherit owner/editor/viewer access. Viewers can read current content and history. Editors can edit/restore with a lease. Only document owners can publish or manage access; their connected agents can manage invitations and member roles through MCP; publishing also requires the credential’s grant. Public viewing links remain read-only. Use backend/bridge 0.5.1 or reconnect remote MCP to discover email invitation inputs.
+The owner shares the private draft through one-time, 24-hour invitations accepted by a signed-in account. Account-connected agents inherit owner/editor/viewer access. Viewers can read current content and history. Editors can edit/restore with a lease. Only document owners can publish or manage access; their connected agents can manage invitations and member roles through MCP; publishing also requires the owner to enable it for the connected client in the Agents tab. Public viewing links remain read-only. Use backend/bridge 0.5.1 or reconnect remote MCP to discover email invitation inputs.
 
 Supply `email` only when the user requests an invitation to that recipient. Email invitations require migration `0008_email_invitations.sql`, the `EMAIL` Workers binding, a Cloudflare Email Sending sender domain, and `DOCSYNC_EMAIL_FROM`. The signed-in accepting account must match the recipient email. `emailDelivery.status: "accepted"` confirms sending-service acceptance, not inbox delivery. Failed or uncertain sends revoke the invitation; never retry them automatically. Sending is limited to 10 attempts per owner per hour, surviving revocation. `EMAIL_NOT_CONFIGURED` creates no invitation; omit email only if the user wants a private link instead.
 

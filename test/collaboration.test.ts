@@ -19,14 +19,11 @@ function emailService(env: Env) {
 async function setup() {
   const f = await fixture(true);
   async function user(email: string) {
-    const signup = await f.call('/auth/signup', 'POST', { email, password: 'a long secure password 123!' }, 'anonymous', { Origin: 'http://127.0.0.1:8787' });
-    assert.equal(signup.status, 200);
-    const cookie = signup.headers.getSetCookie()[0].split(';')[0];
+    const { id: accountId, cookie } = await f.seedUser(email, email === 'owner@example.com' ? 'a long secure password 123!' : undefined);
     const call = (path: string, method = 'GET', body?: unknown) => f.call(path, method, body, 'anonymous', { Cookie: cookie, Origin: 'http://127.0.0.1:8787' });
     const token = (await (await call('/agent-token', 'POST', { allowPublishing: true })).json() as any).token;
     const agent = (path: string, method = 'GET', body?: unknown) => f.call(path, method, body, 'anonymous', { Authorization: `Bearer ${token}` });
-    const account = await f.env.DB.prepare('SELECT id FROM accounts WHERE email=?').bind(email).first<{ id: string }>();
-    return { call, agent, accountId: account!.id, cookie };
+    return { call, agent, accountId, cookie };
   }
   const owner = await user('owner@example.com'), editor = await user('editor@example.com'), viewer = await user('viewer@example.com');
   const doc = await (await owner.call('/documents', 'POST', sample('Team document'))).json() as any;

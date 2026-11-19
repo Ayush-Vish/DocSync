@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { api, ApiError, type Session } from "./api";
 import { LandingPage } from "./LandingPage";
 import { ShareDialog } from "./ShareDialog";
@@ -7,7 +7,8 @@ import { VersionHistory } from "./VersionHistory";
 import { useDocumentLock } from "./useDocumentLock";
 import { MediaContext } from "./MediaContext";
 import { CollaboratorPresence } from "./CollaboratorPresence";
-import { AgentSkill } from "./AgentSkill";
+import { WorkspaceTemplates } from "./WorkspaceTemplates";
+import { AgentConnectionGuide } from "./AgentConnectionGuide";
 import { DownloadMenu } from "./DownloadMenu";
 import { AuditLog } from "./AuditLog";
 import { PageLockButton, PageLockDialog, PageLockInbox, usePageLockFeed, type PageLockControls } from "./PageLocks";
@@ -22,6 +23,7 @@ import {
   Plus,
   Search,
   Bot,
+  LayoutTemplate,
   Sparkles,
   Share2,
   Download,
@@ -44,7 +46,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { isPresentationContent, type Document, type Revision, type RenderedContent } from "../document";
-import themeCatalog from "../../skills/docsync/themes.json";
 
 type Summary = {
   id: string;
@@ -53,21 +54,16 @@ type Summary = {
   updated_at: string;
   format?: "document" | "presentation";
 };
-type ThemeCatalogItem = {
-  id: string;
-  name: string;
-  format: "document" | "presentation";
-  description: string;
-  title: string;
-  background: string;
-  color: string;
-  accent: string;
-  sample: string;
-};
+const workspaceRoutes = { library: "/", agents: "/agents", templates: "/workspace/templates", audit: "/audit" } as const;
+type WorkspaceView = keyof typeof workspaceRoutes;
+type McpClient = { client_id: string; client_name: string; allowPublishing: boolean };
 
-const themes = themeCatalog as ThemeCatalogItem[];
-const customThemePrompt =
-  "Use DocSync to create a document or presentation with a custom theme. Style direction: [describe colors, typography, mood, density, and audience]. Use only facts I provide. Label any example or simulated data clearly. Add interactive charts only when useful, verify the saved result, and return a share link.";
+function workspaceView(path: string): WorkspaceView {
+  if (path === "/connect" || path === workspaceRoutes.agents) return "agents";
+  if (path === workspaceRoutes.templates) return "templates";
+  if (path === workspaceRoutes.audit) return "audit";
+  return "library";
+}
 
 const message = (error: unknown) =>
   error instanceof Error
@@ -93,6 +89,12 @@ function speakerNotes(html: string): string {
   return notes.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
 }
 
+const screenShapes = {
+  widescreen: { label: "Widescreen (16:9)", aspect: "16 / 9" },
+  projector: { label: "Projector (4:3)", aspect: "4 / 3" },
+  phone: { label: "Portrait phone (9:16)", aspect: "9 / 16" },
+} as const;
+
 // Read-only viewer shared by published links and the signed-in workspace (agents make every edit).
 // In the workspace it also offers page assignment: reserving a page for an agent or releasing it.
 function SharedViewer({
@@ -103,6 +105,7 @@ function SharedViewer({
   page: controlledPage,
   onPageChange,
   footer,
+  screenPreview = false,
 }: {
   content: RenderedContent;
   slideshow: boolean;
@@ -111,61 +114,72 @@ function SharedViewer({
   page?: number;
   onPageChange?: (index: number) => void;
   footer?: (section: RenderedContent["sections"][number], index: number) => ReactNode;
+  screenPreview?: boolean;
 }) {
   const [ownPage, setOwnPage] = useState(0);
+  const [screen, setScreen] = useState<keyof typeof screenShapes>("widescreen");
   const page = controlledPage ?? ownPage;
-  const setPage = (next: number | ((value: number) => number)) => {
-    const value = typeof next === "function" ? next(page) : next;
-    if (onPageChange) onPageChange(value); else setOwnPage(value);
-  };
+  const setPage = useCallback((next: number) => {
+    if (onPageChange) onPageChange(next); else setOwnPage(next);
+  }, [onPageChange]);
   const isPresentation = isPresentationContent(content);
   const lastPage = content.sections.length - 1;
   const current = content.sections[Math.min(page, lastPage)];
-  const itemName = isPresentation ? "slide" : "page";
 
   useEffect(() => {
     if (!isPresentation) return;
     const navigate = (event: KeyboardEvent) => {
-      if (slideshow || event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || (event.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) return;
+      if (slideshow || event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (document.querySelector("dialog[open]") || (event.target instanceof Element && event.target.closest("input,textarea,select,[contenteditable]"))) return;
       if (event.key === "ArrowLeft" || event.key === "PageUp") {
         event.preventDefault();
-        setPage((value) => Math.max(0, value - 1));
+        setPage(Math.max(0, page - 1));
       } else if (
         event.key === "ArrowRight" ||
         event.key === "PageDown"
       ) {
         event.preventDefault();
-        setPage((value) => Math.min(lastPage, value + 1));
+        setPage(Math.min(lastPage, page + 1));
       }
     };
     window.addEventListener("keydown", navigate);
     return () => window.removeEventListener("keydown", navigate);
-  }, [isPresentation, lastPage, slideshow]);
+  }, [isPresentation, lastPage, page, setPage, slideshow]);
 
   const controls = (
-    <div className="shared-viewer-toolbar" aria-label={`${isPresentation ? "Slide" : "Page"} navigation`}>
+    <div className="shared-viewer-toolbar" aria-label="Slide navigation">
       <Button
         variant="ghost"
         size="sm"
-        aria-label={`Previous ${itemName}`}
+        className="shared-slide-arrow"
+        aria-label="Previous slide"
         disabled={page === 0}
-        onClick={() => setPage((value) => Math.max(0, value - 1))}
+        onClick={() => setPage(Math.max(0, page - 1))}
       >
         <ChevronLeft className="w-4 h-4" />
       </Button>
       <span className="shared-page-indicator" aria-live="polite">
-        {isPresentation ? "Slide" : "Page"} {page + 1} of {content.sections.length}
+        Slide {page + 1} of {content.sections.length}
       </span>
       <Button
         variant="ghost"
         size="sm"
-        aria-label={`Next ${itemName}`}
+        className="shared-slide-arrow"
+        aria-label="Next slide"
         disabled={page === lastPage}
-        onClick={() => setPage((value) => Math.min(lastPage, value + 1))}
+        onClick={() => setPage(Math.min(lastPage, page + 1))}
       >
         <ChevronRight className="w-4 h-4" />
       </Button>
-      {isPresentation && <Button variant="outline" size="sm" onClick={() => onSlideshowChange(true)}><Play size={14} /> Present</Button>}
+      <Button size="sm" onClick={() => onSlideshowChange(true)}><Play size={14} /> Present</Button>
+      {screenPreview && (
+        <label className="slide-screen-choice">
+          Screen preview
+          <select value={screen} onChange={event => setScreen(event.currentTarget.value as keyof typeof screenShapes)}>
+            {Object.entries(screenShapes).map(([value, shape]) => <option key={value} value={value}>{shape.label}</option>)}
+          </select>
+        </label>
+      )}
     </div>
   );
 
@@ -193,8 +207,9 @@ function SharedViewer({
           ))}
         </aside>
         <div className="shared-slide-workarea">
-          <div className="shared-page-stage">
-            <div className="shared-page">
+          <div className={cn("shared-page-stage", screenPreview && "slide-screen-stage")}>
+            <div className={cn("shared-page", screenPreview && "slide-screen")}
+              style={screenPreview ? { "--screen-aspect": screenShapes[screen].aspect } as CSSProperties : undefined}>
               {slideshow ? <ArtifactThumbnail section={current} title={`Slide ${page + 1}`} /> : <ArtifactFrame
                 key={current.id}
                 title={`Slide ${page + 1}: ${content.title}`}
@@ -211,6 +226,7 @@ function SharedViewer({
           sections={content.sections}
           initialSlide={page}
           title={content.title}
+          startFullscreen={screenPreview}
           onClose={() => onSlideshowChange(false)}
           onSlideChange={(idx) => setPage(idx)}
         />
@@ -300,26 +316,31 @@ function LoginPage({
   error,
   setError,
   google,
+  googleUrl,
   busy,
   claim,
   authenticate,
   onBackToLanding,
   recovering = false,
   recoveryEmail,
+  resumeGoogleSession,
 }: {
   authMode: "signin" | "signup" | "legacy";
   setAuthMode: (mode: "signin" | "signup" | "legacy") => void;
   error: string;
   setError: (err: string) => void;
-  google: boolean;
+  google: boolean | null;
+  googleUrl?: string;
   busy: boolean;
   claim: string;
   authenticate: (e: FormEvent<HTMLFormElement>) => Promise<void>;
   onBackToLanding: () => void;
   recovering?: boolean;
   recoveryEmail?: string;
+  resumeGoogleSession?: () => void;
 }) {
   const formId = useId();
+  const googleOnly = authMode === "signup" || Boolean(resumeGoogleSession);
   const [showPassword, setShowPassword] = useState(false);
   useEffect(() => setShowPassword(false), [authMode]);
   function switchMode(mode: "signin" | "signup" | "legacy") {
@@ -349,7 +370,7 @@ function LoginPage({
           <div className="mb-3">{brand}</div>
           <h2 className="text-xl font-bold tracking-tight text-foreground">
             {recovering ? "Sign in to continue." : authMode === "signup"
-              ? "Make yourself at home."
+              ? "Create a DocSync account"
               : authMode === "legacy"
                 ? "Workspace Owner Key"
                 : "Welcome back."}
@@ -367,22 +388,29 @@ function LoginPage({
           </div>
         )}
 
-        {google && !recovering && (
+        {google && googleUrl && authMode !== "legacy" && (
           <>
             <Button
-              variant="outline"
+              variant={googleOnly ? "default" : "outline"}
               className="w-full justify-between h-10 mb-3 text-xs font-medium"
               asChild
             >
-              <a href="/api/auth/google">
+              <a href={googleUrl} target={recovering ? "_blank" : undefined} rel={recovering ? "noopener" : undefined}>
                 Continue with Google <ArrowRight className="w-4 h-4 ml-1" />
               </a>
             </Button>
-            <div className="or mb-3">or use your email</div>
+            {!googleOnly && <div className="or mb-3">or sign in with an existing password</div>}
+            {resumeGoogleSession && <>
+              <p className="text-xs text-muted-foreground mb-3">Sign in as {recoveryEmail} in the new tab, then return here.</p>
+              <Button type="button" variant="outline" disabled={busy} onClick={resumeGoogleSession}>Resume workspace</Button>
+            </>}
           </>
         )}
+        {googleOnly && google === false && (
+          <p role="status" className="text-xs text-muted-foreground">Google sign-in is currently unavailable. Try again later.</p>
+        )}
 
-        <form onSubmit={authenticate} className="space-y-3.5" aria-busy={busy} aria-describedby={error ? `${formId}-error` : undefined}>
+        {!googleOnly && <form onSubmit={authenticate} className="space-y-3.5" aria-busy={busy} aria-describedby={error ? `${formId}-error` : undefined}>
           <fieldset disabled={busy} className="space-y-3.5">
           {authMode === "legacy" ? (
             <div className="space-y-1.5">
@@ -431,11 +459,7 @@ function LoginPage({
                   minLength={12}
                   maxLength={256}
                   required
-                  autoComplete={
-                    authMode === "signup"
-                      ? "new-password"
-                      : "current-password"
-                  }
+                  autoComplete="current-password"
                   className="h-9 text-xs"
                   autoFocus={recovering}
                 /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}</button></div>
@@ -449,13 +473,9 @@ function LoginPage({
             className="w-full justify-between h-9 text-xs font-medium mt-1"
             disabled={busy}
           >
-            {busy
-              ? "Please wait…"
-              : authMode === "signup"
-                ? "Create account →"
-                : "Sign in →"}
+            {busy ? "Please wait…" : "Sign in →"}
           </Button>
-        </form>
+        </form>}
 
         {!recovering && <><p className="auth-switch text-xs text-muted-foreground mt-5 text-center">
           {authMode === "signup"
@@ -496,7 +516,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     return (
       p === "/login" ||
       p === "/signup" ||
-      p === "/connect" || p === "/audit" ||
+      workspaceView(p) !== "library" ||
       p === "/invite" ||
       Boolean(sessionStorage.getItem("docsync_invite")) ||
       Boolean(sessionStorage.getItem("docsync_claim")) ||
@@ -512,14 +532,12 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   const [authMode, setAuthMode] = useState<"signin" | "signup" | "legacy">(
       location.pathname === "/signup" ? "signup" : "signin",
     ),
-    [google, setGoogle] = useState(false);
+    [google, setGoogle] = useState<boolean | null>(null);
   const [documents, setDocuments] = useState<Summary[]>([]),
     [doc, setDoc] = useState<Document | null>(null),
     [dirty, setDirty] = useState(false),
     [search, setSearch] = useState(""),
-    [view, setView] = useState<"library" | "connect" | "audit">(
-      location.pathname === "/audit" ? "audit" : location.pathname === "/connect" ? "connect" : "library",
-    );
+    [view, setView] = useState(() => workspaceView(location.pathname));
   const [preview, setPreview] = useState(false),
     [activeSlide, setActiveSlide] = useState(0),
     [activeSectionIndex, setActiveSectionIndex] = useState(0),
@@ -565,7 +583,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     return sessionStorage.getItem("docsync_invite") || "";
   });
   const [shared, setShared] = useState<RenderedContent | null>(null);
-  const [mcpClients, setMcpClients] = useState<{client_id:string;client_name:string;access_expires:number}[]>([]);
+  const [mcpClients, setMcpClients] = useState<McpClient[]>([]);
   const sharePath = location.pathname.startsWith("/share/");
   const running = useRef(false);
   const latestDoc = useRef(doc);
@@ -639,9 +657,9 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           setShared(await api("/shared/" + location.pathname.split("/").pop(), "GET", undefined, signal));
           return;
         }
-        // Optional Google configuration must not block email sign-in or the workspace.
         void api<{ google: boolean }>("/auth/config", "GET", undefined, signal)
-          .then(config => { if (!signal.aborted) setGoogle(config.google); }).catch(() => {});
+          .then(config => { if (!signal.aborted) setGoogle(config.google); })
+          .catch(() => { if (!signal.aborted) setGoogle(false); });
         const currentSession = initialSession || await api<Session>("/session", "GET", undefined, signal);
         if (signal.aborted) return;
         setSession(currentSession);
@@ -662,13 +680,13 @@ export default function App({ initialSession }: { initialSession?: Session }) {
   }, []);
 
   useEffect(() => {
-    if (view !== "connect" || !session) return;
+    if (view !== "agents" || !session) return;
     const controller = new AbortController();
     const { signal } = controller;
     setConnectionLoading(true);
     void Promise.all([
       api<{ active: boolean; allowPublishing: boolean }>("/agent-token", "GET", undefined, signal),
-      api<typeof mcpClients>("/mcp-clients", "GET", undefined, signal),
+      api<McpClient[]>("/mcp-clients", "GET", undefined, signal),
     ]).then(([credential, clients]) => {
       if (signal.aborted) return;
       setTokenActive(credential.active);
@@ -692,28 +710,6 @@ export default function App({ initialSession }: { initialSession?: Session }) {
 
 
   useEffect(() => {
-    if (!doc || editorMode !== "slide" || fullscreen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (e.key === "ArrowLeft" || e.key === "PageUp") {
-        setActiveSlide((prev) => Math.max(0, prev - 1));
-      } else if (e.key === "ArrowRight" || e.key === "PageDown") {
-        setActiveSlide((prev) => Math.min(doc.sections.length - 1, prev + 1));
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [doc, editorMode, fullscreen]);
-
-  useEffect(() => {
     const handlePop = () => {
       if (running.current && doc) {
         window.history.pushState(null, "", `/documents/${doc.id}${preview ? "/preview" : ""}`);
@@ -731,22 +727,15 @@ export default function App({ initialSession }: { initialSession?: Session }) {
       }
       if (route) {
         void run(() => loadDocument(route.id, false, route.preview));
-      } else if (location.pathname === "/audit") {
+      } else {
+        const next = workspaceView(location.pathname);
+        if (next === "library" && location.pathname !== workspaceRoutes.library) return;
         setDoc(null);
         setDirty(false);
         setPreview(false);
-        setView("audit");
+        setView(next);
         setError("");
         setNotice("");
-      } else if (location.pathname === "/connect") {
-        setDoc(null);
-        setDirty(false);
-        setView("connect");
-      } else if (location.pathname === "/") {
-        setDoc(null);
-        setDirty(false);
-        setPreview(false);
-        setView("library");
       }
     };
     window.addEventListener("popstate", handlePop);
@@ -820,12 +809,34 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     });
   }
 
-  async function connect() {
+  function openWorkspace(next: WorkspaceView) {
     if (!leave()) return;
     setDoc(null);
     setDirty(false);
-    setView("connect");
-    window.history.pushState(null, "", "/connect");
+    setPreview(false);
+    setError("");
+    setNotice("");
+    setView(next);
+    if (location.pathname !== workspaceRoutes[next]) window.history.pushState(null, "", workspaceRoutes[next]);
+  }
+
+  async function finishSignIn() {
+    const signedIn = await api<Session>("/session");
+    if (doc && session && signedIn.accountId !== session.accountId)
+      throw new ApiError(403, `Sign back in as ${session.email} to continue with this draft.`);
+    setSession(signedIn);
+    setSessionExpired(false);
+    setAuthenticationNeeded(false);
+    if (!doc) {
+      const route = documentRoute();
+      await Promise.all([refresh(), route ? loadDocument(route.id, false, route.preview) : Promise.resolve()]);
+    }
+    setAuthPage(false);
+    if (!doc && !documentRoute()) {
+      const next = claim ? "agents" : view;
+      setView(next);
+      window.history.replaceState(null, "", workspaceRoutes[next]);
+    }
   }
 
   async function authenticate(event: FormEvent<HTMLFormElement>) {
@@ -833,23 +844,13 @@ export default function App({ initialSession }: { initialSession?: Session }) {
     const form = new FormData(event.currentTarget);
     await run(async () => {
       await api(
-        authMode === "legacy" ? "/login" : "/auth/" + authMode,
+        authMode === "legacy" ? "/login" : "/auth/signin",
         "POST",
         authMode === "legacy"
           ? { key: form.get("key") }
           : { email: form.get("email"), password: form.get("password") },
       );
-      const signedIn = await api<Session>("/session");
-      if (doc && session && signedIn.email !== session.email) throw new ApiError(403, `Sign back in as ${session.email} to continue with this draft.`);
-      setSession(signedIn);
-      setSessionExpired(false);
-      setAuthenticationNeeded(false);
-      if (!doc) {
-        const route = documentRoute();
-        await Promise.all([refresh(), route ? loadDocument(route.id, false, route.preview) : Promise.resolve()]);
-      }
-      setAuthPage(false);
-      if (!doc && !documentRoute()) window.history.replaceState(null, "", view === "audit" ? "/audit" : view === "connect" || claim ? "/connect" : "/");
+      await finishSignIn();
     });
   }
 
@@ -882,6 +883,9 @@ export default function App({ initialSession }: { initialSession?: Session }) {
         error={error}
         setError={setError}
         google={google}
+        googleUrl={"/api/auth/google?" + new URLSearchParams({
+          returnTo: invitation ? "/invite" : documentRoute() ? location.pathname : workspaceRoutes[claim ? "agents" : view],
+        })}
         busy={busy}
         claim={claim}
         authenticate={authenticate}
@@ -907,7 +911,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
         <Button
           className="new-button w-full justify-start gap-2 h-9 font-medium shadow-none"
           disabled={busy}
-          onClick={() => { if (!leave()) return; setDoc(null); setView("connect"); window.history.pushState(null, "", "/connect"); }}
+          onClick={() => openWorkspace("agents")}
         >
           <Plus className="w-4 h-4 shrink-0" />
           <span>New with your agent</span>
@@ -922,15 +926,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                 ? "bg-secondary font-medium text-foreground"
                 : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
             )}
-            onClick={() => {
-              if (leave()) {
-                setDoc(null);
-                setDirty(false);
-                setView("library");
-                setPreview(false);
-                window.history.pushState(null, "", "/");
-              }
-            }}
+            onClick={() => openWorkspace("library")}
           >
             <span className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -945,17 +941,23 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             disabled={busy}
             className={cn(
               "w-full flex items-center justify-start gap-2 px-3 py-2 text-sm rounded-md transition-colors cursor-pointer border-0 bg-transparent text-left",
-              view === "connect"
+              view === "agents"
                 ? "bg-secondary font-medium text-foreground"
                 : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground",
             )}
-            onClick={() => void connect()}
+            aria-current={view === "agents" ? "page" : undefined}
+            onClick={() => openWorkspace("agents")}
           >
             <Bot className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span>Connect agent</span>
+            <span>Agents</span>
+          </button>
+          <button type="button" disabled={busy} aria-current={view === "templates" ? "page" : undefined}
+            className={cn("w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors cursor-pointer border-0 bg-transparent text-left", view === "templates" ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground")}
+            onClick={() => openWorkspace("templates")}>
+            <LayoutTemplate className="w-4 h-4 text-muted-foreground shrink-0" /><span>Templates</span>
           </button>
           <button type="button" disabled={busy} className={cn("w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors cursor-pointer border-0 bg-transparent text-left", view === "audit" ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground")}
-            onClick={() => { if (leave()) { setDoc(null); setDirty(false); setPreview(false); setError(""); setNotice(""); setView("audit"); window.history.pushState(null, "", "/audit"); } }}>
+            onClick={() => openWorkspace("audit")}>
             <Shield className="w-4 h-4 text-muted-foreground shrink-0" /><span>Audit log</span>
           </button>
           {!doc && <button type="button" aria-label="Page lock requests" className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md cursor-pointer border-0 bg-transparent text-left text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
@@ -1088,7 +1090,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                 <span>Workspace</span>
                 <span className="slash">/</span>
                 <span className="text-foreground truncate">
-                  {view === "audit" ? "Audit log" : view === "connect" ? "Connect agent" : "My documents"}
+                  {view === "audit" ? "Audit log" : view === "agents" ? "Agents" : view === "templates" ? "Templates" : "My documents"}
                 </span>
               </div>
               <div className="shrink-0">
@@ -1160,15 +1162,18 @@ export default function App({ initialSession }: { initialSession?: Session }) {
           await loadDocument(id, true, false);
           sessionStorage.removeItem("docsync_invite"); setInvitation("");
           await refresh();
-        }} /> : view === "audit" ? <AuditLog /> : view === "connect" ? (
+        }} /> : view === "audit" ? <AuditLog /> : view === "templates" ? (
+          <WorkspaceTemplates busy={busy} onCopyPrompt={prompt => void run(async () => {
+            await navigator.clipboard.writeText(prompt);
+            setNotice("Custom theme prompt copied.");
+          })} />
+        ) : view === "agents" ? (
           <section className="connect-page" aria-busy={connectionLoading}>
             {connectionLoading && <p role="status">Checking your agent connection…</p>}
-            <p className="eyebrow">YOUR AGENT, YOUR WORKSPACE</p>
-            <h1 className="tracking-tight">Good ideas travel.</h1>
+            <h1 className="tracking-tight">Agents</h1>
             <p className="subtitle">
-              Connect Claude, Codex, Antigravity, or any MCP-compatible agent.
+              Connect DocSync to the agent you use in your terminal, browser, or desktop app.
             </p>
-            <AgentSkill />
             {claim && (
               <div className="claim-card">
                 <h3 className="tracking-tight">Bring your first document home.</h3>
@@ -1200,156 +1205,147 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                 )}
               </div>
             )}
-            <div className="connect-card">
-              <span className="step">01</span>
-              <h3 className="tracking-tight">Optional: use a private token</h3>
-              <p>
-                Use this for local stdio clients. Remote clients can connect below and authorize in your browser without copying a token.
-              </p>
-              <details className="mt-3">
-                <summary>Generate or revoke a private token</summary>
-              <label className="checkbox flex items-center gap-2 text-xs font-normal cursor-pointer my-4">
-                <input
-                  type="checkbox"
-                  className="rounded border-input text-primary focus:ring-primary h-4 w-4"
-                  checked={allowPublishing}
-                  onChange={(e) => setAllowPublishing(e.target.checked)}
-                />
-                Allow my agent to publish share links
-              </label>
-              {tokenActive && (
-                <p className="text-xs text-muted-foreground mb-3">
-                  An active token exists. Generating another revokes it.
-                </p>
-              )}
-              <div className="actions flex items-center gap-2">
-                <Button
-                  className="primary"
-                  disabled={busy || connectionLoading}
-                  onClick={() =>
-                    void run(async () => {
-                      if (
-                        tokenActive &&
-                        !confirm(
-                          "Replace your existing token? Agents using it will need the new token.",
-                        )
-                      )
-                        return;
-                      setToken(
-                        (await api("/agent-token", "POST", { allowPublishing }))
-                          .token,
-                      );
-                      setTokenActive(true);
-                    })
-                  }
-                >
-                  Generate token
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={busy || connectionLoading}
-                  onClick={() =>
-                    void run(async () => {
-                      if (!confirm("Revoke your agent token?")) return;
-                      await api("/agent-token", "DELETE");
-                      setToken("");
-                      setTokenActive(false);
-                      setNotice("Agent token revoked.");
-                    })
-                  }
-                >
-                  Revoke token
-                </Button>
+            <AgentConnectionGuide origin={location.origin} busy={busy} onCopy={(value, notice) => void run(async () => {
+              await navigator.clipboard.writeText(value);
+              setNotice(notice);
+            })} />
+            <section className="connect-card" aria-labelledby="authorized-clients-title">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="authorized-clients-title" className="text-base font-semibold">Authorized MCP clients</h2>
+                <Button variant="outline" size="sm" disabled={busy || connectionLoading}
+                  onClick={() => void run(async () => setMcpClients(await api<McpClient[]>("/mcp-clients")))}>Refresh clients</Button>
               </div>
-              {token && (
-                <div className="token mt-4">
-                  <label className="block text-xs font-medium text-muted-foreground">
-                    Copy now — shown once
-                    <Input
-                      aria-label="New agent token"
-                      type="password"
-                      readOnly
-                      value={token}
-                      className="font-mono text-xs mt-1"
-                    />
-                  </label>
+              <p className="text-xs text-muted-foreground">Enable publishing after connecting. Anyone with a published link can view that document.</p>
+              {mcpClients.length ? mcpClients.map(client => (
+                <div key={client.client_id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">{client.client_name}</p>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={client.allowPublishing} disabled={busy || connectionLoading}
+                        aria-label={`Allow ${client.client_name} to publish share links`}
+                        onChange={event => {
+                          const allowPublishing = event.currentTarget.checked;
+                          void run(async () => {
+                            const saved = await api<{ allowPublishing: boolean }>("/mcp-clients", "PATCH", { clientId: client.client_id, allowPublishing });
+                            setMcpClients(clients => clients.map(item => item.client_id === client.client_id ? { ...item, ...saved } : item));
+                            setNotice(saved.allowPublishing ? `Publishing enabled for ${client.client_name}.` : `Publishing disabled for ${client.client_name}.`);
+                          });
+                        }} />
+                      Allow publishing
+                    </label>
+                  </div>
+                  <Button variant="outline" size="sm" disabled={busy || connectionLoading} onClick={() => void run(async () => {
+                    await api("/mcp-clients", "DELETE", { clientId: client.client_id });
+                    setMcpClients(clients => clients.filter(item => item.client_id !== client.client_id));
+                    setNotice(`${client.client_name} access revoked.`);
+                  })}>Revoke access</Button>
+                </div>
+              )) : <p className="text-xs text-muted-foreground">No remote MCP clients authorized yet.</p>}
+            </section>
+            <section className="connect-card" aria-labelledby="local-mcp-title">
+              <h2 id="local-mcp-title" className="mb-2 text-base font-semibold">Local MCP bridge</h2>
+              <p>
+                Use the bridge for clients that connect through a local command.
+              </p>
+              <details id="local-mcp-setup" className="mt-3">
+                <summary>Set up the local bridge</summary>
+                <p className="mt-2">With Node.js 22.18 or later, download the bridge and add this entry to the client's MCP configuration using the absolute path to the file.</p>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/downloads/docsync-mcp.cjs" download>
+                    <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Download MCP server
+                  </a>
+                </Button>
+                <pre>{JSON.stringify({ mcpServers: { docsync: { command: "node", args: ["/absolute/path/to/docsync-mcp.cjs", "--url", location.origin] } } }, null, 2)}</pre>
+                <p>To connect your DocSync account, generate a private token below and run this command. Paste the token into the terminal, press Enter, then press Ctrl+D on macOS or Linux, or Ctrl+Z followed by Enter on Windows. Restart your agent after setup.</p>
+                <pre>{`node /absolute/path/to/docsync-mcp.cjs login --url ${location.origin} --token-stdin`}</pre>
+              </details>
+              <details id="local-mcp-token" className="mt-3">
+                <summary>Generate or revoke a private token</summary>
+                <label className="checkbox flex items-center gap-2 text-xs font-normal cursor-pointer my-4">
+                  <input
+                    type="checkbox"
+                    className="rounded border-input text-primary focus:ring-primary h-4 w-4"
+                    checked={allowPublishing}
+                    onChange={(e) => setAllowPublishing(e.target.checked)}
+                  />
+                  Allow my agent to publish share links
+                </label>
+                {tokenActive && (
+                  <p className="text-xs text-muted-foreground mb-3">
+                    An active token exists. Generating another revokes it.
+                  </p>
+                )}
+                <div className="actions flex items-center gap-2">
                   <Button
-                    variant="outline"
+                    className="primary"
+                    disabled={busy || connectionLoading}
                     onClick={() =>
                       void run(async () => {
-                        await navigator.clipboard.writeText(token);
-                        setNotice(
-                          "Token copied. Save it in your private MCP connection.",
+                        if (
+                          tokenActive &&
+                          !confirm(
+                            "Replace your existing token? Agents using it will need the new token.",
+                          )
+                        )
+                          return;
+                        setToken(
+                          (await api("/agent-token", "POST", { allowPublishing }))
+                            .token,
                         );
+                        setTokenActive(true);
                       })
                     }
                   >
-                    <Copy className="w-3.5 h-3.5 mr-1" />
-                    Copy token
+                    Generate token
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={busy || connectionLoading}
+                    onClick={() =>
+                      void run(async () => {
+                        if (!confirm("Revoke your agent token?")) return;
+                        await api("/agent-token", "DELETE");
+                        setToken("");
+                        setTokenActive(false);
+                        setNotice("Agent token revoked.");
+                      })
+                    }
+                  >
+                    Revoke token
                   </Button>
                 </div>
-              )}
-              </details>
-            </div>
-            <div className="connect-card">
-              <span className="step">02</span>
-              <h3 className="tracking-tight">Connect directly from your client</h3>
-              <p>
-                Add DocSync as a remote MCP server. Your client opens a DocSync sign-in page to authorize access; no local server or copied token is needed.
-              </p>
-              <h4 className="mt-3">Codex CLI</h4>
-              <pre>{`codex mcp add docsync --url ${location.origin}/mcp\ncodex mcp login docsync`}</pre>
-              <h4 className="mt-3">Antigravity CLI</h4>
-              <pre>{`agy mcp add --type http docsync ${location.origin}/mcp`}</pre>
-              <h4 className="mt-3">Claude Code</h4>
-              <pre>{`claude mcp add --transport http docsync ${location.origin}/mcp`}</pre>
-              <p className="text-xs text-muted-foreground mt-2">
-                The client will open DocSync in your browser for sign-in and permission approval.
-              </p>
-              <details className="mt-3">
-                <summary>Other remote MCP clients</summary>
-                <pre>
-                  {JSON.stringify(
-                    {
-                      mcpServers: {
-                        docsync: {
-                          type: "http",
-                          url: `${location.origin}/mcp`,
-                        },
-                      },
-                    },
-                    null,
-                    2,
-                  )}
-                </pre>
-              </details>
-              <details className="mt-3">
-                <summary>Use a local stdio server</summary>
-                <p>For clients that do not support remote MCP servers.</p>
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/downloads/docsync-mcp.cjs" download>
-                    <Download className="w-3.5 h-3.5 mr-1.5" />
-                    Download MCP server
-                  </a>
-                </Button>
-                <pre>{`agy mcp add docsync node /path/to/docsync-mcp.cjs --url ${location.origin}`}</pre>
-              </details>
-              <div className="mt-4 border-t pt-3">
-                <h4>Authorized MCP clients</h4>
-                {mcpClients.length ? mcpClients.map((client) => (
-                  <div key={client.client_id} className="flex items-center justify-between gap-3 py-2">
-                    <span className="text-sm">{client.client_name}</span>
-                    <Button variant="outline" size="sm" disabled={busy || connectionLoading} onClick={() => void run(async () => {
-                      await api("/mcp-clients", "DELETE", {clientId:client.client_id});
-                      setMcpClients(mcpClients.filter((item)=>item.client_id!==client.client_id));
-                      setNotice(`${client.client_name} access revoked.`);
-                    })}>Revoke access</Button>
+                {token && (
+                  <div className="token mt-4">
+                    <label className="block text-xs font-medium text-muted-foreground">
+                      Copy now — shown once
+                      <Input
+                        aria-label="New agent token"
+                        type="password"
+                        readOnly
+                        value={token}
+                        className="font-mono text-xs mt-1"
+                      />
+                    </label>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        void run(async () => {
+                          await navigator.clipboard.writeText(token);
+                          setNotice(
+                            "Token copied. Save it in your private MCP connection.",
+                          );
+                        })
+                      }
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-1" />
+                      Copy token
+                    </Button>
                   </div>
-                )) : <p className="text-xs text-muted-foreground">No remote MCP clients authorized yet.</p>}
-              </div>
-            </div>
+                )}
+              </details>
+            </section>
+
             <div className="connect-card">
-              <span className="step">03</span>
               <h3 className="tracking-tight">Start with a simple request</h3>
               <blockquote className="my-3">
                 Use DocSync to make a report from these notes and return its
@@ -1358,7 +1354,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
               <p className="text-xs text-muted-foreground">
                 {["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)
                   ? "Localhost links are local previews. Use a deployed DocSync server to share with other people."
-                  : "During browser authorization, allow publishing if you want the agent to return share links. Anyone with a published link can view that document."}
+                  : "To get a share link, enable publishing for the agent under Authorized MCP clients."}
               </p>
             </div>
           </section>
@@ -1369,6 +1365,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
             slideshow={fullscreen}
             onSlideshowChange={setFullscreen}
             pageLocks={pageLockControls}
+            screenPreview
             page={editorMode === "slide" ? safeActiveSlide : activeSectionIndex}
             onPageChange={editorMode === "slide" ? setActiveSlide : setActiveSectionIndex}
             footer={(section) => {
@@ -1397,65 +1394,6 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                 />
               </div>
             </div>
-            {!search && (
-              <section className="theme-library" aria-labelledby="theme-library-title">
-                <div className="theme-library-heading">
-                  <div>
-                    <h2 id="theme-library-title">Templates your agent can use</h2>
-                    <p>Preview a template, then ask your connected agent to build from it. Every edit is made by your agent.</p>
-                  </div>
-                  <Badge variant="outline">{themes.length} templates + custom</Badge>
-                </div>
-                <div className="theme-grid">
-                  {themes.map((theme) => (
-                    <a
-                      className="theme-card"
-                      data-theme-id={theme.id}
-                      key={theme.id}
-                      href={`/templates?template=${theme.id}`}
-                    >
-                      <span
-                        className="theme-preview"
-                        style={{
-                          background: theme.background,
-                          color: theme.color,
-                          borderTopColor: theme.accent,
-                        }}
-                      >
-                        <small>{theme.format === "presentation" ? "PRESENTATION" : "DOCUMENT"}</small>
-                        <strong>{theme.sample}</strong>
-                        <span aria-hidden="true" className="theme-bars">
-                          {[42, 65, 52, 78, 96].map((height) => (
-                            <i key={height} style={{ height: `${height}%`, background: theme.accent }} />
-                          ))}
-                        </span>
-                      </span>
-                      <span className="theme-copy"><strong>{theme.name}</strong><small>{theme.description}</small></span>
-                    </a>
-                  ))}
-                  <details className="theme-card custom-theme-card">
-                    <summary>
-                      <span className="custom-theme-mark"><Sparkles className="h-5 w-5" /></span>
-                      <span className="theme-copy"><strong>Custom via agent</strong><small>Describe the look to Codex, Claude, or Antigravity.</small></span>
-                    </summary>
-                    <p>Paste this into your connected agent and replace the bracketed style direction:</p>
-                    <code>{customThemePrompt}</code>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => void run(async () => {
-                        await navigator.clipboard.writeText(customThemePrompt);
-                        setNotice("Custom theme prompt copied.");
-                      })}
-                    >
-                      <Copy className="mr-1.5 h-3.5 w-3.5" />Copy agent prompt
-                    </Button>
-                  </details>
-                </div>
-              </section>
-            )}
             <div className="library-label">
               <span>{search ? "SEARCH RESULTS" : "ALL DOCUMENTS"}</span>
               <span>{list.length} documents</span>
@@ -1506,7 +1444,7 @@ export default function App({ initialSession }: { initialSession?: Session }) {
                 </p>
                 {!search && (
                   <Button
-                    onClick={() => void connect()}
+                    onClick={() => openWorkspace("agents")}
                     className="gap-2"
                   >
                     Connect your agent →
@@ -1542,7 +1480,10 @@ export default function App({ initialSession }: { initialSession?: Session }) {
         />
       )}
       {sessionExpired && session && <dialog ref={recoveryDialog} className="session-dialog" aria-label="Sign in to keep working" onCancel={event => { event.preventDefault(); if (!busy) setSessionExpired(false); }}>
-        <LoginPage authMode={authMode} setAuthMode={setAuthMode} error={error} setError={setError} google={false} busy={busy} claim="" authenticate={authenticate} onBackToLanding={() => { if (!busy) setSessionExpired(false); }} recovering recoveryEmail={session.email} />
+        <LoginPage authMode={authMode} setAuthMode={setAuthMode} error={error} setError={setError} google={session.google ? google : false}
+          googleUrl={session.google ? "/api/auth/google?" + new URLSearchParams({ returnTo: "/login", reauth: session.accountId }) : undefined}
+          resumeGoogleSession={session.google ? () => void run(finishSignIn) : undefined}
+          busy={busy} claim="" authenticate={authenticate} onBackToLanding={() => { if (!busy) setSessionExpired(false); }} recovering recoveryEmail={session.email} />
       </dialog>}
 
       {shareModalOpen && doc && session && (

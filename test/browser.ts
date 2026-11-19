@@ -18,6 +18,22 @@ import { handle } from "../src/worker.ts";
 import { hash } from "../src/auth.ts";
 
 const f = await fixture();
+f.env.GOOGLE_CLIENT_ID = "browser-oauth-client";
+f.env.GOOGLE_CLIENT_SECRET = "browser-oauth-secret";
+let googleEmail = "browser@example.com";
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (input, init) => {
+  if (String(input) === "https://oauth2.googleapis.com/token") {
+    const data = new URLSearchParams(init?.body as URLSearchParams);
+    assert.ok(data.get("code_verifier"));
+    return Response.json({ access_token: data.get("code") });
+  }
+  if (String(input) === "https://openidconnect.googleapis.com/v1/userinfo") {
+    const email = new Headers(init?.headers).get("Authorization")!.slice("Bearer ".length);
+    return Response.json({ sub: "browser-google:" + email, email, email_verified: true });
+  }
+  return realFetch(input, init);
+};
 const invitationEmails: { to: unknown; text?: string }[] = [];
 f.env.DOCSYNC_EMAIL_FROM = "invites@example.com";
 f.env.EMAIL = { async send(message) {
@@ -68,6 +84,15 @@ const server = createServer(async (req, res) => {
       }),
       f.env,
     );
+    const location = r.headers.get("Location");
+    if (location?.startsWith("https://accounts.google.com/")) {
+      // Simulate Google's authorization response while using the real DocSync callback.
+      const authorization = new URL(location);
+      const callback = new URL(authorization.searchParams.get("redirect_uri")!);
+      callback.searchParams.set("state", authorization.searchParams.get("state")!);
+      callback.searchParams.set("code", googleEmail);
+      r.headers.set("Location", callback.href);
+    }
     res.setHeader("Set-Cookie", r.headers.getSetCookie());
     res.writeHead(
       r.status,
@@ -143,7 +168,7 @@ try {
   page.on("request", trackHomepage);
   await page.goto(origin, { waitUntil: "networkidle0" });
   assert.equal(await page.$$eval("h1", nodes => nodes.length), 1);
-  assert.equal(await page.$eval("h1", node => node.textContent), "Turn agent drafts into work worth sharing.");
+  assert.equal(await page.$eval("h1", node => node.textContent), "AI documents and presentations, ready to share.");
   assert.ok(await page.$eval(".home-hero img", img => (img as HTMLImageElement).naturalWidth > 0), "The outcome image loads from the public asset route");
   assert.ok(!homepageRequests.some(url => /\/assets\/main-/.test(url)), "Guest homepage must not load the editor bundle");
   page.off("request", trackHomepage);
@@ -165,16 +190,23 @@ try {
   assert.match(await staticPage.$eval("main", node => node.textContent || ""), /Reports & updates/);
   await staticPage.click(".home-faq summary");
   assert.equal(await staticPage.$eval(".home-faq details", node => (node as HTMLDetailsElement).open), true);
+  await Promise.all([staticPage.waitForNavigation(), staticPage.click('nav[aria-label="Main navigation"] a[href="/guides"]')]);
+  await Promise.all([staticPage.waitForNavigation(), staticPage.click('a[href="/guides/connect-mcp"]')]);
+  await staticPage.click('[aria-label="CLI setup"] details:first-of-type > summary');
+  assert.match(await staticPage.$eval('[aria-label="CLI setup"] details[open] pre', node => node.textContent ?? ""), /codex mcp add docsync/);
+  assert.match(await staticPage.$eval('[aria-label="Web and desktop setup"] summary', node => node.textContent ?? ""), /ChatGPT web & Projects/);
   await staticPage.close();
   await page.setViewport({ width: 1440, height: 1000 });
   await Promise.all([page.waitForNavigation(), page.click('.home-use-cases a[href="/templates?template=sales-dashboard"]')]);
   await page.waitForFunction(() => document.querySelector('[aria-label="Selected template"] h2')?.textContent === "Sales Dashboard");
   await page.goto(origin);
   await Promise.all([page.waitForNavigation(), page.click('.home-actions a[href="/signup"]')]);
-  await page.waitForSelector('input[name="email"]');
-  assert.ok(await page.$('input[name="password"]'));
+  const googleLink = 'a[href^="/api/auth/google?"]';
+  await page.waitForSelector(googleLink);
+  assert.equal(await page.$('input[name="password"]'), null);
   await page.goto(origin + "/login");
-  await page.waitForSelector('input[name="email"]');
+  await page.waitForSelector(googleLink);
+  await page.waitForSelector('input[name="password"]');
   console.log("Homepage acceptance passed: prerendering without JavaScript, metadata routes, keyboard access, FAQ, mobile layout, deferred editor loading, template links, signup and sign-in.");
   const trial = await mcp();
   const connection = parse(
@@ -207,12 +239,9 @@ try {
     await trial.callTool({ name: "connect_account", arguments: {} }),
   );
   await page.goto(link.signInUrl);
-  await page.waitForSelector("input[name=email]");
+  await page.waitForSelector(googleLink);
   await page.screenshot({ path: "/tmp/docsync-signin.png", fullPage: true });
-  await click("Create an account");
-  await page.type("input[name=email]", "browser@example.com");
-  await page.type("input[name=password]", "Browser account password 123!");
-  await click("Create account →");
+  await page.click(googleLink);
   await page.waitForSelector(".workspace");
   console.log("Account signup passed; claiming the trial document.");
   await click("Claim my document");
@@ -221,7 +250,7 @@ try {
       .querySelector("[role=status]")
       ?.textContent?.includes("Document added"),
   );
-  await page.click(".connect-card details > summary");
+  await page.click("#local-mcp-token > summary");
   await click("Generate token");
   await page.waitForSelector('input[aria-label="New agent token"]');
   const token = await page.$eval(
@@ -289,12 +318,50 @@ try {
   await coverFrame.waitForSelector('h1');
   assert.equal(await coverFrame.$eval('h1', node => node.textContent), 'Overview');
   await page.screenshot({ path: "/tmp/docsync-library.png", fullPage: true });
+  assert.equal(await page.$(".theme-library"), null);
+  const savedTemplate = await account.callTool({ name: "save_company_template", arguments: {
+    name: "Class report", format: "document", instructions: "Use the report heading style.", css: "h1{color:navy}",
+    layouts: [{ name: "Title", html: "<h1>[Title]</h1>" }],
+  } });
+  assert.equal(savedTemplate.isError, false);
+  await click("Templates");
+  assert.equal(new URL(page.url()).pathname, "/workspace/templates");
+  await page.waitForFunction(() => document.querySelector('[aria-labelledby="saved-templates-title"]')?.textContent?.includes("Class report"));
   await page.click(".custom-theme-card summary");
   assert.match(await page.$eval(".custom-theme-card code", node => node.textContent || ""), /custom theme/i);
   console.log("Agent connection passed; checking the read-only workspace.");
   // Templates are previews for the agent; the browser never creates documents.
   assert.equal(await page.$eval('a[data-theme-id="pitch-deck"]', node => (node as HTMLAnchorElement).getAttribute("href")), "/templates?template=pitch-deck");
   assert.ok(!(await page.$eval("body", node => node.textContent || "")).includes("New document"));
+  const clientId = "c".repeat(64), oauthToken = "d".repeat(64);
+  const browserAccount = await f.env.DB.prepare("SELECT account_id FROM account_credentials WHERE token_hash=?").bind(await hash(token)).first<{ account_id: string }>();
+  await f.env.DB.batch([
+    f.env.DB.prepare("INSERT INTO oauth_clients VALUES(?,'Claude Code','[]',unixepoch())").bind(clientId),
+    f.env.DB.prepare("INSERT INTO oauth_access_tokens VALUES(?,?,?,0,unixepoch()+3600)").bind(await hash(oauthToken), browserAccount!.account_id, clientId),
+  ]);
+  await click("Agents");
+  assert.equal(new URL(page.url()).pathname, "/agents");
+  assert.equal(await page.$(".theme-library"), null);
+  const cliGuide = '[aria-label="CLI setup"]';
+  assert.deepEqual(await page.$$eval(`${cliGuide} summary`, labels => labels.map(label => label.textContent?.trim())),
+    ["Codex CLI", "Claude Code CLI", "Gemini CLI", "Antigravity CLI"]);
+  await page.click(`${cliGuide} details:first-child > summary`);
+  assert.equal(await page.$eval(`${cliGuide} details[open] pre`, code => code.textContent), `codex mcp add docsync --url ${origin}/mcp`);
+  await click("Web & desktop");
+  const webGuide = '[aria-label="Web and desktop setup"]';
+  assert.deepEqual(await page.$$eval(`${webGuide} summary`, labels => labels.map(label => label.textContent?.trim())),
+    ["ChatGPT web & Projects", "Claude web & Claude Code on the web", "Gemini web", "Antigravity App & IDE", "Codex on the web & ChatGPT desktop"]);
+  await page.click(`${webGuide} details:first-of-type > summary`);
+  assert.match(await page.$eval(`${webGuide} details[open]`, panel => panel.textContent ?? ""), /In a project chat, use the same picker/);
+  assert.match(await page.$eval(webGuide, panel => panel.textContent ?? ""), /Web agents need a public HTTPS endpoint/);
+  const allow = 'input[aria-label="Allow Claude Code to publish share links"]';
+  await page.waitForSelector(allow);
+  assert.equal(await page.$eval(allow, input => (input as HTMLInputElement).checked), false);
+  await page.click(allow);
+  await page.waitForFunction(selector => document.querySelector<HTMLInputElement>(selector)?.checked && document.querySelector('[role="status"]')?.textContent?.includes("Publishing enabled"), {}, allow);
+  const permission = await fetch(`${origin}/api/connection`, { headers: { Authorization: `Bearer ${oauthToken}` } });
+  assert.equal((await permission.json()).canPublish, true);
+  await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>(".sidebar nav button")].find(button => button.textContent?.includes("My documents"))!.click());
   // The connected agent creates a presentation (with its brief) and an interactive document.
   const pitch = await (await fetch(`${origin}/downloads/docsync/themes/pitch-deck.json`)).json();
   const pitchBrief = { answeredBy: "defaults", audience: "investors", depth: "overview", slideCount: pitch.sections.length, animation: "none", style: "pitch", speakerNotes: false };
@@ -318,15 +385,38 @@ try {
   await page.goto(`${origin}/documents/${presentationId}`, { waitUntil: "networkidle0" });
   await page.waitForSelector('.shared-slide-filmstrip');
   assert.equal(await page.$$eval('.shared-slide-filmstrip .shared-slide-thumbnail', nodes => nodes.length), 6);
-  assert.equal(await page.$$eval('input:not([type=hidden]),textarea,[contenteditable="true"]', nodes => nodes.length), 0, "The workspace has no editable fields");
+  assert.equal(await page.$$eval('input:not([type=hidden]),textarea,[contenteditable="true"]', nodes => nodes.length), 0, "The workspace has no content-editing fields");
   for (const removed of ["Save", "Add slide", "Delete slide", "Start editing", "Preview"]) assert.ok(!(await page.$$eval("button", (buttons, label) => buttons.some(button => button.textContent?.trim() === label || button.title === label), removed)), `${removed} is not offered`);
   assert.match(await page.$eval('.edit-lock-description', node => node.textContent || ''), /agent makes every edit/);
+  const screen = '.slide-screen-choice select';
+  await page.waitForSelector(screen);
+  for (const [preset, aspect] of [["widescreen", 16 / 9], ["projector", 4 / 3], ["phone", 9 / 16]] as const) {
+    await page.select(screen, preset);
+    await page.waitForFunction(aspect => {
+      const preview = document.querySelector('.slide-screen')!.getBoundingClientRect();
+      const slide = document.querySelector('.slide-screen iframe')!.getBoundingClientRect();
+      return Math.abs(preview.width / preview.height - aspect) < .01 &&
+        Math.abs(slide.width / slide.height - 16 / 9) < .01 && slide.width <= preview.width + 1 && slide.height <= preview.height + 1;
+    }, {}, aspect);
+  }
+  await page.focus(screen);
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.$eval('.shared-page-indicator', node => node.textContent?.trim()), 'Slide 1 of 6');
+  await page.select(screen, 'projector');
+  await page.setViewport({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector('.slide-screen')!.getBoundingClientRect().width > 0);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: '/tmp/docsync-projector-preview.png' });
+  await page.setViewport({ width: 1440, height: 1000 });
   await click('Present');
   await page.waitForSelector('dialog.presentation-viewer[open]');
+  await page.waitForFunction(() => document.fullscreenElement?.classList.contains('presentation-shell'));
   await page.locator('button[aria-label="Exit presentation"]').click();
+  await page.waitForFunction(() => !document.fullscreenElement);
   // An interactive document keeps running in the viewer.
   await page.goto(`${origin}/documents/${salesId}`, { waitUntil: "networkidle0" });
   await page.waitForSelector('.document-viewer');
+  assert.equal(await page.$(screen), null);
   const salesFrame = await (await page.$('iframe[src="/artifact-frame"]'))!.contentFrame();
   assert.ok(salesFrame);
   await salesFrame.waitForSelector("#live-sales");
@@ -408,11 +498,9 @@ try {
   assert.ok(invitationEmails[0].text?.includes(invitationUrl));
   await page.keyboard.press("Escape");
   await publicPage.goto(invitationUrl);
-  await publicPage.waitForSelector('input[name=email]');
-  await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Create an account')!.click());
-  await publicPage.type('input[name=email]', 'collaborator@example.com');
-  await publicPage.type('input[name=password]', 'Collaboration browser password 123!');
-  await publicPage.click('button[type=submit]');
+  await publicPage.waitForSelector(googleLink);
+  googleEmail = "collaborator@example.com";
+  await publicPage.click(googleLink);
   await publicPage.waitForSelector('.invitation-card');
   await publicPage.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent?.trim() === 'Accept invitation')!.click());
   await publicPage.waitForSelector('.document-viewer');
@@ -430,14 +518,20 @@ try {
   await page.waitForSelector('[aria-label="Version comparison"]');
   await page.screenshot({ path: '/tmp/docsync-version-history.png' });
   await click("Close history");
-  // An expired session asks for the password again without leaving the document.
+  // Google reauthentication keeps the current document open.
   const accountCookie = (await page.cookies()).find(cookie => cookie.name === "docsync_account")!;
   await f.env.DB.prepare("DELETE FROM account_sessions WHERE token_hash=?").bind(await hash(accountCookie.value)).run();
   await click("History");
   await page.waitForSelector("dialog.session-dialog[open]");
-  assert.equal(await page.$eval('.session-dialog input[name=email]', input => (input as HTMLInputElement).readOnly), true);
-  await page.type('.session-dialog input[name=password]', "Browser account password 123!");
-  await click("Sign in →");
+  assert.equal(await page.$('.session-dialog input[name=password]'), null);
+  googleEmail = "browser@example.com";
+  const [recoveryTarget] = await Promise.all([
+    browser.waitForTarget(target => target.url() === origin + "/login" && target !== page.target()),
+    page.click(".session-dialog " + googleLink),
+  ]);
+  await (await recoveryTarget.page())?.waitForSelector(".workspace");
+  await (await recoveryTarget.page())?.close();
+  await click("Resume workspace");
   await page.waitForSelector("dialog.session-dialog", { hidden: true });
   assert.equal(new URL(page.url()).pathname, `/documents/${doc.id}`);
   await click("Share");

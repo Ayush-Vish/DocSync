@@ -1,4 +1,4 @@
-export type Session = { authenticated?: boolean; email: string; legacy: boolean };
+export type Session = { authenticated?: boolean; accountId: string; email: string; google: boolean; legacy: boolean };
 
 export class ApiError extends Error {
   status: number;

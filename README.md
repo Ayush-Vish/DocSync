@@ -12,7 +12,7 @@ npm run setup
 PORT=8788 npm run dev
 ```
 
-Open **http://127.0.0.1:8788**. Create an email/password account, or choose **Existing workspace owner** and use `.local/owner-key` to access documents from the original MVP. Setup preserves existing credentials. The default port remains 8787; this workspace uses 8788 because another process occupies 8787.
+Open **http://127.0.0.1:8788**. Configure Google sign-in below to create an account. Existing users can sign in with their password. To access the original MVP workspace, choose **Existing workspace owner** on the sign-in page and use `.local/owner-key`. Setup preserves existing credentials. The default port remains 8787; this workspace uses 8788 because another process occupies 8787.
 
 For frontend hot reload, keep the backend running on 8788 and run `npm run dev:ui` in a second terminal. Open http://localhost:5173. Vite proxies API calls to the local backend and keeps cookies on the frontend origin. Production serves the built frontend and API from one origin.
 
@@ -28,9 +28,9 @@ For frontend hot reload, keep the backend running on 8788 and run `npm run dev:u
 - Two six-slide presentation templates with entrance animation, animated charts, and self-contained interactive examples. The presentation player supports keyboard and touch navigation, slide overview, animation replay, progress, and native fullscreen.
 - Upload images, animated GIFs, and video to docs and presentations with the `upload_media` MCP tool. Collaborator panels show reported agent names, companies, icons, and recent activity.
 - Library cards show the first saved page or slide. Covers load near the viewport and render without document JavaScript.
-- Email/password accounts, server-side sessions, Google OAuth, and account-scoped document access.
+- Google OAuth signup and sign-in, password sign-in for existing accounts, server-side sessions, and account-scoped document access.
 - One anonymous document per MCP installation, browser claiming, and account tokens with an explicit publishing grant.
-- A self-contained, publishable npm MCP package and a standalone download in **Connect agent**.
+- A self-contained, publishable npm MCP package and a standalone download in **Agents**.
 
 Browser requests have a 30-second timeout and clear connection errors. Mutations are never automatically retried, and repeated action clicks produce one request. An expired session asks for the password again without leaving the open document.
 
@@ -68,15 +68,17 @@ The authenticated **collaborators** menu and **Share → People with access** sh
 
 ### Downloadable agent skill and templates
 
-The landing page and **Connect agent** page provide `/downloads/docsync-skill.zip`, an installable `docsync/` skill folder for Codex and Claude Code. Browse the interactive examples at `/templates`. Source lives in `skills/docsync/`; `npm run build` packages it and publishes browsable template previews. ZIP creation uses the build-only `fflate` dependency.
+The landing page and workspace **Templates** tab provide `/downloads/docsync-skill.zip`, an installable `docsync/` skill folder for Codex and Claude Code. Browse the interactive examples at `/templates`. Source lives in `skills/docsync/`; `npm run build` packages it and publishes browsable template previews. ZIP creation uses the build-only `fflate` dependency.
+
+On your first DocSync design request for each format, your agent can ask whether you have a template or example to follow. Share a PDF, PowerPoint, Word file, or another reference your client can inspect, or say **“No template”** and continue with a design that fits your request. If you want to reuse a reference, the agent can save its design rules, HTML layouts, and stylesheet to your signed-in account. DocSync keeps one private template for documents and one for presentations. On later requests, say **“Use my saved template”** or **“Use my company template.”** The agent picks the matching format and DocSync applies its saved stylesheet. Templates store the reusable design with placeholders for assets such as logos. Output uses DocSync's HTML format.
 
 ### Public pages and search visibility
 
 The build prerenders the homepage and template gallery from their React components, so their content is readable before JavaScript loads. The guest homepage loads the editor only after a successful session check; authentication and document routes load it when needed.
 
-The Worker adds page-specific titles, descriptions, canonical URLs, Open Graph/Twitter cards, and JSON-LD using the request origin. `/robots.txt` points to `/sitemap.xml`, which lists only `/` and `/templates`. Account pages, document routes, share links, and API responses carry `X-Robots-Tag: noindex, nofollow`; this is a search directive, not access control. Published links remain accessible to anyone who has the link. Unknown app URLs return 404.
+The Worker adds page-specific titles, descriptions, canonical URLs, social cards, and JSON-LD using the request origin. `/robots.txt` points to `/sitemap.xml`, which lists the homepage, template gallery, and public guides. The guides are linked from the homepage and render without application JavaScript. Account pages, document routes, share links, and API responses carry `X-Robots-Tag: noindex, nofollow`. Published links remain accessible to anyone who has the link. Unknown app URLs return 404.
 
-After deploying to the preferred public domain, submit `https://YOUR_HOST/sitemap.xml` in Google Search Console and Bing Webmaster Tools. Redirect alternative deployment domains to that preferred domain at the hosting layer so they do not compete in search. Indexing and search rankings depend on the engines; local checks do not submit or deploy the site.
+In Google Search Console, add the exact production URL as a URL-prefix property. For HTML file verification, put the downloaded `google<token>.html` file in `public/`, build, and deploy. Verify ownership, then submit `https://YOUR_HOST/sitemap.xml` in the Sitemaps report. Inspect the homepage and guides to confirm Google can crawl them. If you move to a custom domain, redirect the old public origin to the preferred domain at the hosting layer.
 
 Unzip `docsync/` into `~/.codex/skills/` for Codex or `~/.claude/skills/` for Claude Code. Connect the DocSync MCP separately. The skill includes editorial documents, technical design documents, pitch decks, and project review slides. Each template has HTML/CSS and shares dependency-free JavaScript preview controls. Its Node.js helper converts marked sections into MCP creation payloads.
 
@@ -87,6 +89,8 @@ Hosted documents render sanitized HTML/CSS and optional per-section JavaScript. 
 Documents and presentations use their saved `format` to select distinct workspaces. Documents show one portrait page at a time in the workspace and the shared reader. Use the outline or **←/→**, **Page Up/Down**, and **Home/End** to turn pages, and **R** or the replay button to restart the current page. Up/down arrows and Space retain normal scrolling and control behavior. Page changes reset reading to the top; leaving a page stops its scripts.
 
 Each presentation page has an independent `html`, `css`, and `js` payload. Slides use a 1280 × 720 design viewport that scales to the available space, including mobile screens. Only the current page or slide runs in its viewer; overview, filmstrip, and library thumbnails never execute scripts. Presentations opened from the workspace or a shared link use the same player, and the workspace shows each slide's speaker notes under it. The gallery's **Present template** button opens it without creating an account or document.
+
+Use **Screen preview** in the workspace presentation view to check a slide on a 16:9 display, a 4:3 projector, or a portrait phone. The preview keeps the original slide proportions and shows the unused space as black bars. **Present** fits the full slide to the display in use and opens browser fullscreen when available. Navigation controls float over the slide and fade when idle. Move the pointer or tap to bring them back.
 
 Use **←/→**, **Page Up/Down**, **Space**, **Home/End**, **G** for overview, **R** to replay, and **Esc** to leave. Keyboard and horizontal swipe navigation also work while a slide frame has focus. Buttons, inputs, canvas interactions, and events handled with `preventDefault()` keep their own behavior. The frame bridge accepts only navigation actions from the currently mounted slide and grants no account access. Fullscreen uses the browser's native control; motion respects `prefers-reduced-motion`.
 
@@ -131,7 +135,7 @@ Restart the client and ask:
 
 Literal `@DocSync` support depends on the client. Standard MCP tool use works without mention syntax. DocSync does not call a model API; your existing agent generates the content.
 
-The second create request returns `AUTH_REQUIRED`. The agent calls `connect_account` to obtain a 15-minute browser link. Sign up or sign in, explicitly **Claim my document**, then generate a token under **Connect agent**. Claiming moves the trial document into the signed-in account and revokes the trial credential. A used/expired link cannot claim again. Claim links keep the secret in the URL fragment, out of HTTP request paths and referrers.
+The second create request returns `AUTH_REQUIRED`. The agent calls `connect_account` to obtain a 15-minute browser link. Sign up or sign in, explicitly **Claim my document**, then generate a token under **Agents**. Claiming moves the trial document into the signed-in account and revokes the trial credential. A used/expired link cannot claim again. Claim links keep the secret in the URL fragment, out of HTTP request paths and referrers.
 
 Save the token in a private file containing only the token (mode 600), then import it outside the agent conversation:
 
@@ -146,6 +150,8 @@ Delete the temporary token file afterward, then restart the agent. The CLI verif
 This trial identifies a local installation, **not physical hardware**. Deleting the profile can start another installation. Per-IP registration limits reduce casual abuse; this is not a billing or hardware-attestation boundary. No fingerprinting is performed.
 
 ## Google sign-in
+
+New accounts use Google. Existing password accounts keep their sign-in and documents. Hosted MCP users can continue with Google from the agent authorization screen, then approve agent access in DocSync.
 
 Create a **Web application OAuth client** in Google Cloud. Configure an exact authorized redirect URI:
 
@@ -179,7 +185,7 @@ Clients can install the npm package with:
 agy mcp add docsync npx -y @ayush-vish/docsync-mcp --url https://YOUR_HOST
 ```
 
-A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Connect agent → Download MCP server**. Downloading an executable does not include credentials. Tools cover connection and template discovery, documents, media uploads, edit leases, page locks and unlock requests, revision history, and collaboration. See [the MCP README](packages/mcp/README.md) for their contracts.
+A deployed DocSync URL is always required; there is no bundled public service. The local standalone artifact is also available through **Agents → Download MCP server**. Downloading an executable does not include credentials. Tools cover connection and template discovery, documents, media uploads, edit leases, page locks and unlock requests, revision history, and collaboration. See [the MCP README](packages/mcp/README.md) for their contracts.
 
 ### Hosted MCP (OAuth)
 
@@ -192,7 +198,7 @@ agy mcp add --type http docsync https://YOUR_HOST/mcp
 claude mcp add --transport http docsync https://YOUR_HOST/mcp
 ```
 
-The browser authorization page grants document access and lets the user separately allow publishing. OAuth uses authorization code with PKCE, short-lived access tokens, rotating refresh tokens, and account-scoped revocation from **Connect agent**. Approval is bound to the initiating browser by a single-use token and HttpOnly cookie. Registration, authorization, and token exchange have per-IP limits; OAuth JSON/forms are capped at 16 KiB, and ordinary API/MCP bodies at 550,000 bytes, including streamed bodies. Binary media uploads allow 8 MiB; only the `upload_media` hosted RPC allows up to 12 MiB of JSON for base64 overhead. OAuth pages block inline executable scripts, HTTPS responses use HSTS, and sensitive responses are not cached. Hosted MCP requires migrations through `0004_remote_mcp_oauth.sql`. Local stdio with private agent tokens remains available for clients without remote OAuth.
+The browser authorization page connects the agent with document and template access. To let an agent publish, open **Agents → Authorized MCP clients** and turn on **Allow publishing** for that client. Toggle it off or revoke the connection from the same page. The setting applies to existing tokens and survives token refresh. OAuth uses authorization code with PKCE, short-lived access tokens, and rotating refresh tokens. Approval is bound to the initiating browser by a single-use token and HttpOnly cookie. Registration, authorization, and token exchange have per-IP limits; OAuth JSON/forms are capped at 16 KiB, and ordinary API/MCP bodies at 550,000 bytes, including streamed bodies. Binary media uploads allow 8 MiB; only the `upload_media` hosted RPC allows up to 12 MiB of JSON for base64 overhead. OAuth pages block inline executable scripts, HTTPS responses use HSTS, and sensitive responses are not cached. Apply migrations through `0013_oauth_publishing_permissions.sql` for per-client publishing controls. Local stdio with private agent tokens remains available for clients without remote OAuth.
 
 ## Content and sharing
 
@@ -214,13 +220,13 @@ The small arrow beside Download HTML offers **Download JSON backup**. Neither do
 
 Open **Audit log** in the signed-in workspace to review your account's agent activity. Entries show the tool or API action, UTC/local timestamps, result and HTTP status, duration, document ID, request and connection references, client name/company/version, reported device name/platform, network IP, user agent, and safe parameter/result summaries. Search by tool, client, or device; filter by result and page through older events. Only the account's signed-in browser owner can read its audit history; agent tokens and public viewers cannot. The log shows the last **90 days**; old entries are purged as the account receives activity.
 
-Hosted MCP records tool calls, including SDK validation errors, on the server. Bridge **0.5.3** measures each completed local DocSync tool call from receipt to result, including validation, file preparation, and any API round trip. The audit log shows **Local MCP** time alongside **Server API** time on the same entry when an API request was recorded. Local-only calls, such as template discovery and input validation failures, have a client-reported entry. Bridge timing excludes delivery of the timing report itself. Device details and local duration are client-reported. Network IPs can be proxy or egress addresses. Timing reports require connectivity to DocSync.
+Hosted MCP records tool calls, including SDK validation errors, on the server. Bridge **0.5.3** measures each completed local DocSync tool call from receipt to result, including validation, file preparation, and any API round trip. The audit log shows **Local MCP** time alongside **Server API** time on the same entry when an API request was recorded. Local-only calls, such as input validation failures, have a client-reported entry. Bridge timing excludes delivery of the timing report itself. Device details and local duration are client-reported. Network IPs can be proxy or egress addresses. Timing reports require connectivity to DocSync.
 
 Audit records exclude authorization/session/edit tokens, passwords, media bytes, local file paths, and document HTML/CSS/JavaScript. Payloads are summarized, not copied verbatim. An audit record is reserved before an agent action executes; if reservation fails, the action is refused. If finalizing a successful action's log fails, its record stays **Unconfirmed** and the original result is returned, so clients do not mistake a saved write for a failed write and retry it. Unrelated local shell commands are not part of this agent audit history. Logging begins after migration `0009_agent_audit.sql`; past activity cannot be reconstructed.
 
 ## Deploy to Cloudflare
 
-Apply all migrations through **`0011_page_locks.sql` before deploying this Worker**. Uploaded media uses Supabase Storage when its three variables below are configured; without Supabase, an existing `MEDIA` R2 binding still works. The app can deploy and edit documents without media storage; uploads return a configuration error until storage is available. Migration `0008` adds an optional recipient email and preserves existing link invitations. The media migration adds asset metadata and agent activity without rewriting existing content. Migration `0006_collaboration.sql` is also required for collaboration. It adds membership, invitation and lease tables and nullable revision metadata without rewriting saved content. Rebuild/publish the npm bridge separately when releasing it; changing this repository does not update the npm registry.
+Apply all migrations through **`0013_oauth_publishing_permissions.sql` before deploying this Worker**. Uploaded media uses Supabase Storage when its three variables below are configured; without Supabase, an existing `MEDIA` R2 binding still works. The app can deploy and edit documents without media storage; uploads return a configuration error until storage is available. Migration `0008` adds an optional recipient email and preserves existing link invitations. The media migration adds asset metadata and agent activity without rewriting existing content. Migration `0006_collaboration.sql` is also required for collaboration. It adds membership, invitation and lease tables and nullable revision metadata without rewriting saved content. Rebuild/publish the npm bridge separately when releasing it; changing this repository does not update the npm registry.
 
 ### Supabase image and video storage
 
@@ -252,8 +258,8 @@ For email delivery, onboard your sender domain to [Cloudflare Email Sending](htt
 3. Apply all migrations with `npx wrangler@4 d1 migrations apply docsync --remote`. For uploads, configure the private Supabase bucket and three variables above. Existing R2 deployments can keep using their `MEDIA` binding when no Supabase variables are set.
 4. Generate production credentials using `node scripts/production-secrets.mjs`. It writes private files under `.local/production-*` without deploying anything.
 5. Set `OWNER_KEY_HASH` and `SESSION_SECRET` using `npx wrangler@4 secret put NAME`, using the generated hash and session-secret files. Keep the owner key privately for the legacy workspace.
-6. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if enabling Google sign-in. Register the correct deployed callback URL with Google.
-7. Run `npx wrangler@4 deploy --keep-vars` and verify sign-up, Google sign-in, anonymous installation, claim, token connection, media upload/playback, publication, and revocation on the hosted origin.
+6. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to enable account creation and Google sign-in. Register the exact deployed callback URL with Google.
+7. Run `npx wrangler@4 deploy --keep-vars` and verify Google signup and sign-in, existing password sign-in, anonymous installation, claim, token connection, media upload/playback, publication, and revocation on the hosted origin.
 
 Free-tier deployment is quota-limited. HTML parsing and password hashing consume CPU; check actual usage against [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) and [D1 limits](https://developers.cloudflare.com/d1/platform/limits/). Production traffic may need paid capacity. No model API is billed by DocSync; your coding agent's subscription is separate.
 

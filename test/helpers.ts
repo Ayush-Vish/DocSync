@@ -1,5 +1,7 @@
+import { createHmac, pbkdf2Sync } from 'node:crypto';
 import { sqliteDatabase } from '../scripts/sqlite.ts';
 import { hash, randomToken } from '../src/auth.ts';
+import { newSession } from '../src/accounts.ts';
 import { handle } from '../src/worker.ts';
 import type { Env, MediaBucket } from '../src/platform.ts';
 
@@ -28,6 +30,20 @@ export async function fixture(canPublish = false) {
     return handle(new Request(`http://127.0.0.1:8787/api${path}`, { method, headers, body: data === undefined ? undefined : JSON.stringify(data) }), env);
   }
   const response = await call('/login', 'POST', { key: ownerKey }); cookie = response.headers.get('Set-Cookie')!.split(';')[0];
-  return { env, ownerKey, agentToken, call, close: database.close };
+  async function seedUser(email: string, password?: string) {
+    const id = crypto.randomUUID();
+    let passwordHash = null;
+    if (password) {
+      // Match the persisted format of accounts created before Google-only signup.
+      const salt = randomToken();
+      const peppered = createHmac('sha256', env.SESSION_SECRET).update(password).digest();
+      passwordHash = salt + ':' + pbkdf2Sync(peppered, salt, 100_000, 32, 'sha256').toString('hex');
+    }
+    await env.DB.prepare("INSERT INTO accounts(id,kind,email,password_hash,google_sub,created_at) VALUES(?,'user',?,?,?,?)")
+      .bind(id, email, passwordHash, password ? null : id, new Date().toISOString()).run();
+    const cookie = (await newSession(new Request('http://127.0.0.1:8787'), env, id)).split(';')[0];
+    return { id, cookie };
+  }
+  return { env, ownerKey, agentToken, call, seedUser, close: database.close };
 }
 export const sample = (title = 'Architecture notes') => ({ title, sections: [{ id: 'intro', html: '<h1>Overview</h1><p>A useful document.</p>', css: 'h1{color:#276c54}' }] });

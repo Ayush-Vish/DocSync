@@ -33,7 +33,9 @@ export function TemplateGallery({ initialFormat: requested, initialTemplate }: {
     return () => window.removeEventListener("popstate", restore);
   }, []);
   return <main className="mx-auto max-w-6xl p-6 sm:p-10">
-    <a href="/" className="text-sm underline">DocSync</a>
+    <nav aria-label="Main navigation" className="flex gap-4 text-sm underline underline-offset-4">
+      <a href="/">DocSync</a><a href="/guides">Guides</a>
+    </nav>
     <h1 className="mt-6 text-3xl font-semibold">Choose your starting point</h1>
     <p className="mt-3 text-muted-foreground">Browse document and presentation templates. Tell your agent the template name, or say “you decide” for a custom design.</p>
     <nav aria-label="Template format" className="my-6 flex gap-3">

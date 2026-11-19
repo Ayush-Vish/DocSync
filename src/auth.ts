@@ -96,6 +96,7 @@ export type Principal = {
   kind: "legacy" | "user" | "trial";
   actorId: string;
   actorLabel: string;
+  oauthTokenHash?: string;
 };
 export async function authenticate(
   request: Request,
@@ -105,10 +106,11 @@ export async function authenticate(
   if (bearer) {
     if (!/^Bearer [a-f0-9]{64}$/.test(bearer))
       throw new HttpError(401, "Invalid agent token");
+    const tokenHash = await hash(bearer.slice(7));
     const credential = await env.DB.prepare(
       "SELECT c.account_id,c.can_publish,a.kind FROM account_credentials c JOIN accounts a ON a.id=c.account_id WHERE c.token_hash=?",
     )
-      .bind(await hash(bearer.slice(7)))
+      .bind(tokenHash)
       .first<{
         account_id: string;
         can_publish: number;
@@ -120,26 +122,26 @@ export async function authenticate(
         canPublish: credential.can_publish === 1,
         accountId: credential.account_id,
         kind: credential.kind,
-        actorId: `credential:${await hash(bearer.slice(7))}`,
+        actorId: `credential:${tokenHash}`,
         actorLabel: clientName(request, "Account agent"),
       };
     const oauth = await env.DB.prepare(
-      "SELECT t.account_id,t.can_publish,a.kind,t.client_id,c.client_name FROM oauth_access_tokens t JOIN accounts a ON a.id=t.account_id JOIN oauth_clients c ON c.client_id=t.client_id WHERE t.token_hash=? AND t.expires_at>?",
+      "SELECT t.account_id,COALESCE(p.can_publish,t.can_publish) AS can_publish,a.kind,t.client_id,c.client_name FROM oauth_access_tokens t JOIN accounts a ON a.id=t.account_id JOIN oauth_clients c ON c.client_id=t.client_id LEFT JOIN oauth_publishing_permissions p ON p.account_id=t.account_id AND p.client_id=t.client_id WHERE t.token_hash=? AND t.expires_at>?",
     )
-      .bind(await hash(bearer.slice(7)), Math.floor(Date.now() / 1000))
+      .bind(tokenHash, Math.floor(Date.now() / 1000))
       .first<{ account_id: string; can_publish: number; kind: Principal["kind"]; client_id: string; client_name: string }>();
-    if (oauth) return { role: "agent", canPublish: oauth.can_publish === 1, accountId: oauth.account_id, kind: oauth.kind, actorId: `oauth:${oauth.client_id}`, actorLabel: oauth.client_name };
+    if (oauth) return { role: "agent", canPublish: oauth.can_publish === 1, accountId: oauth.account_id, kind: oauth.kind, actorId: `oauth:${oauth.client_id}`, actorLabel: oauth.client_name, oauthTokenHash: tokenHash };
     const stored = await env.DB.prepare(
       "SELECT token_hash,can_publish FROM agent_credentials WHERE slot=1",
     ).first<{ token_hash: string; can_publish: number }>();
-    if (!stored || !same(await hash(bearer.slice(7)), stored.token_hash))
+    if (!stored || !same(tokenHash, stored.token_hash))
       throw new HttpError(401, "Invalid or revoked agent token");
     return {
       role: "agent",
       canPublish: stored.can_publish === 1,
       accountId: "legacy",
       kind: "legacy",
-      actorId: `credential:${await hash(bearer.slice(7))}`,
+      actorId: `credential:${tokenHash}`,
       actorLabel: clientName(request, "Workspace agent"),
     };
   }

@@ -29,8 +29,7 @@ test("OAuth inputs reject malformed and oversized bodies before storing clients"
 
 test("OAuth uses the caller's IP for password limits and binds approval to the issuing browser", async t => {
   const f = await fixture(); t.after(f.close);
-  const signup = await f.call("/auth/signup", "POST", { email: "flow@example.com", password: "a long safe password 123!" }, "anonymous", { Origin: "http://127.0.0.1:8787", "CF-Connecting-IP": "192.0.2.1" });
-  assert.equal(signup.status, 200);
+  await f.seedUser("flow@example.com", "a long safe password 123!");
   const clientId = randomToken(), redirect = 'https://client.example/callback?note=</script><script>bad()</script>';
   await f.env.DB.prepare("INSERT INTO oauth_clients VALUES(?,?,?,?)").bind(clientId, "Test Agent", JSON.stringify([redirect]), Math.floor(Date.now() / 1000)).run();
   const url = new URL(origin + "/oauth/authorize");

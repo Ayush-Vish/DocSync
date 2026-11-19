@@ -34,12 +34,11 @@ const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH
 try {
   const page = await browser.newPage(); await page.setViewport({ width: 1440, height: 1000 });
   const errors: string[] = []; page.on("pageerror", error => errors.push(String(error)));
-  await page.goto(origin + "/signup");
-  const token = await page.evaluate(async () => {
-    const signup = await fetch("/api/auth/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "media@example.com", password: "a long secure password 123!" }) });
-    if (!signup.ok) throw Error(await signup.text());
-    return (await (await fetch("/api/agent-token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ allowPublishing: true }) })).json()).token as string;
-  });
+  const { cookie } = await f.seedUser("media@example.com");
+  await browser.setCookie({ name: "docsync_account", value: cookie.slice("docsync_account=".length), domain: "127.0.0.1", path: "/" });
+  const issued = await f.call("/agent-token", "POST", { allowPublishing: true }, "anonymous", { Cookie: cookie, Origin: "http://127.0.0.1:8787" });
+  assert.equal(issued.status, 200);
+  const { token } = await issued.json() as { token: string };
   const api = async (path: string, method = "GET", data?: unknown) => {
     const response = await fetch(`${origin}/api${path}`, { method, headers: { Authorization: `Bearer ${token}`, "X-DocSync-Client": "Codex", ...(data === undefined ? {} : { "Content-Type": "application/json" }) }, body: data === undefined ? undefined : JSON.stringify(data) });
     const result = await response.json() as any; assert.ok(response.ok, JSON.stringify(result)); return result;

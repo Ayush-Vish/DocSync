@@ -36,9 +36,11 @@ claude mcp add --transport http docsync https://your-docsync.example/mcp
 agy mcp add --type http docsync https://your-docsync.example/mcp
 ```
 
-Complete sign-in and approval in the browser. Publishing is a separate opt-in permission. Revoke remote client access from **Connect agent**. `connect_account` handles stdio trial claiming; it does not replace the remote OAuth flow.
+Complete sign-in and approval in the browser. After connecting, you can enable publishing for the client under **Agents → Authorized MCP clients**. You can turn publishing off or revoke the connection from the same page. `connect_account` handles stdio trial claiming; it does not replace the remote OAuth flow.
 
 Ask your agent to create a report or presentation from your facts. `get_template_options` returns the template gallery and each template's preview and content URLs. Choose Editorial Report, Technical Blueprint, Sales Dashboard, Bold Pitch, Delivery Review, or Animated Research Talk, or ask for a custom design. Agents load the DocSync skill through `get_docsync_skill`, so no separate skill install is required. Before a presentation, the agent asks how detailed and how animated it should be (`plan_presentation`); animated decks are checked against the research-talk benchmark before they are saved. Slides or pages with class `motion` get step-by-step animation added automatically when saved. Both presentation templates contain six slides. Preview them at `/templates` using **Present template**. Bundled Northstar figures are fictional examples; replace them with your information.
+
+Your first design prompt for each format can ask whether you have a template or example to follow. Share a PDF, PowerPoint, Word file, or another reference your host can inspect, or say **“No template”** and the agent can choose a suitable design. The agent can save one reusable design per signed-in account and format. Say **“Use my saved template”** or **“Use my company template”** on future requests to select its layouts and styles.
 
 Each page or slide has independent **HTML, CSS, and optional JavaScript**. Set `format` to `document` or `presentation`, and provide ordered `pages` or `sections` with stable IDs. Use one of those array fields per request; reads return `sections`. Each item accepts `{id, kind?, html, css, js?}`. For example, pass this to `create_document`:
 
@@ -73,11 +75,11 @@ Animate with the Web Animations API, `requestAnimationFrame()`, or CSS `@keyfram
 
 Users can download either format from the web editor with **Download HTML**, without an agent or MCP call. The standalone file includes the current draft, page scripts/styles, media bytes, navigation, replay, and fullscreen controls. It works without internet or login and preserves sandbox isolation. A failed media download aborts the export. The arrow beside that button retains **Download JSON backup**. These are independent copies; server access changes do not revoke downloaded files.
 
-The signed-in account owner can review agent requests in **Audit log**. Apply migration `0010_agent_audit_local_duration.sql` before deploying the Worker. Bridge **0.5.3** reports elapsed time for completed local DocSync tools, including validation, file preparation and any API round trip. The same audit entry shows server API duration when available. Tools that never reach the API, such as template discovery and locally rejected calls, send a separate timing report. Hosted MCP measures its own tool duration on the server. Local timing and device metadata are reported by the bridge. Timing delivery requires connectivity. Tokens, document source, binary media and local file paths are excluded. Audit history is available to the signed-in owner for up to 90 days. The downloadable bridge is rebuilt with the website. npm publishing is separate.
+The signed-in account owner can review agent requests in **Audit log**. Apply migration `0010_agent_audit_local_duration.sql` before deploying the Worker. Bridge **0.5.3** reports elapsed time for completed local DocSync tools, including validation, file preparation and any API round trip. The same audit entry shows server API duration when available. Tools that never reach the API, such as locally rejected calls, send a separate timing report. Hosted MCP measures its own tool duration on the server. Local timing and device metadata are reported by the bridge. Timing delivery requires connectivity. Tokens, document source, binary media and local file paths are excluded. Audit history is available to the signed-in owner for up to 90 days. The downloadable bridge is rebuilt with the website. npm publishing is separate.
 
 The downloadable agent skill at `/downloads/docsync-skill.zip` includes templates and a conversion helper. It converts marked HTML sections to independent page payloads and supports optional `slides/SECTION_ID.css` and `slides/SECTION_ID.js` overrides. Install the skill separately from the MCP connection. Use a 0.5.0 backend and bridge with migration `0007_media_and_agents.sql` and the `MEDIA` R2 binding for uploads and collaborator activity. Reconnect your client after upgrading to refresh the tool schema.
 
-Bridge 0.5.4 provides 24 tools with a backend migrated through `0011_page_locks.sql`:
+Tool reference for a backend migrated through `0013_oauth_publishing_permissions.sql`
 
 | Tool | Purpose |
 | --- | --- |
@@ -85,11 +87,14 @@ Bridge 0.5.4 provides 24 tools with a backend migrated through `0011_page_locks.
 | `plan_presentation` | The questions an agent asks before building a presentation (detail, slide count, animation, style, audience, notes). Their answers are required as `brief` on `create_document`. |
 | `get_slide_patterns` | Research-talk slide patterns (the animated explainer benchmark) to copy, served over MCP. |
 | `get_docsync_skill` | Load the DocSync skill on demand (design rules, motion builds, the research-talk workflow, MCP contract) without installing it; also returns optional install commands. |
-| `get_template_options` | Discover templates, themes, gallery links, and self-contained content URLs. |
+| `get_template_options` | Discover saved company templates, see whether to ask about setup, and offer the built-in gallery. |
+| `get_company_template` | Read the saved company layouts and styles for the requested format. |
+| `save_company_template` | Save a reusable template after reviewing a user-supplied reference. To replace it, provide its current ID. |
+| `skip_company_template_setup` | Record that the user declined template setup for the requested format. |
 | `list_documents` | Find owned documents and private documents shared with the account. |
 | `get_document` | Read content, page IDs, revision, and document role. Optional `revision` reads a historical snapshot. |
 | `upload_media` | Upload document-owned images, GIFs, or video; returns a URL, canonical `src`, and HTML snippet. See the media workflow below. |
-| `create_document` | Create a private document or presentation from `pages` or `sections`. |
+| `create_document` | Create a private document or presentation from `pages` or `sections`. Pass `companyTemplateId` and the explicit `format` to apply the selected company stylesheet. |
 | `update_document` | Save a complete snapshot with `id`, `expectedRevision`, and `lockToken`; optional `changeSummary` is at most 300 characters. |
 | `publish_document` | Publish a verified saved revision as the document owner, with a publishing grant. |
 | `connect_account` | Request a browser link to claim a stdio installation's trial document. |
@@ -137,7 +142,7 @@ Limits: 1–40 pages; title 1–200 characters; unique page IDs of 1–80 letter
 
 The bridge stores a random private installation credential under `~/.config/docsync/servers/`, separately for each server origin. The backend permits one document per installation, including edits and publication. This is a convenience trial, not hardware identification: deleting the profile can create another installation. Server-side rate limits reduce casual abuse.
 
-On the next stdio document, ask your agent to call `connect_account`. Open the link, sign up or sign in, and explicitly claim your trial document. Generate an account token under **Connect agent → Generate or revoke a private token**. Publishing is disabled by default for new account tokens; explicitly enable it if you want the agent to return public share links. Import the token outside the agent conversation:
+On the next stdio document, ask your agent to call `connect_account`. Open the link, sign up or sign in, and explicitly claim your trial document. Generate an account token under **Agents → Generate or revoke a private token**. Publishing is disabled by default for new account tokens; explicitly enable it if you want the agent to return public share links. Import the token outside the agent conversation:
 
 ```sh
 npx -y @ayush-vish/docsync-mcp login --url https://your-docsync.example --token-stdin < /path/to/private-token-file

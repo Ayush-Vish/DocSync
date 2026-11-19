@@ -88,6 +88,7 @@ const artifactRuntime = (embeddedMedia: boolean) => String.raw`(() => {
           document.addEventListener("pointermove", () => {
             if (performance.now() - lastMove > 200) { lastMove = performance.now(); send("activity"); }
           }, { passive: true });
+          document.addEventListener("pointerdown", () => send("activity"), { passive: true });
         }
       }
       if (data.autoHeight === true) {

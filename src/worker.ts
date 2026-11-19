@@ -17,7 +17,7 @@ import { handleRemoteMcp } from "./remote-mcp.ts";
 import { artifactFrame, artifactPolicy } from "./artifact-frame.ts";
 import { errorResponse, jsonBody as body } from "./request.ts";
 import { webResponse } from "./web.ts";
-import { publicPages } from "./seo.ts";
+import { escapeHtml, publicPages } from "./seo.ts";
 import { mediaGrant, serveMedia, uploadMedia } from "./media.ts";
 import { maxMediaBytes } from "./media-config.ts";
 import { readBody } from "./request.ts";
@@ -25,6 +25,8 @@ import type { Document } from "./document.ts";
 import { agentActivity, collaborators } from "./agents.ts";
 import { lockPages, pageLockRequests, pageLockState, parsePageIds, requestPageUnlock, unlockPages } from "./page-locks.ts";
 import { invitationEmailAvailable, inviteByEmail } from "./invitation-email.ts";
+import { companyTemplateFormat } from "./company-template-schema.ts";
+import { getCompanyTemplate, saveCompanyTemplate, skipCompanyTemplateSetup, templateOptions } from "./company-templates.ts";
 
 const appPolicy =
   "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' about:; img-src 'self'; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
@@ -61,25 +63,24 @@ async function route(request: Request, env: Env, internalMcp: boolean): Promise<
   )
     throw new HttpError(503, "Server credentials are not configured");
   if (pathname === "/api/auth/config" && method === "GET")
-    return json({
-      google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-    });
-  if (
-    ["/api/auth/signup", "/api/auth/signin"].includes(pathname) &&
-    method === "POST"
-  )
+    return json({ google: accounts.googleSignInEnabled(env) });
+  if (pathname === "/api/auth/signup" && method === "POST")
+    throw new HttpError(410, "Create new accounts with Google at /signup.");
+  if (pathname === "/api/auth/signin" && method === "POST")
     return json({ ok: true }, 200, {
-      "Set-Cookie": await accounts.emailAuth(
-        request,
-        env,
-        await body(request),
-        pathname.endsWith("/signup"),
-      ),
+      "Set-Cookie": await accounts.passwordSignIn(request, env, await body(request)),
     });
-  if (pathname === "/api/auth/google" && method === "GET")
-    return accounts.googleStart(request, env);
-  if (pathname === "/api/auth/google/callback" && method === "GET")
-    return accounts.googleCallback(request, env);
+  if (method === "GET" && (pathname === "/api/auth/google" || pathname === "/api/auth/google/callback")) {
+    try {
+      return await (pathname === "/api/auth/google" ? accounts.googleStart : accounts.googleCallback)(request, env);
+    } catch (error) {
+      if (!(error instanceof HttpError) || !request.headers.get("Accept")?.includes("text/html")) throw error;
+      return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Google sign-in | DocSync</title><main><h1>Google sign-in</h1><p>${escapeHtml(error.message)}</p><a href="/login">Back to DocSync sign-in</a></main>`, {
+        status: error.status,
+        headers: { "Content-Type": "text/html;charset=utf-8" },
+      });
+    }
+  }
   if (pathname === "/api/installations" && method === "POST")
     return json(await accounts.bootstrap(request, env, await body(request)));
   if (pathname === "/api/login" && method === "POST") {
@@ -131,24 +132,43 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
       return json(await collaboration.acceptInvitation(env.DB, invitationMatch[1], principal.accountId));
     }
   }
-  if (pathname === "/api/mcp-clients" && method === "GET") {
+  if (pathname === "/api/mcp-clients") {
     owner();
-    const clients = await env.DB.prepare(
-      "SELECT c.client_id,c.client_name,MAX(t.expires_at) AS access_expires FROM oauth_clients c JOIN (SELECT client_id,account_id,expires_at FROM oauth_access_tokens UNION ALL SELECT client_id,account_id,expires_at FROM oauth_refresh_tokens) t ON t.client_id=c.client_id WHERE t.account_id=? AND t.expires_at>? GROUP BY c.client_id,c.client_name ORDER BY c.client_name",
-    ).bind(principal.accountId, Math.floor(Date.now()/1000)).all();
-    return json(clients.results);
-  }
-  if (pathname === "/api/mcp-clients" && method === "DELETE") {
-    owner(); checkOrigin(request);
-    const clientId=(await body(request)).clientId;
-    if(typeof clientId!=="string" || !/^[a-f0-9]{64}$/.test(clientId)) throw new HttpError(400,"Invalid MCP client");
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM edit_locks WHERE account_id=? AND actor_id=?").bind(principal.accountId, `oauth:${clientId}`),
-      env.DB.prepare("DELETE FROM oauth_codes WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
-      env.DB.prepare("DELETE FROM oauth_access_tokens WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
-      env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE client_id=? AND account_id=?").bind(clientId,principal.accountId),
-    ]);
-    return json({ok:true});
+    if (method === "GET") {
+      const clients = await env.DB.prepare(`SELECT c.client_id,c.client_name,MAX(t.expires_at) AS access_expires,
+        MAX(COALESCE(p.can_publish,t.can_publish)) AS can_publish
+        FROM (SELECT client_id,account_id,expires_at,can_publish FROM oauth_access_tokens
+          UNION ALL SELECT client_id,account_id,expires_at,can_publish FROM oauth_refresh_tokens) t
+        JOIN oauth_clients c ON c.client_id=t.client_id
+        LEFT JOIN oauth_publishing_permissions p ON p.account_id=t.account_id AND p.client_id=t.client_id
+        WHERE t.account_id=? AND t.expires_at>unixepoch() GROUP BY c.client_id,c.client_name ORDER BY c.client_name`)
+        .bind(principal.accountId).all<{ client_id: string; client_name: string; access_expires: number; can_publish: number }>();
+      return json(clients.results.map(({ can_publish, ...client }) => ({ ...client, allowPublishing: can_publish === 1 })));
+    }
+    if (method === "PATCH" || method === "DELETE") {
+      checkOrigin(request);
+      const { clientId, allowPublishing } = await body(request);
+      if (typeof clientId !== "string" || !/^[a-f0-9]{64}$/.test(clientId)) throw new HttpError(400, "Invalid MCP client");
+      const { accountId } = principal;
+      if (method === "PATCH") {
+        if (typeof allowPublishing !== "boolean") throw new HttpError(400, "Choose whether this agent can publish.");
+        const result = await env.DB.prepare(`INSERT INTO oauth_publishing_permissions(account_id,client_id,can_publish)
+          SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM oauth_access_tokens WHERE account_id=? AND client_id=? AND expires_at>unixepoch()
+            UNION ALL SELECT 1 FROM oauth_refresh_tokens WHERE account_id=? AND client_id=? AND expires_at>unixepoch())
+          ON CONFLICT(account_id,client_id) DO UPDATE SET can_publish=excluded.can_publish`)
+          .bind(accountId, clientId, Number(allowPublishing), accountId, clientId, accountId, clientId).run();
+        if (!result.meta.changes) throw new HttpError(404, "Connected agent not found");
+        return json({ allowPublishing });
+      }
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM edit_locks WHERE account_id=? AND actor_id=?").bind(accountId, `oauth:${clientId}`),
+        env.DB.prepare("DELETE FROM oauth_codes WHERE client_id=? AND account_id=?").bind(clientId, accountId),
+        env.DB.prepare("DELETE FROM oauth_access_tokens WHERE client_id=? AND account_id=?").bind(clientId, accountId),
+        env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE client_id=? AND account_id=?").bind(clientId, accountId),
+        env.DB.prepare("DELETE FROM oauth_publishing_permissions WHERE client_id=? AND account_id=?").bind(clientId, accountId),
+      ]);
+      return json({ ok: true });
+    }
   }
   const linkAccess = ["localhost", "127.0.0.1", "[::1]"].includes(
     new URL(request.url).hostname,
@@ -156,6 +176,21 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
     ? "local_only"
     : "anyone_with_link";
   if (pathname === "/api/page-lock-requests" && method === "GET") return json(await pageLockRequests(env.DB, principal));
+  if (pathname === "/api/template-options" && method === "GET")
+    return json(await templateOptions(env.DB, principal.accountId, principal.kind === "trial", new URL(request.url)));
+  const companyTemplate = pathname.match(/^\/api\/company-templates\/(document|presentation)(\/skip)?$/);
+  if (companyTemplate) {
+    const format = companyTemplateFormat.parse(companyTemplate[1]);
+    if (companyTemplate[2]) {
+      if (method === "POST") return json(await skipCompanyTemplateSetup(env.DB, principal.accountId, format));
+    } else {
+      if (principal.kind === "trial") throw new HttpError(403, "Sign in to save or retrieve a reusable template.", {
+        code: "AUTH_REQUIRED", signInUrl: new URL("/agents", request.url).href,
+      });
+      if (method === "GET") return json(await getCompanyTemplate(env.DB, principal.accountId, format));
+      if (method === "PUT") return json(await saveCompanyTemplate(env.DB, principal.accountId, format, await body(request)));
+    }
+  }
   if (pathname === "/api/connection" && method === "GET") {
     const pending = principal.role === "agent" ? await pageLockRequests(env.DB, principal) : [];
     return json({
@@ -164,20 +199,19 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
       origin: new URL(request.url).origin,
       linkAccess,
       trial: principal.kind === "trial",
-      signInUrl: new URL("/connect", request.url).href,
+      signInUrl: new URL("/agents", request.url).href,
       ...(pending.length ? { pageLockRequests: pending } : {}),
     });
   }
   if (pathname === "/api/session" && method === "GET") {
     owner();
+    const account = await env.DB.prepare("SELECT email,google_sub FROM accounts WHERE id=?")
+      .bind(principal.accountId).first<{ email: string | null; google_sub: string | null }>();
     return json({
       authenticated: true,
-      email:
-        (
-          await env.DB.prepare("SELECT email FROM accounts WHERE id=?")
-            .bind(principal.accountId)
-            .first<{ email: string }>()
-        )?.email || "Workspace owner",
+      accountId: principal.accountId,
+      email: account?.email || "Workspace owner",
+      google: Boolean(account?.google_sub),
       legacy: principal.kind === "legacy",
     });
   }
@@ -196,7 +230,7 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
   }
   if (pathname === "/api/claim-link" && method === "POST") {
     if (principal.kind !== "trial")
-      return json({ signInUrl: new URL("/connect", request.url).href });
+      return json({ signInUrl: new URL("/agents", request.url).href });
     return json(
       await accounts.claimLink(
         env,
@@ -306,7 +340,7 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
             "Your free document is ready. Sign in to create more documents.",
             {
               code: "AUTH_REQUIRED",
-              signInUrl: new URL("/connect", request.url).href,
+              signInUrl: new URL("/agents", request.url).href,
             },
           );
         throw error;
@@ -433,7 +467,7 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
         if (!principal.canPublish)
           throw new HttpError(
             403,
-            "Publishing is disabled for this agent token. In DocSync, use Connect agent to generate a token with Allow publishing enabled.",
+            "Publishing is disabled for this agent. Enable publishing in the DocSync Agents tab.",
           );
         const input = await body(request),
           token = randomToken();
@@ -443,6 +477,7 @@ async function authenticatedRoute(request: Request, env: Env, principal: Princip
           revision(input.expectedRevision),
           await hash(token),
           principal.accountId,
+          principal.oauthTokenHash,
         );
         return json({
           url: `${new URL(request.url).origin}/share/${token}`,

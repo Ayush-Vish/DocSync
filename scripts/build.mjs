@@ -26,8 +26,9 @@ await build({
 });
 const { pages } = await import("../dist/prerender.mjs");
 const shell = readFileSync("dist/public/index.html", "utf8");
+const staticShell = shell.replace(/<script\b[^>]*\btype="module"[^>]*><\/script>\s*/g, "");
 for (const page of pages) {
-  const html = shell
+  const html = (page.interactive ? shell : staticShell)
     .replace(/<!--seo:start-->[\s\S]*?<!--seo:end-->/, () => `<!--seo:start-->${page.metadata}<!--seo:end-->`)
     .replace(/<!--app:start-->[\s\S]*?<!--app:end-->/, () => `<!--app:start-->${page.content}<!--app:end-->`);
   mkdirSync(dirname(join("dist/public", page.file)), { recursive: true });

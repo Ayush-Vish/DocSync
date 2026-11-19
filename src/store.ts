@@ -4,6 +4,7 @@ import { hash } from "./auth.ts";
 import { access, readableDocument, editableDocument, lostLock } from "./collaboration.ts";
 import { validateMedia } from "./media.ts";
 import { withMotionRuntime, withoutMotionRuntime } from "./motion-runtime.ts";
+import { applyCompanyTemplate } from "./company-templates.ts";
 import {
   HttpError,
   validateContent,
@@ -53,11 +54,14 @@ export async function documentThumbnail(db: Database, id: string, accountId: str
 
 export async function createDocument(
   db: Database,
-  input: unknown,
+  input: Record<string, unknown>,
   accountId = "legacy",
   actor?: Principal,
 ): Promise<Document> {
-  const content = withMotionRuntime(validateContent(withoutMotionRuntime(input))),
+  const { companyTemplateId, ...documentInput } = input;
+  const validated = validateContent(withoutMotionRuntime(documentInput));
+  const content = withMotionRuntime(companyTemplateId === undefined ? validated
+    : await applyCompanyTemplate(db, accountId, companyTemplateId, documentInput.format, validated)),
     warnings = lintContent(content),
     id = crypto.randomUUID(),
     time = new Date().toISOString();
@@ -184,15 +188,23 @@ export async function publish(
   expected: number,
   tokenHash: string,
   accountId = "legacy",
+  oauthTokenHash?: string,
 ) {
   await access(db, id, accountId, "owner");
+  const allowed = `SELECT 1 FROM oauth_access_tokens t
+    LEFT JOIN oauth_publishing_permissions p ON p.account_id=t.account_id AND p.client_id=t.client_id
+    WHERE t.token_hash=? AND t.account_id=? AND t.expires_at>unixepoch() AND COALESCE(p.can_publish,t.can_publish)=1`;
   const result = await db
     .prepare(
-      "INSERT INTO publications(document_id,revision,token_hash) SELECT id,current_revision,? FROM documents WHERE id=? AND current_revision=? AND account_id=? ON CONFLICT(document_id) DO UPDATE SET revision=excluded.revision,token_hash=excluded.token_hash",
+      `INSERT INTO publications(document_id,revision,token_hash) SELECT id,current_revision,? FROM documents
+      WHERE id=? AND current_revision=? AND account_id=? ${oauthTokenHash ? `AND EXISTS(${allowed})` : ""}
+      ON CONFLICT(document_id) DO UPDATE SET revision=excluded.revision,token_hash=excluded.token_hash`,
     )
-    .bind(tokenHash, id, expected, accountId)
+    .bind(tokenHash, id, expected, accountId, ...(oauthTokenHash ? [oauthTokenHash, accountId] : []))
     .run();
   if (!result.meta.changes) {
+    if (oauthTokenHash && !await db.prepare(allowed).bind(oauthTokenHash, accountId).first())
+      throw new HttpError(403, "Publishing is disabled for this agent. Enable publishing in the DocSync Agents tab.");
     const current = await getDocument(db, id, undefined, accountId);
     throw new HttpError(
       409,

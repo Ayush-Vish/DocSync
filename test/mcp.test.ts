@@ -28,6 +28,7 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "compare_document_versions",
     "connect_account",
     "create_document",
+    "get_company_template",
     "get_connection",
     "get_docsync_skill",
     "get_document",
@@ -48,6 +49,8 @@ test("official MCP client exercises document tools and real Worker API in-proces
     "request_page_unlock",
     "restore_document",
     "revoke_document_invitation",
+    "save_company_template",
+    "skip_company_template_setup",
     "update_document",
     "update_document_collaborator_access",
     "upload_media",
@@ -96,6 +99,47 @@ test("official MCP client exercises document tools and real Worker API in-proces
     assert.ok(Array.isArray(options.themes) && options.themes.includes("midnight"));
     assert.match(options.guidance, /custom design/);
   }
+  const callTemplate = (name: string, args: Record<string, unknown> = {}) => client.callTool({ name, arguments: { format: "document", ...args } });
+  const initialOptions = parse(await callTemplate("get_template_options"));
+  assert.match(initialOptions.companyTemplateSetup.question, /^Do you have a template or example/);
+  assert.match(initialOptions.companyTemplateSetup.question, /PDF, PowerPoint, Word/);
+  assert.match(initialOptions.companyTemplateSetup.question, /If you don't have one or would rather skip/);
+  assert.equal(initialOptions.canSaveTemplates, true);
+  assert.deepEqual(initialOptions.companyTemplates, []);
+  const missingTemplate = await callTemplate("get_company_template");
+  assert.equal(missingTemplate.isError, true);
+  assert.equal(parse(missingTemplate).details.code, "COMPANY_TEMPLATE_NOT_FOUND");
+  assert.equal((await callTemplate("skip_company_template_setup")).isError, false);
+  assert.equal(parse(await callTemplate("get_template_options")).companyTemplateSetup, null);
+  assert.deepEqual(parse(await callTemplate("get_template_options", { format: "all" })).companyTemplateSetup.formats, ["presentation"]);
+  assert.equal((await callTemplate("create_document", sample("Report without a template"))).isError, false);
+  const recipe = {
+    name: "Company report",
+    instructions: "Use the established report cover and brand color.",
+    css: ".brand{color:#015b67}",
+    layouts: [{ name: "Cover", html: '<article class="brand"><h1>[Title]</h1><script>untrusted()</script></article>' }],
+  };
+  assert.equal((await callTemplate("save_company_template", { ...recipe, css: '@import "https://example.com/brand.css";' })).isError, true);
+  const template = parse(await callTemplate("save_company_template", recipe));
+  const foundTemplate = parse(await callTemplate("get_company_template"));
+  assert.equal(foundTemplate.id, template.id);
+  assert.equal(foundTemplate.layouts[0].html, '<article class="brand"><h1>[Title]</h1></article>');
+  assert.deepEqual(parse(await callTemplate("get_template_options")).companyTemplates, [template]);
+  const branded = {
+    title: "Branded report", companyTemplateId: template.id,
+    pages: [{ id: "cover", html: foundTemplate.layouts[0].html.replace("[Title]", "Branded report"), css: "h1{margin:0}" }],
+  };
+  const createdBranded = await callTemplate("create_document", branded);
+  assert.equal(createdBranded.isError, false);
+  const brandedDoc = parse(createdBranded);
+  assert.equal(brandedDoc.sections[0].css, ".brand{color:#015b67}\nh1{margin:0}");
+  assert.equal((await callTemplate("save_company_template", recipe)).isError, true);
+  const replacement = parse(await callTemplate("save_company_template", { ...recipe, replaceTemplateId: template.id, css: ".brand{color:blue}" }));
+  assert.notEqual(replacement.id, template.id);
+  assert.equal((await callTemplate("save_company_template", { ...recipe, replaceTemplateId: template.id })).isError, true);
+  assert.equal((await callTemplate("create_document", branded)).isError, true);
+  const snapshot = parse(await client.callTool({ name: "get_document", arguments: { id: brandedDoc.id } }));
+  assert.equal(snapshot.sections[0].css, brandedDoc.sections[0].css);
   const connection = parse(
     await client.callTool({ name: "get_connection", arguments: {} }),
   );

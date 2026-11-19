@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Grid2X2, Maximize, Minimize, RotateCcw, X } from "lucide-react";
 import { ArtifactFrame, ArtifactThumbnail, type NavigationAction } from "./ArtifactFrame";
 import type { Content } from "../document";
 import "./presentation.css";
 
-export function PresentationViewer({ sections, initialSlide = 0, title = "Presentation", onClose, onSlideChange }: {
+export function PresentationViewer({ sections, initialSlide = 0, title = "Presentation", startFullscreen = false, onClose, onSlideChange }: {
   sections: Content["sections"];
   initialSlide?: number;
   title?: string;
+  startFullscreen?: boolean;
   onClose: () => void;
   onSlideChange?: (index: number) => void;
 }) {
@@ -35,7 +36,7 @@ export function PresentationViewer({ sections, initialSlide = 0, title = "Presen
     showControls();
   }, [last, showControls]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current!;
     const surface = screen.current!;
     element.showModal();
@@ -43,13 +44,17 @@ export function PresentationViewer({ sections, initialSlide = 0, title = "Presen
     const change = () => setFullscreen(document.fullscreenElement === surface);
     document.addEventListener("fullscreenchange", change);
     showControls();
+    if (startFullscreen && document.fullscreenEnabled && navigator.userActivation?.isActive && !document.fullscreenElement) {
+      // Present is a user gesture. The viewport-sized dialog is the fallback when native fullscreen is blocked.
+      void surface.requestFullscreen().catch(() => {});
+    }
     return () => {
       clearTimeout(timer.current);
       document.removeEventListener("fullscreenchange", change);
       if (document.fullscreenElement === surface) void document.exitFullscreen().catch(() => {});
       element.close();
     };
-  }, [showControls]);
+  }, [showControls, startFullscreen]);
   useEffect(() => { notify.current?.(current); }, [current]);
   useEffect(() => {
     if (overview) dialog.current?.querySelector<HTMLButtonElement>('[data-slide][aria-current="true"]')?.focus();
@@ -90,11 +95,11 @@ export function PresentationViewer({ sections, initialSlide = 0, title = "Presen
     return () => window.removeEventListener("keydown", navigate);
   }, [action, overview]);
 
-  return <dialog ref={dialog} tabIndex={-1} className={`presentation-viewer ${visible || overview ? "" : "controls-hidden"}`} aria-label={`${title} — presentation`} onPointerMove={showControls}
+  return <dialog ref={dialog} tabIndex={-1} className={`presentation-viewer ${visible || overview ? "" : "controls-hidden"}`} aria-label={`${title} — presentation`} onPointerMove={showControls} onPointerDown={showControls}
     onCancel={event => { event.preventDefault(); action("exit"); }}>
     <div ref={screen} className="presentation-shell">
     <header className="presentation-heading">
-      <div><span>DOCSYNC / PRESENTATION</span><strong>{title}</strong></div>
+      <strong>{title}</strong>
       <button className="presentation-ctrl-btn" aria-label="Exit presentation" title="Exit presentation (Esc)" onClick={onClose}><X size={20} /></button>
     </header>
     {error && <p role="alert" className="presentation-error">{error}</p>}

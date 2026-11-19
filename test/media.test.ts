@@ -73,8 +73,7 @@ test("media byte/type, filename and body limits reject invalid uploads before st
 
 test("only editors upload; private render grants recheck membership after revocation", async t => {
   const f = await fixture(); t.after(f.close); const doc = await draft(f);
-  const signup = await f.call("/auth/signup", "POST", { email: "member@example.com", password: "a long secure password 123!" }, "anonymous", { Origin: origin });
-  const cookie = signup.headers.getSetCookie()[0].split(";")[0];
+  const { cookie } = await f.seedUser("member@example.com");
   const accountId = (await f.env.DB.prepare("SELECT id FROM accounts WHERE email='member@example.com'").first<any>()).id;
   const token = (await (await f.call("/agent-token", "POST", { allowPublishing: false }, "anonymous", { Cookie: cookie, Origin: origin })).json() as any).token;
   assert.equal((await upload(f, doc.id, png, "image/png", "image.png", token)).status, 404);

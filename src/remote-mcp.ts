@@ -1,7 +1,7 @@
 import { withAgentAudit } from "./audit.ts";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { authenticate, hash, randomToken } from "./auth.ts";
-import { readCookie, rateLimit } from "./accounts.ts";
+import { googleSignInEnabled, readCookie, rateLimit, passwordSignIn } from "./accounts.ts";
 import { jsonBody, formBody, readBody } from "./request.ts";
 import { HttpError } from "./content.ts";
 import { createMcpServer } from "./mcp-server.ts";
@@ -16,16 +16,25 @@ const html = (value: string) => value.replace(/[&<>"']/g, (c) => ({ "&": "&amp;"
 function authorizationCookie(request: Request, token: string, age = 600) {
   return `docsync_oauth=${token}; HttpOnly; SameSite=Lax; Path=/oauth/authorize; Max-Age=${age}${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`;
 }
-function page(client: string, fields: Record<string, string>, error = "", signedIn = "") {
-  const hidden = Object.entries(fields).map(([k,v]) => `<input type="hidden" name="${html(k)}" value="${html(v)}">`).join("");
-  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect ${html(client)} to DocSync</title><style>body{font:16px system-ui;max-width:440px;margin:12vh auto;padding:24px;color:#202124}form{display:grid;gap:14px}input{padding:12px;border:1px solid #bbb;border-radius:8px}button{padding:12px;background:#171717;color:white;border:0;border-radius:8px;cursor:pointer}.error{color:#b42318}</style><h1>Connect ${html(client)} to DocSync</h1><p>Authorize this agent to read and edit your DocSync documents. You can revoke access from Connect agent.</p>${error ? `<p class="error">${html(error)}</p>` : ""}<form method="post">${hidden}${signedIn ? `<p>Signed in as ${html(signedIn)}</p>` : `<label>Email<br><input required type="email" name="email" autocomplete="username"></label><label>Password<br><input required type="password" name="password" autocomplete="current-password"></label>`}<label><input type="checkbox" name="publish" value="yes"> Allow this agent to publish share links</label><button>Authorize DocSync</button></form><p><a href="/">Create an account in DocSync first</a></p>`, { headers: { "Content-Type": "text/html;charset=utf-8", "Cache-Control": "no-store" } });
+function page(client: string, csrf: string, googleUrl: string, error = "", signedIn = "") {
+  const signIn = signedIn ? `<p>Signed in as ${html(signedIn)}</p>` : `
+    ${googleUrl ? `<p><a href="${html(googleUrl)}">Continue with Google</a></p>` : ""}
+    <p>Sign in with an existing DocSync password.</p>
+    <label>Email<br><input required type="email" name="email" autocomplete="username"></label>
+    <label>Password<br><input required type="password" name="password" autocomplete="current-password"></label>`;
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Connect ${html(client)} to DocSync</title><style>body{font:16px system-ui;max-width:440px;margin:12vh auto;padding:24px;color:#202124}form{display:grid;gap:14px}input{padding:12px;border:1px solid #bbb;border-radius:8px}button{padding:12px;background:#171717;color:white;border:0;border-radius:8px;cursor:pointer}.error{color:#b42318}</style><h1>Connect ${html(client)} to DocSync</h1><p>Authorize this agent to read and edit your DocSync documents and saved templates. You can manage access and publishing in the Agents tab.</p>${error ? `<p class="error">${html(error)}</p>` : ""}<form method="post"><input type="hidden" name="csrf" value="${html(csrf)}">${signIn}<button>Authorize DocSync</button></form>`, { headers: { "Content-Type": "text/html;charset=utf-8", "Cache-Control": "no-store" } });
+}
+function googleAuthorizationLink(env: Env, fields: Record<string, string>) {
+  if (!googleSignInEnabled(env)) return "";
+  const query = new URLSearchParams({ ...fields, response_type: "code", code_challenge_method: "S256" });
+  return "/api/auth/google?" + new URLSearchParams({ returnTo: "/oauth/authorize?" + query });
 }
 async function retryPage(request: Request, env: Env, client: string, fields: Record<string, string>, error: string) {
   const csrf = randomToken();
   await env.DB.prepare("INSERT INTO oauth_authorizations VALUES(?,?,?,?,?,?)")
     .bind(await hash(csrf), fields.client_id, fields.redirect_uri, fields.code_challenge, fields.state || null, now() + 600)
     .run();
-  const response = page(client, { ...fields, csrf }, error);
+  const response = page(client, csrf, googleAuthorizationLink(env, fields), error);
   response.headers.append("Set-Cookie", authorizationCookie(request, csrf));
   return response;
 }
@@ -43,9 +52,9 @@ function loopbackRedirect(uri: string) {
 export async function handleRemoteMcp(request: Request, env: Env, fetchApi: typeof fetch): Promise<Response | null> {
   const url = new URL(request.url), path = url.pathname, origin = url.origin, method = request.method;
   if (path === "/.well-known/oauth-protected-resource" || path === "/.well-known/oauth-protected-resource/mcp")
-    return json({ resource: `${origin}/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["docsync", "docsync:publish"] });
+    return json({ resource: `${origin}/mcp`, authorization_servers: [origin], bearer_methods_supported: ["header"], scopes_supported: ["docsync"] });
   if (path === "/.well-known/oauth-authorization-server")
-    return json({ issuer: origin, authorization_endpoint: `${origin}/oauth/authorize`, token_endpoint: `${origin}/oauth/token`, registration_endpoint: `${origin}/oauth/register`, revocation_endpoint: `${origin}/oauth/revoke`, response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: ["docsync", "docsync:publish"] });
+    return json({ issuer: origin, authorization_endpoint: `${origin}/oauth/authorize`, token_endpoint: `${origin}/oauth/token`, registration_endpoint: `${origin}/oauth/register`, revocation_endpoint: `${origin}/oauth/revoke`, response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: ["docsync"] });
   if (path === "/oauth/register" && method === "POST") {
     await rateLimit(request, env, "oauth-registration", 20, 3600);
     const input = await jsonBody(request, 16_384);
@@ -65,7 +74,8 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
     await env.DB.prepare("INSERT INTO oauth_authorizations VALUES(?,?,?,?,?,?)").bind(await hash(csrf),clientId,redirectUri,challenge,state||null,now()+600).run();
     let signedIn="";
     try { const user=await authenticate(request,env); if(user.role==="owner"&&user.kind==="user") signedIn=(await env.DB.prepare("SELECT email FROM accounts WHERE id=?").bind(user.accountId).first<{email:string}>())?.email||""; } catch {}
-    const response = page(client.client_name,{csrf},"",signedIn);
+    const googleUrl = googleAuthorizationLink(env, { client_id: clientId, redirect_uri: redirectUri, code_challenge: challenge, state });
+    const response = page(client.client_name, csrf, googleUrl, "", signedIn);
     response.headers.append("Set-Cookie", authorizationCookie(request, csrf));
     return response;
   }
@@ -82,7 +92,7 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
     let accountId: string, sessionCookie = "";
     const email=String(form.get("email")||""),password=String(form.get("password")||"");
     if (email && password) {
-      try { sessionCookie = await (await import("./accounts.ts")).emailAuth(new Request(`${origin}/oauth/authorize`,{method:"POST",headers:{Origin:origin,"Content-Type":"application/json",...(request.headers.has("CF-Connecting-IP") ? {"CF-Connecting-IP":request.headers.get("CF-Connecting-IP")!} : {})}}),env,{email,password},false); }
+      try { sessionCookie = await passwordSignIn(new Request(`${origin}/oauth/authorize`,{method:"POST",headers:{Origin:origin,"Content-Type":"application/json",...(request.headers.has("CF-Connecting-IP") ? {"CF-Connecting-IP":request.headers.get("CF-Connecting-IP")!} : {})}}),env,{email,password}); }
       catch(error) { if(error instanceof HttpError && error.status===401) return retryPage(request,env,client.client_name,fields,"Email or password is incorrect."); throw error; }
       const value=sessionCookie.split(";")[0].slice("docsync_account=".length);
       const session=await env.DB.prepare("SELECT account_id FROM account_sessions WHERE token_hash=? AND expires_at>?").bind(await hash(value),now()).first<{account_id:string}>();
@@ -94,11 +104,11 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
         const authRequest=new Request(request.url,{method:request.method,headers:authHeaders});
         const user=await authenticate(authRequest,env); if(user.role!=="owner" || user.kind!=="user") throw new Error(); accountId=user.accountId;
       }
-      catch { return retryPage(request,env,client.client_name,fields,"Enter your DocSync email and password to continue."); }
+      catch { return retryPage(request,env,client.client_name,fields,"Sign in to DocSync to continue."); }
     }
-    const code=randomToken(), canPublish=form.get("publish")==="yes", scope=canPublish?"docsync docsync:publish":"docsync";
+    const code = randomToken();
     await env.DB.prepare("DELETE FROM oauth_codes WHERE expires_at<?").bind(now()).run();
-    await env.DB.prepare("INSERT INTO oauth_codes VALUES(?,?,?,?,?,?,?)").bind(await hash(code),fields.client_id,accountId,fields.redirect_uri,fields.code_challenge,scope,now()+300).run();
+    await env.DB.prepare("INSERT INTO oauth_codes VALUES(?,?,?,?,?,?,?)").bind(await hash(code),fields.client_id,accountId,fields.redirect_uri,fields.code_challenge,"docsync",now()+300).run();
     const headers = new Headers();
     const callback = new URL(fields.redirect_uri);
     callback.searchParams.set("code", code);
@@ -113,18 +123,17 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
   }
   if (path === "/oauth/token" && method === "POST") {
     await rateLimit(request, env, "oauth-token", 120);
-    const form=await formBody(request), grant=String(form.get("grant_type")||""), clientId=String(form.get("client_id")||"");
-    if(grant==="authorization_code") {
-      const code=String(form.get("code")||""),redirectUri=String(form.get("redirect_uri")||""),verifier=String(form.get("code_verifier")||"");
-      if(!/^[A-Za-z0-9_-]{43,128}$/.test(verifier))return json({error:"invalid_grant"},400);
-      const row=await env.DB.prepare("DELETE FROM oauth_codes WHERE code_hash=? AND client_id=? AND redirect_uri=? RETURNING account_id,client_id,redirect_uri,code_challenge,scope,expires_at").bind(await hash(code),clientId,redirectUri).first<{account_id:string;client_id:string;redirect_uri:string;code_challenge:string;scope:string;expires_at:number}>();
-      if(!row||row.expires_at<=now()||row.code_challenge!==b64(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier))))return json({error:"invalid_grant"},400);
-      return issue(env,row.account_id,clientId,row.scope.includes("docsync:publish"),row.scope);
+    const form = await formBody(request), grant = form.get("grant_type"), clientId = String(form.get("client_id") || "");
+    if (grant === "authorization_code") {
+      const code = String(form.get("code") || ""), redirectUri = String(form.get("redirect_uri") || ""), verifier = String(form.get("code_verifier") || "");
+      // RFC 7636 verifiers permit every unreserved character, including dot and tilde.
+      if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return json({ error: "invalid_grant" }, 400);
+      const challenge = b64(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+      return exchange(env, "oauth_codes", "code_hash=? AND client_id=? AND redirect_uri=? AND code_challenge=?", [await hash(code), clientId, redirectUri, challenge]);
     }
-    if(grant==="refresh_token") {
-      const token=String(form.get("refresh_token")||""), row=await env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE token_hash=? AND client_id=? RETURNING account_id,client_id,can_publish,expires_at").bind(await hash(token),clientId).first<{account_id:string;client_id:string;can_publish:number;expires_at:number}>();
-      if(!row||row.expires_at<=now())return json({error:"invalid_grant"},400);
-      return issue(env,row.account_id,clientId,row.can_publish===1,row.can_publish?"docsync docsync:publish":"docsync");
+    if (grant === "refresh_token") {
+      const token = String(form.get("refresh_token") || "");
+      return exchange(env, "oauth_refresh_tokens", "token_hash=? AND client_id=?", [await hash(token), clientId]);
     }
     return json({error:"unsupported_grant_type"},400);
   }
@@ -150,9 +159,23 @@ export async function handleRemoteMcp(request: Request, env: Env, fetchApi: type
   }
   return null;
 }
-async function issue(env:Env,accountId:string,clientId:string,canPublish:boolean,scope:string){
-  const access=randomToken(),refresh=randomToken(),at=now()+900,rt=now()+2592000;
-  await env.DB.batch([env.DB.prepare("DELETE FROM oauth_access_tokens WHERE expires_at<?").bind(now()),env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE expires_at<?").bind(now()),env.DB.prepare("DELETE FROM oauth_codes WHERE expires_at<?").bind(now())]);
-  await env.DB.batch([env.DB.prepare("INSERT INTO oauth_access_tokens VALUES(?,?,?,?,?)").bind(await hash(access),accountId,clientId,canPublish?1:0,at),env.DB.prepare("INSERT INTO oauth_refresh_tokens VALUES(?,?,?,?,?)").bind(await hash(refresh),accountId,clientId,canPublish?1:0,rt)]);
-  return json({access_token:access,token_type:"Bearer",expires_in:900,refresh_token:refresh,scope});
+async function exchange(
+  env: Env,
+  table: "oauth_codes" | "oauth_refresh_tokens",
+  predicate: string,
+  parameters: string[],
+) {
+  const access = randomToken(), refresh = randomToken(), time = now();
+  const where = `${predicate} AND expires_at>?`;
+  const grant = `SELECT ?,account_id,client_id,${table === "oauth_codes" ? "0" : "can_publish"},? FROM ${table} WHERE ${where}`;
+  // Consume the verified grant and issue both replacement tokens in one transaction.
+  const [issued] = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO oauth_access_tokens ${grant}`).bind(await hash(access), time + 900, ...parameters, time),
+    env.DB.prepare(`INSERT INTO oauth_refresh_tokens ${grant}`).bind(await hash(refresh), time + 2_592_000, ...parameters, time),
+    env.DB.prepare(`DELETE FROM ${table} WHERE ${where}`).bind(...parameters, time),
+    env.DB.prepare("DELETE FROM oauth_access_tokens WHERE expires_at<=?").bind(time),
+    env.DB.prepare("DELETE FROM oauth_refresh_tokens WHERE expires_at<=?").bind(time),
+  ]);
+  if (!issued.meta.changes) return json({ error: "invalid_grant" }, 400);
+  return json({ access_token: access, token_type: "Bearer", expires_in: 900, refresh_token: refresh, scope: "docsync" });
 }

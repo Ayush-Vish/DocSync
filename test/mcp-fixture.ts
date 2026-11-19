@@ -31,14 +31,15 @@ process.once("beforeExit", () => {
   assert.deepEqual(rows.map(row => [row.tool, row.source, row.outcome]), [
     ["create_document", "api", "success"],
     ["get_document", "api", "error"],
-    ["get_template_options", "client", "success"],
+    ["get_template_options", "api", "success"],
     ["update_document", "client", "error"],
     ["upload_media", "client", "error"],
   ]);
   for (const row of rows) assert.ok(typeof row.local_duration_ms === "number" && row.local_duration_ms >= 0);
   assert.ok(Number(rows[0].local_duration_ms) >= Number(rows[0].duration_ms) + 40);
   assert.equal(rows[1].status, 404);
-  assert.ok(rows.slice(2).every(row => row.duration_ms === null));
+  assert.equal(rows[2].status, 200);
+  assert.ok(rows.slice(3).every(row => row.duration_ms === null));
   assert.ok(!JSON.stringify(rows).includes("private.png"));
   database.close();
 });

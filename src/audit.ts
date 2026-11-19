@@ -50,6 +50,11 @@ function operation(request: Request): string {
   if (path === "/api/documents") return method === "POST" ? "create_document" : "list_documents";
   if (path === "/api/connection") return "get_connection";
   if (path === "/api/claim-link") return "connect_account";
+  if (path === "/api/template-options") return "get_template_options";
+  if (path.startsWith("/api/company-templates/")) {
+    if (path.endsWith("/skip")) return "skip_company_template_setup";
+    return method === "PUT" ? "save_company_template" : "get_company_template";
+  }
   if (/\/invitations\//.test(path)) return "revoke_document_invitation";
   if (/^\/api\/documents\/[a-f0-9-]{36}$/.test(path)) return method === "GET" ? "get_document" : "update_document";
   const action = path.split("/").at(-1);

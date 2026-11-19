@@ -39,7 +39,7 @@ export const briefQuestions = [
   { key: "speakerNotes", question: "Add speaker notes with a script for each slide?", default: true },
 ] as const;
 
-export const askHow = "Ask the user these questions before building, in one message (or your client's question/choice UI), showing each option and the default. Skip any question the user already answered in their request. If the user says to decide for them, use the defaults and set answeredBy to \"defaults\". Then pass the answers as brief to create_document.";
+export const askHow = "Ask the user these questions before building, in one message (or your client's question/choice UI), showing each option and the default. Skip any question the user already answered in their request. If the user says to decide for them, use the defaults and set answeredBy to \"defaults\". A selected company template answers the style question (custom). If the user delegates animation for a company template, choose the animation that matches its layout and pacing. Then pass the answers as brief to create_document.";
 
 export const depthGuide = {
   overview: "One idea per slide in plain words; analogies welcome; at most one number per slide.",

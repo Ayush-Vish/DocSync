@@ -47,6 +47,7 @@ export function LandingPage() {
           <a href="#use-cases">Examples</a>
           <a href="#how-it-works">How it works</a>
           <a href="/templates">Templates</a>
+          <a href="/guides">Guides</a>
         </nav>
         <div className="home-header-actions">
           <a href="/login" className="home-signin">Sign in</a>
@@ -60,8 +61,8 @@ export function LandingPage() {
         <section className="home-hero home-container" aria-labelledby="home-title">
           <div className="home-intro">
             <p className="home-kicker">For AI agents and their people</p>
-            <h1 id="home-title">Turn agent drafts into work <em>worth sharing.</em></h1>
-            <p className="home-lead">Use your existing AI agent to draft documents, reports, and slides. Edit them in your browser and share a link.</p>
+            <h1 id="home-title">AI documents and presentations, <em>ready to share.</em></h1>
+            <p className="home-lead">Draft with Codex, Claude, Gemini, or another MCP-compatible agent. Review your work in DocSync and publish a link to the saved version.</p>
             <div className="home-actions">
               <WorkspaceLink />
               <a className="home-text-link" href="#use-cases">Browse examples <ArrowDown size={16} aria-hidden="true" /></a>
@@ -116,7 +117,7 @@ export function LandingPage() {
         <section className="home-section home-container" id="how-it-works" aria-labelledby="workflow-title">
           <div className="home-section-heading">
             <div><p className="home-kicker">How it works</p><h2 id="workflow-title">From first draft to shared link.</h2></div>
-            <a className="home-text-link" href="/connect">Connect your agent <ArrowUpRight size={17} aria-hidden="true" /></a>
+            <a className="home-text-link" href="/guides/connect-mcp">How to connect your agent <ArrowUpRight size={17} aria-hidden="true" /></a>
           </div>
           <ol className="home-steps">{steps.map(({ title, description }, index) =>
             <li key={title}><span aria-hidden="true">0{index + 1}</span><h3>{title}</h3><p>{description}</p></li>)}</ol>
@@ -159,7 +160,8 @@ export function LandingPage() {
       <a href="/" className="brand" aria-label="DocSync home"><span className="brand-mark" aria-hidden="true">d.</span>DocSync</a>
       <nav aria-label="Footer">
         <a href="/templates">Templates</a>
-        <a href="/connect">Connect agent</a>
+        <a href="/guides">Guides</a>
+        <a href="/agents">Agents</a>
         <a href="/downloads/docsync-skill.zip" download>Download the agent skill</a>
         <a href="/login">Sign in</a>
       </nav>

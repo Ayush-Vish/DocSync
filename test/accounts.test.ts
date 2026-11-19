@@ -27,20 +27,12 @@ function client(env: any) {
       env,
     );
 }
-async function signup(call: ReturnType<typeof client>, email: string) {
-  const r = await call("/auth/signup", "POST", {
-    email,
-    password: "a long safe password 123!",
-  });
-  assert.equal(r.status, 200);
-  return r.headers.getSetCookie()[0].split(";")[0];
-}
 test("accounts enforce tenant isolation, session revocation, CSRF and token rotation", async (t) => {
   const f = await fixture();
   t.after(f.close);
   const call = client(f.env);
-  const alice = await signup(call, "alice@example.com"),
-    bob = await signup(call, "bob@example.com");
+  const { cookie: alice } = await f.seedUser("alice@example.com", "a long safe password 123!");
+  const { cookie: bob } = await f.seedUser("bob@example.com");
   const doc = (await (
     await call("/documents", "POST", sample("Alice private"), "", alice)
   ).json()) as any;
@@ -198,7 +190,7 @@ test("trial first document is atomic, claim transfers ownership and revokes the 
   const code = new URLSearchParams(new URL(link.signInUrl).hash.slice(1)).get(
     "claim",
   );
-  const account = await signup(call, "claim@example.com");
+  const { cookie: account } = await f.seedUser("claim@example.com");
   assert.equal(
     (await call("/claim", "POST", { code }, "", account)).status,
     200,
@@ -264,33 +256,52 @@ test("trial quota is enforced inside the database, not a check-then-insert race"
   assert.equal(limited.status, 403);
   assert.equal(((await limited.json()) as any).details.code, "AUTH_REQUIRED");
 });
+test("trial users can skip optional template setup and create a document", async (t) => {
+  const f = await fixture();
+  t.after(f.close);
+  const call = client(f.env), trial = randomToken();
+  await call("/installations", "POST", { credential: trial });
+  const options = async () => (await call("/template-options?format=document", "GET", undefined, trial)).json() as Promise<{
+    canSaveTemplates: boolean;
+    companyTemplateSetup: { question: string } | null;
+  }>;
+  const initial = await options();
+  assert.equal(initial.canSaveTemplates, false);
+  assert.match(initial.companyTemplateSetup?.question ?? "", /^Do you have a template or example/);
+  assert.equal((await call("/company-templates/document/skip", "POST", undefined, trial)).status, 200);
+  assert.equal((await options()).companyTemplateSetup, null);
+  assert.equal((await call("/company-templates/document", "PUT", {}, trial)).status, 403);
+  assert.equal((await call("/documents", "POST", sample(), trial)).status, 201);
+});
 test("Google OAuth checks browser state, PKCE, verified identity and one-time callback", async (t) => {
   const f = await fixture();
   t.after(f.close);
   f.env.GOOGLE_CLIENT_ID = "client";
   f.env.GOOGLE_CLIENT_SECRET = "secret";
   const call = client(f.env);
-  const started = await call("/auth/google");
+  for (const destination of ["//different.example/login", "/\\different.example/login", "/oauth/token"]) {
+    const denied = await call("/auth/google?" + new URLSearchParams({ returnTo: destination }));
+    assert.equal(denied.status, 400);
+  }
+  const started = await call("/auth/google?returnTo=%2Finvite");
   assert.equal(started.status, 302);
   const redirect = new URL(started.headers.get("Location")!),
     state = redirect.searchParams.get("state")!;
+  assert.equal(redirect.searchParams.get("redirect_uri"), origin + "/api/auth/google/callback");
   assert.equal(redirect.searchParams.get("code_challenge_method"), "S256");
   const cookie = started.headers.getSetCookie()[0].split(";")[0];
   assert.equal(
     (await call("/auth/google/callback?state=" + state + "&code=code")).status,
     400,
   );
+  let identity = { sub: "google-subject", email: "google@example.com", email_verified: true };
   t.mock.method(globalThis, "fetch", async (url: any, init: any) => {
     if (String(url).endsWith("/token")) {
       assert.ok(new URLSearchParams(init.body).get("code_verifier"));
       return Response.json({ access_token: "google-access" });
     }
     assert.equal(init.headers.Authorization, "Bearer google-access");
-    return Response.json({
-      sub: "google-subject",
-      email: "google@example.com",
-      email_verified: true,
-    });
+    return Response.json(identity);
   });
   const callback = await call(
     "/auth/google/callback?state=" + state + "&code=code",
@@ -300,14 +311,15 @@ test("Google OAuth checks browser state, PKCE, verified identity and one-time ca
     cookie,
   );
   assert.equal(callback.status, 302);
+  assert.equal(callback.headers.get("Location"), "/invite");
   const session = callback.headers
     .getSetCookie()
     .find((x) => x.startsWith("docsync_account="))!
     .split(";")[0];
-  assert.equal(
-    (await call("/session", "GET", undefined, "", session)).status,
-    200,
-  );
+  const firstSession = await call("/session", "GET", undefined, "", session);
+  assert.equal(firstSession.status, 200);
+  const { accountId, google } = await firstSession.json();
+  assert.equal(google, true);
   assert.equal(
     (
       await call(
@@ -320,6 +332,36 @@ test("Google OAuth checks browser state, PKCE, verified identity and one-time ca
     ).status,
     400,
   );
+  async function signIn(path: string) {
+    const response = await call(path);
+    assert.equal(response.status, 302);
+    const state = new URL(response.headers.get("Location")!).searchParams.get("state");
+    return call("/auth/google/callback?state=" + state + "&code=code", "GET", undefined, "",
+      response.headers.getSetCookie()[0].split(";")[0]);
+  }
+  const recoveryPath = "/auth/google?" + new URLSearchParams({ returnTo: "/login", reauth: accountId });
+  identity = { sub: "different-subject", email: "different@example.com", email_verified: true };
+  const wrongAccount = await signIn(recoveryPath);
+  assert.equal(wrongAccount.status, 403);
+  assert.deepEqual(wrongAccount.headers.getSetCookie(), []);
+  identity.email_verified = false;
+  assert.equal((await signIn("/auth/google")).status, 401);
+  assert.equal((await f.env.DB.prepare("SELECT COUNT(*) AS count FROM accounts WHERE kind='user'").first<{ count: number }>())?.count, 1);
+  identity = { sub: "google-subject", email: "google@example.com", email_verified: true };
+  const renewed = await signIn(recoveryPath);
+  assert.equal(renewed.status, 302);
+  const renewedCookie = renewed.headers.getSetCookie()[0].split(";")[0];
+  assert.equal((await (await call("/session", "GET", undefined, "", renewedCookie)).json()).accountId, accountId);
+});
+
+test("password signup is retired and cannot create a user", async (t) => {
+  const f = await fixture();
+  t.after(f.close);
+  const call = client(f.env);
+  const credentials = { email: "new@example.com", password: "a long safe password 123!" };
+  assert.equal((await call("/auth/signup", "POST", credentials)).status, 410);
+  assert.equal((await call("/auth/signin", "POST", credentials)).status, 401);
+  assert.equal(await f.env.DB.prepare("SELECT id FROM accounts WHERE email=?").bind(credentials.email).first(), null);
 });
 test("Google never automatically links a password account with the same email", async (t) => {
   const f = await fixture();
@@ -327,7 +369,7 @@ test("Google never automatically links a password account with the same email", 
   f.env.GOOGLE_CLIENT_ID = "client";
   f.env.GOOGLE_CLIENT_SECRET = "secret";
   const call = client(f.env);
-  await signup(call, "existing@example.com");
+  await f.seedUser("existing@example.com", "a long safe password 123!");
   const started = await call("/auth/google");
   const state = new URL(started.headers.get("Location")!).searchParams.get(
     "state",

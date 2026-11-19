@@ -101,11 +101,10 @@ export async function newSession(
     .run();
   return sessionCookie(request, token);
 }
-export async function emailAuth(
+export async function passwordSignIn(
   request: Request,
   env: Env,
   input: Record<string, unknown>,
-  signup: boolean,
 ) {
   checkOrigin(request);
   await rateLimit(request, env, "password", 10);
@@ -127,29 +126,6 @@ export async function emailAuth(
   )
     .bind(email)
     .first<{ id: string; password_hash: string | null }>();
-  if (signup) {
-    if (existing)
-      throw new HttpError(
-        409,
-        "Unable to create this account. Try signing in.",
-      );
-    const salt = randomToken(),
-      id = crypto.randomUUID(),
-      value = await passwordHash(password, salt, env.SESSION_SECRET);
-    try {
-      await env.DB.prepare(
-        "INSERT INTO accounts(id,kind,email,password_hash,created_at) VALUES(?,'user',?,?,?)",
-      )
-        .bind(id, email, `${salt}:${value}`, new Date().toISOString())
-        .run();
-    } catch {
-      throw new HttpError(
-        409,
-        "Unable to create this account. Try signing in.",
-      );
-    }
-    return newSession(request, env, id);
-  }
   const [salt, expected] = (
     existing?.password_hash || `${"0".repeat(64)}:${"0".repeat(64)}`
   ).split(":");
@@ -197,7 +173,7 @@ export async function claimLink(env: Env, accountId: string, origin: string) {
   await env.DB.prepare("INSERT INTO installation_claims VALUES(?,?,?)")
     .bind(await hash(token), accountId, now() + 900)
     .run();
-  return { signInUrl: `${origin}/connect#claim=${token}`, expiresIn: 900 };
+  return { signInUrl: `${origin}/agents#claim=${token}`, expiresIn: 900 };
 }
 export async function claimInstallation(
   env: Env,
@@ -234,20 +210,40 @@ export async function claimInstallation(
 }
 const googleCookie = (request: Request, value: string, age: number) =>
   `docsync_google=${value}; HttpOnly; SameSite=Lax; Path=/api/auth/google; Max-Age=${age}${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`;
+
+export function googleSignInEnabled(env: Env) {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+}
+
+function googleReturnPath(url: URL) {
+  const value = url.searchParams.get("returnTo") ?? "/agents";
+  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\") || value.length > 8192)
+    throw new HttpError(400, "Invalid Google sign-in destination.");
+  const target = new URL(value, url.origin);
+  const workspace = ["/", "/login", "/connect", "/invite", "/agents", "/audit", "/workspace/templates"].includes(target.pathname)
+    || /^\/documents\/[a-f0-9-]{36}(\/preview)?$/.test(target.pathname);
+  if (target.origin !== url.origin || target.hash || value !== target.pathname + target.search ||
+    !(target.pathname === "/oauth/authorize" || (workspace && !target.search)))
+    throw new HttpError(400, "Invalid Google sign-in destination.");
+  return value;
+}
+
 export async function googleStart(request: Request, env: Env) {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)
-    throw new HttpError(
-      503,
-      "Google sign-in is not configured. Use email and password.",
-    );
+    throw new HttpError(503, "Google sign-in is currently unavailable.");
+  const requestUrl = new URL(request.url);
+  const returnPath = googleReturnPath(requestUrl);
+  const reauthAccountId = requestUrl.searchParams.get("reauth");
+  if (reauthAccountId !== null && (!/^[a-f0-9-]{36}$/.test(reauthAccountId) || returnPath !== "/login"))
+    throw new HttpError(400, "Invalid Google sign-in recovery request.");
   await rateLimit(request, env, "google", 20);
   const state = randomToken(),
     verifier = randomToken();
   await env.DB.prepare("DELETE FROM oauth_states WHERE expires_at<?")
     .bind(now())
     .run();
-  await env.DB.prepare("INSERT INTO oauth_states VALUES(?,?,?)")
-    .bind(await hash(state), verifier, now() + 600)
+  await env.DB.prepare("INSERT INTO oauth_states(state_hash,verifier,expires_at,return_path,reauth_account_id) VALUES(?,?,?,?,?)")
+    .bind(await hash(state), verifier, now() + 600, returnPath, reauthAccountId)
     .run();
   const challenge = btoa(
     String.fromCharCode(
@@ -295,16 +291,11 @@ export async function googleCallback(request: Request, env: Env) {
     throw new HttpError(400, "Google sign-in failed. Start again.");
   const digest = await hash(state);
   const saved = await env.DB.prepare(
-    "SELECT verifier FROM oauth_states WHERE state_hash=? AND expires_at>?",
+    "DELETE FROM oauth_states WHERE state_hash=? AND expires_at>? RETURNING verifier,return_path,reauth_account_id",
   )
     .bind(digest, now())
-    .first<{ verifier: string }>();
-  const used = await env.DB.prepare(
-    "DELETE FROM oauth_states WHERE state_hash=?",
-  )
-    .bind(digest)
-    .run();
-  if (!saved || !used.meta.changes)
+    .first<{ verifier: string; return_path: string; reauth_account_id: string | null }>();
+  if (!saved)
     throw new HttpError(400, "Google sign-in expired. Start again.");
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -335,35 +326,26 @@ export async function googleCallback(request: Request, env: Env) {
   };
   if (
     !userResponse.ok ||
-    !user.sub ||
-    !user.email ||
+    typeof user.sub !== "string" || !user.sub ||
+    typeof user.email !== "string" || !user.email ||
     user.email_verified !== true
   )
     throw new HttpError(401, "A verified Google email is required.");
   const email = user.email.toLowerCase();
-  let account = await env.DB.prepare(
-    "SELECT id FROM accounts WHERE google_sub=?",
-  )
-    .bind(user.sub)
-    .first<{ id: string }>();
+  const findAccount = () => env.DB.prepare("SELECT id FROM accounts WHERE google_sub=?")
+    .bind(user.sub).first<{ id: string }>();
+  let account = await findAccount();
+  if (saved.reauth_account_id && account?.id !== saved.reauth_account_id)
+    throw new HttpError(403, "Choose the Google account you originally signed in with.");
   if (!account) {
-    if (
-      await env.DB.prepare("SELECT id FROM accounts WHERE email=?")
-        .bind(email)
-        .first()
-    )
-      throw new HttpError(
-        409,
-        "This email already has an account. Sign in using your password.",
-      );
-    account = { id: crypto.randomUUID() };
     await env.DB.prepare(
-      "INSERT INTO accounts(id,kind,email,google_sub,created_at) VALUES(?,'user',?,?,?)",
-    )
-      .bind(account.id, email, user.sub, new Date().toISOString())
-      .run();
+      "INSERT INTO accounts(id,kind,email,google_sub,created_at) VALUES(?,'user',?,?,?) ON CONFLICT DO NOTHING",
+    ).bind(crypto.randomUUID(), email, user.sub, new Date().toISOString()).run();
+    account = await findAccount();
+    if (!account)
+      throw new HttpError(409, "This email already has a DocSync account. Use your existing sign-in method.");
   }
-  const headers = new Headers({ Location: "/connect" });
+  const headers = new Headers({ Location: saved.return_path });
   headers.append("Set-Cookie", await newSession(request, env, account.id));
   headers.append("Set-Cookie", googleCookie(request, "", 0));
   return new Response(null, { status: 302, headers });
